@@ -61,77 +61,79 @@ export default function Home({ params }: { params: { id: string } }) {
             <div className="flex flex-col items-center justify-center border-x">
               <div>{story && <Story story={story} />}</div>
               {/* Stills */}
-              <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
-                <div className="col-span-1 flex flex-col mr-3">
-                  <Image
-                    src={"/abrahamlogo.png"}
-                    alt={"abrahaml"}
-                    width={100}
-                    height={100}
-                    className="rounded-full aspect-[1] object-cover border"
-                  />
-                </div>
-                <div className="col-span-11 flex flex-col pr-4">
-                  {/* <p className="mb-1 mr-8">Stills</p> */}
+              {story?.stills && story.stills.length > 0 && (
+                <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
+                  <div className="col-span-1 flex flex-col mr-3">
+                    <Image
+                      src={"/abrahamlogo.png"}
+                      alt={"abrahaml"}
+                      width={100}
+                      height={100}
+                      className="rounded-full aspect-[1] object-cover border"
+                    />
+                  </div>
+                  <div className="col-span-11 flex flex-col pr-4">
+                    {/* <p className="mb-1 mr-8">Stills</p> */}
 
-                  <div className="grid grid-cols-12 ">
-                    <div className="col-span-9 flex flex-col mr-0.5 mt-2">
-                      {/* Simple Carousel */}
-                      {story?.stills && story.stills.length > 0 && (
-                        <div className="flex flex-col items-center">
-                          <div className="flex items-center justify-center">
-                            <div className="">
-                              <img
-                                src={story.stills[currentIndex]}
-                                alt="still"
-                                className="rounded-lg w-auto h-72 object-cover"
-                              />
+                    <div className="grid grid-cols-12 ">
+                      <div className="col-span-9 flex flex-col mr-0.5 mt-2">
+                        {/* Simple Carousel */}
+                        {story?.stills && story.stills.length > 0 && (
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center justify-center">
+                              <div className="">
+                                <img
+                                  src={story.stills[currentIndex]}
+                                  alt="still"
+                                  className="rounded-lg w-auto h-72 object-cover"
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Thumbnails */}
-                    <ScrollArea className="col-span-3 h-72 overflow-x-hidden mt-2">
-                      <div className="">
-                        <div className="flex flex-col justify-center space-y-0.5">
-                          {story?.stills &&
-                            story.stills.map((still, index) => (
-                              <img
-                                key={index}
-                                src={still}
-                                alt={`thumbnail-${index}`}
-                                className={`w-32 h-20  aspect-[1/1] object-cover rounded-lg cursor-pointer ${
-                                  currentIndex === index
-                                    ? "border-2 border-gray-700"
-                                    : "opacity-80"
-                                }`}
-                                onClick={() => handleThumbnailClick(index)}
-                              />
-                            ))}
-                        </div>
+                        )}
                       </div>
-                    </ScrollArea>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    {/* Previous Button */}
-                    <button
-                      onClick={prevSlide}
-                      className="border p-2 m-2 rounded-full shadow-sm"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    {/* Next Button */}
-                    <button
-                      onClick={nextSlide}
-                      className="border p-2 m-2 rounded-full shadow-sm"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+
+                      {/* Thumbnails */}
+                      <ScrollArea className="col-span-3 h-72 overflow-x-hidden mt-2">
+                        <div className="">
+                          <div className="flex flex-col justify-center space-y-0.5">
+                            {story?.stills &&
+                              story.stills.map((still, index) => (
+                                <img
+                                  key={index}
+                                  src={still}
+                                  alt={`thumbnail-${index}`}
+                                  className={`w-32 h-20  aspect-[1/1] object-cover rounded-lg cursor-pointer ${
+                                    currentIndex === index
+                                      ? "border-2 border-gray-700"
+                                      : "opacity-80"
+                                  }`}
+                                  onClick={() => handleThumbnailClick(index)}
+                                />
+                              ))}
+                          </div>
+                        </div>
+                      </ScrollArea>
+                    </div>
+                    <div className="flex items-center justify-center">
+                      {/* Previous Button */}
+                      <button
+                        onClick={prevSlide}
+                        className="border p-2 m-2 rounded-full shadow-sm"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      {/* Next Button */}
+                      <button
+                        onClick={nextSlide}
+                        className="border p-2 m-2 rounded-full shadow-sm"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               {/* Blessings */}
               <div>
                 <Blessings blessings={story?.blessings || []} />
