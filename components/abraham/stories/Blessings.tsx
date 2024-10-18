@@ -4,8 +4,9 @@ import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 //replace with actual user image
 const profileImage = "";
 const userAccounts = "0x641f5ffC5F6239A0873";
+import { Blessing } from "@/types";
 
-export default function Blessings({ blessings }: { blessings: any[] }) {
+export default function Blessings({ blessings }: { blessings: Blessing[] }) {
   return (
     <div className="flex flex-col items-center justify-center">
       {blessings.map((blessing, index) => (
