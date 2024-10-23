@@ -1,5 +1,11 @@
 "use client";
-import React, { createContext, useState, useContext, useEffect } from "react";
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useMemo,
+} from "react";
 import { IAdapter, IProvider } from "@web3auth/base";
 import { web3auth } from "@/lib/web3AuthConfig";
 import RPC from "@/lib/ethersRPC";
@@ -29,116 +35,109 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [idToken, setIdToken] = useState<string | null>(() => null);
-  const [loggedIn, setLoggedIn] = useState(!!idToken);
+  const [idToken, setIdToken] = useState<string | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
   const [provider, setProvider] = useState<IProvider | null>(null);
   const [userInfo, setUserInfo] = useState<any | null>(null);
   const [userAccounts, setUserAccounts] = useState<string | null>(null);
-  const [loadingAuth, setLoadingAuth] = useState(false);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
-  //use effect when idToken changes
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("idToken");
+    // Read idToken from localStorage synchronously on the first render
+    const token = localStorage.getItem("idToken");
+    const storedAccounts = localStorage.getItem("userAccounts");
+
+    if (token) {
       setIdToken(token);
+      setLoggedIn(true);
+      setUserAccounts(storedAccounts);
     }
-  }, []);
 
-  useEffect(() => {
-    // Initialize Web3Auth and check login status
     const initWeb3Auth = async () => {
       try {
-        await web3auth.initModal(); // Initialize the Web3Auth modal
+        // Defer heavy operations until after the initial render
+        await web3auth.initModal();
         setProvider(web3auth.provider);
 
-        if (web3auth.connected && idToken) {
-          setLoadingAuth(true);
-          setLoggedIn(true);
+        if (web3auth.connected && token) {
           const userData = await web3auth.getUserInfo();
-
-          if (web3auth.provider) {
-            console.log("Provider is initialized:", web3auth.provider);
-
-            const storedAccounts = await localStorage.getItem("userAccounts");
-
-            if (storedAccounts) {
-              console.log("Stored accounts:", storedAccounts);
-              setUserAccounts(storedAccounts);
-            }
-            setLoadingAuth(false);
-          } else {
-            console.log("Provider is not initialized");
-          }
-          console.log("User data:", userData);
-          console.log("User accounts:", userAccounts);
           setUserInfo(userData);
         }
       } catch (error) {
         console.error("Error initializing Web3Auth:", error);
+      } finally {
+        setLoadingAuth(false);
       }
     };
 
-    initWeb3Auth();
-  }, [idToken]);
+    if (token) {
+      initWeb3Auth();
+    } else {
+      setLoadingAuth(false); // No token, stop loading
+    }
+  }, []);
 
   const login = async () => {
+    setLoadingAuth(true);
     try {
-      setLoadingAuth(true);
       const web3authProvider = await web3auth.connect();
       setProvider(web3authProvider);
 
-      if (web3auth.connected) {
-        setLoggedIn(true);
+      if (web3auth.provider) {
         const userData = await web3auth.getUserInfo();
-        if (web3auth.provider) {
-          const getUserAccounts = await RPC.getAccounts(web3auth.provider);
-          // Set user accounts to local storage
-          localStorage.setItem("userAccounts", getUserAccounts);
-          setUserAccounts(getUserAccounts);
-        }
-        console.log("User data:", userData);
+        const getUserAccounts = await RPC.getAccounts(web3auth.provider);
 
+        localStorage.setItem("userAccounts", getUserAccounts);
+        setUserAccounts(getUserAccounts);
         setUserInfo(userData);
+
         const tokenResponse = await web3auth.authenticateUser();
         setIdToken(tokenResponse.idToken);
-        localStorage.setItem("idToken", tokenResponse.idToken); // Persist the token
-        setLoadingAuth(false);
+        localStorage.setItem("idToken", tokenResponse.idToken);
+        setLoggedIn(true);
       }
     } catch (error) {
       console.error("Login failed:", error);
+    } finally {
+      setLoadingAuth(false);
     }
   };
 
   const logout = async () => {
+    setLoadingAuth(true);
     try {
-      setLoadingAuth(true);
       await web3auth.logout();
       setProvider(null);
       setLoggedIn(false);
       setIdToken(null);
-      localStorage.removeItem("idToken"); // Clear token on logout
+      localStorage.removeItem("idToken");
       localStorage.removeItem("userInfo");
       localStorage.removeItem("userAccounts");
       setUserAccounts(null);
-      setLoadingAuth(false);
     } catch (error) {
       console.error("Logout failed:", error);
+    } finally {
+      setLoadingAuth(false);
     }
   };
 
+  // UseMemo to avoid unnecessary re-renders
+  const authContextValue = useMemo(
+    () => ({
+      idToken,
+      login,
+      logout,
+      loggedIn,
+      userInfo,
+      userAccounts,
+      loadingAuth,
+      provider,
+    }),
+    [idToken, loggedIn, userInfo, userAccounts, loadingAuth, provider]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        idToken,
-        login,
-        logout,
-        loggedIn,
-        userInfo,
-        userAccounts,
-        loadingAuth,
-        provider,
-      }}
-    >
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );
