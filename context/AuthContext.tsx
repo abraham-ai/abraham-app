@@ -7,7 +7,7 @@ import React, {
   useMemo,
 } from "react";
 import { IProvider } from "@web3auth/base";
-import { web3auth } from "@/lib/web3AuthConfig";
+import { web3auth, configureWeb3AuthAdapters } from "@/lib/web3AuthConfig";
 import RPC from "@/lib/ethersRPC";
 
 // Define the AuthContext type
@@ -55,9 +55,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initWeb3Auth = async () => {
       try {
-        await web3auth.initModal();
+        await configureWeb3AuthAdapters(); // Ensure adapters are configured before initializing Web3Auth
+        await web3auth.initModal(); // Initialize the Web3Auth modal
         setProvider(web3auth.provider);
-        setWeb3AuthInitialized(true); // Set to true after initialization
+        setWeb3AuthInitialized(true); // Mark as initialized after setup
 
         if (web3auth.connected && token) {
           const userData = await web3auth.getUserInfo();
@@ -80,10 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async () => {
     setLoadingAuth(true);
     try {
-      // Check if Web3Auth is initialized, if not, reinitialize it
+      // Reinitialize Web3Auth if not done yet
       if (!web3AuthInitialized) {
+        await configureWeb3AuthAdapters(); // Reconfigure adapters if necessary
         await web3auth.initModal();
-        setWeb3AuthInitialized(true); // Ensure it's marked as initialized
+        setWeb3AuthInitialized(true);
       }
 
       const web3authProvider = await web3auth.connect();
