@@ -1,8 +1,7 @@
 "use client";
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { IAdapter, IProvider } from "@web3auth/base";
-import { web3auth, web3AuthOptions } from "@/lib/web3AuthConfig";
-import { getDefaultExternalAdapters } from "@web3auth/default-evm-adapter";
+import { web3auth } from "@/lib/web3AuthConfig";
 import RPC from "@/lib/ethersRPC";
 
 // Define the AuthContext type
@@ -43,23 +42,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = localStorage.getItem("idToken");
       setIdToken(token);
     }
-  }, [typeof window]);
+  }, []);
 
   useEffect(() => {
     // Initialize Web3Auth and check login status
     const initWeb3Auth = async () => {
       try {
-        const adapters = await getDefaultExternalAdapters({
-          options: web3AuthOptions,
-        });
-        adapters.forEach((adapter: IAdapter<unknown>) => {
-          if (web3auth.getAdapter(adapter.name)) {
-            return;
-          }
-          web3auth.configureAdapter(adapter); // Configure adapter
-        });
-
-        await web3auth.initModal();
+        await web3auth.initModal(); // Initialize the Web3Auth modal
         setProvider(web3auth.provider);
 
         if (web3auth.connected && idToken) {
@@ -90,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initWeb3Auth();
-  }, [idToken, typeof window]);
+  }, [idToken]);
 
   const login = async () => {
     try {
@@ -103,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userData = await web3auth.getUserInfo();
         if (web3auth.provider) {
           const getUserAccounts = await RPC.getAccounts(web3auth.provider);
-          //set user accounts to local storage
+          // Set user accounts to local storage
           localStorage.setItem("userAccounts", getUserAccounts);
           setUserAccounts(getUserAccounts);
         }
@@ -113,8 +102,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const tokenResponse = await web3auth.authenticateUser();
         setIdToken(tokenResponse.idToken);
         localStorage.setItem("idToken", tokenResponse.idToken); // Persist the token
-        //localStorage.setItem("userInfo", JSON.stringify(userData));
-        //localStorage.setItem("userAccounts", userAccounts);
         setLoadingAuth(false);
       }
     } catch (error) {
