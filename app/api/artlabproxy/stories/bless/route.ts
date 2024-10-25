@@ -10,7 +10,7 @@ export const revalidate = 0;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { story_id, blessing } = body;
+    const { story_id, blessing, address } = body;
 
     // Ensure that the Authorization header is present
     const token = request.headers.get("Authorization")?.split(" ")[1];
@@ -71,8 +71,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Use a fake user ID for now (replace with actual logic later)
-    const user = "test_user_1"; // Example, use a unique identifier for the user
+    const user = address;
+    console.log("User:", user);
 
     // Prepare the payload for the /bless endpoint
     const blessData = {

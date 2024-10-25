@@ -8,18 +8,19 @@ import BlessDialog from "./BlessDialog";
 import Link from "next/link";
 
 export default function Story({ story }: { story: StoryItem }) {
-  const { idToken, loggedIn } = useAuth();
+  const { idToken, loggedIn, userAccounts } = useAuth();
   const [praisesCount, setPraisesCount] = useState(story.praises.length);
   const [burnsCount, setBurnsCount] = useState(story.burns.length);
   const [blessingsCount, setBlessingsCount] = useState(story.blessings.length);
   const [hasPraised, setHasPraised] = useState(
-    story.praises.includes("test_user_1") // Replace with actual user id
+    story.praises.includes(userAccounts) // Replace with actual user id
   );
   const [hasBurned, setHasBurned] = useState(
-    story.burns.includes("test_user_1") // Replace with actual user id
+    story.burns.includes(userAccounts) // Replace with actual user id
   );
 
   const handleReaction = async (actionType: string) => {
+    console.log("User accounts:", userAccounts);
     if (!idToken) {
       throw new Error("User not authenticated");
     }
@@ -32,6 +33,7 @@ export default function Story({ story }: { story: StoryItem }) {
       body: JSON.stringify({
         story_id: story.id,
         action: actionType,
+        address: userAccounts,
       }),
     });
 

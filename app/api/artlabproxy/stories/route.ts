@@ -30,7 +30,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { story_id, action } = body;
+    const { story_id, action, address } = body;
 
     const token = request.headers.get("Authorization")?.split(" ")[1];
 
@@ -90,8 +90,8 @@ export async function POST(request: Request) {
     }
     console.log("Payload:", payload);
 
-    // Use a fake user ID for now
-    const user = "test_user_1"; // use an actual identifier like public key or user ID
+    const user = address;
+    console.log("User:", user);
 
     // Prepare the payload for the /react endpoint
     const actionData = {
