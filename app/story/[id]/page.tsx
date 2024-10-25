@@ -82,10 +82,12 @@ export default function Home({ params }: { params: { id: string } }) {
                           <div className="flex flex-col items-center">
                             <div className="flex items-center justify-center">
                               <div className="">
-                                <img
+                                <Image
                                   src={story.stills[currentIndex]}
                                   alt="still"
                                   className="rounded-lg w-auto h-72 object-cover"
+                                  width={500}
+                                  height={500}
                                 />
                               </div>
                             </div>
@@ -99,7 +101,7 @@ export default function Home({ params }: { params: { id: string } }) {
                           <div className="flex flex-col justify-center space-y-0.5">
                             {story?.stills &&
                               story.stills.map((still, index) => (
-                                <img
+                                <Image
                                   key={index}
                                   src={still}
                                   alt={`thumbnail-${index}`}
@@ -109,6 +111,8 @@ export default function Home({ params }: { params: { id: string } }) {
                                       : "opacity-80"
                                   }`}
                                   onClick={() => handleThumbnailClick(index)}
+                                  width={500}
+                                  height={500}
                                 />
                               ))}
                           </div>
