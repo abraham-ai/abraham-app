@@ -24,9 +24,9 @@ export default function Blessings({ blessings }: { blessings: Blessing[] }) {
                 className="rounded-full aspect-[1] object-cover border"
               />
             ) : (
-              <div className="border rounded-full overflow-hidden">
+              <div className="border rounded-full overflow-hidden w-full">
                 <RandomPixelAvatar
-                  username={userAccounts || "username"}
+                  username={blessing.user || "username"}
                   size={32}
                 />
               </div>

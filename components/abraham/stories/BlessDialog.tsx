@@ -42,6 +42,7 @@ export default function BlessDialog({
         body: JSON.stringify({
           story_id: story.id, // Story ID
           blessing: blessingText, // User's blessing/comment
+          address: userAccounts, // User's public address
         }),
       });
 
