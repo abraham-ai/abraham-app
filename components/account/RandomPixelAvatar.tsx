@@ -80,6 +80,7 @@ const PixelAvatar: React.FC<PixelAvatarProps> = ({
         width={size}
         height={size}
         style={{ imageRendering: "pixelated", border: "1px solid black" }}
+        className="rounded-full"
       ></canvas>
     </div>
   );
