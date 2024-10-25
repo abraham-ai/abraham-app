@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userInfo, setUserInfo] = useState<any | null>(null);
   const [userAccounts, setUserAccounts] = useState<string | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [web3AuthInitialized, setWeb3AuthInitialized] = useState(false); // Add initialization state
+  const [web3AuthInitialized, setWeb3AuthInitialized] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("idToken");
@@ -55,10 +55,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initWeb3Auth = async () => {
       try {
-        await configureWeb3AuthAdapters(); // Ensure adapters are configured before initializing Web3Auth
-        await web3auth.initModal(); // Initialize the Web3Auth modal
+        await configureWeb3AuthAdapters(); // Configure adapters
+        await web3auth.initModal();
         setProvider(web3auth.provider);
-        setWeb3AuthInitialized(true); // Mark as initialized after setup
+        setWeb3AuthInitialized(true);
 
         if (web3auth.connected && token) {
           const userData = await web3auth.getUserInfo();
@@ -76,14 +76,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       setLoadingAuth(false);
     }
-  }, []);
+
+    const tokenCheckInterval = setInterval(() => {
+      if (idToken && isTokenExpired(idToken)) {
+        resetAuthState(); // Clear state and storage on token expiry
+        logout();
+      }
+    }, 60000); // Check every 60 seconds
+
+    return () => clearInterval(tokenCheckInterval);
+  }, [idToken]);
 
   const login = async () => {
     setLoadingAuth(true);
     try {
-      // Reinitialize Web3Auth if not done yet
       if (!web3AuthInitialized) {
-        await configureWeb3AuthAdapters(); // Reconfigure adapters if necessary
+        await configureWeb3AuthAdapters();
         await web3auth.initModal();
         setWeb3AuthInitialized(true);
       }
@@ -112,21 +120,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    if (!web3auth.connected) {
+      console.warn("No wallet is connected.");
+      resetAuthState();
+      return;
+    }
+
     setLoadingAuth(true);
     try {
       await web3auth.logout();
-      setProvider(null);
-      setLoggedIn(false);
-      setIdToken(null);
-      localStorage.removeItem("idToken");
-      localStorage.removeItem("userInfo");
-      localStorage.removeItem("userAccounts");
-      setUserAccounts(null);
+      resetAuthState();
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
       setLoadingAuth(false);
     }
+  };
+
+  const resetAuthState = () => {
+    setProvider(null);
+    setLoggedIn(false);
+    setIdToken(null);
+    setUserInfo(null);
+    setUserAccounts(null);
+    localStorage.removeItem("idToken");
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("userAccounts");
+  };
+
+  const isTokenExpired = (token: string): boolean => {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    const expiration = payload.exp * 1000;
+    return Date.now() > expiration;
   };
 
   const authContextValue = useMemo(
