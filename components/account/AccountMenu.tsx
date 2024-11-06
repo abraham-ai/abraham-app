@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import {
@@ -13,10 +13,45 @@ import {
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { Button } from "@/components/ui/button";
 import { Loader2Icon } from "lucide-react";
+import { useMannaTransactions } from "@/hooks/useMannaTransactions"; // Import the custom hook
+import { formatUnits } from "viem";
 
 function AccountMenu() {
   const { login, logout, loggedIn, userInfo, userAccounts, loadingAuth } =
     useAuth();
+
+  const { balance, buyManna, getMannaBalance } = useMannaTransactions(); // Use the custom hook
+
+  const [etherAmount, setEtherAmount] = useState("0.01"); // State to hold the amount of Ether to spend
+  const [formattedBalance, setFormattedBalance] = useState<string>("0");
+
+  // Format the balance for display
+  useEffect(() => {
+    if (balance) {
+      const formatted = formatUnits(BigInt(balance), 18); // Assuming 18 decimals
+      setFormattedBalance(formatted);
+    }
+  }, [balance]);
+
+  const handleBuyManna = async () => {
+    if (
+      !etherAmount ||
+      isNaN(Number(etherAmount)) ||
+      Number(etherAmount) <= 0
+    ) {
+      alert("Please enter a valid Ether amount.");
+      return;
+    }
+    try {
+      await buyManna(etherAmount);
+      await getMannaBalance(); // Refresh the balance after buying
+      setEtherAmount("0.01"); // Reset the input field
+      alert("Successfully purchased Manna tokens!");
+    } catch (error) {
+      console.error("Error buying Manna:", error);
+      alert("Transaction failed. Please try again.");
+    }
+  };
 
   return (
     <div className="m-3">
@@ -24,17 +59,16 @@ function AccountMenu() {
         <div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div>
-                {userInfo?.profileImage && (
+              <div className="cursor-pointer">
+                {userInfo?.profileImage ? (
                   <Image
-                    src={userInfo?.profileImage}
-                    alt={"user image"}
+                    src={userInfo.profileImage}
+                    alt="user image"
                     width={32}
                     height={32}
                     className="rounded-full"
                   />
-                )}
-                {!userInfo?.profileImage && (
+                ) : (
                   <div className="rounded-full overflow-hidden">
                     <RandomPixelAvatar
                       username={userAccounts || "username"}
@@ -44,15 +78,36 @@ function AccountMenu() {
                 )}
               </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-64">
               <DropdownMenuLabel>
-                {userInfo?.name && <p>{userInfo.name}</p>}
-                {!userInfo?.name && userAccounts && <p>{userAccounts}</p>}
+                {userInfo?.name ? (
+                  <p>{userInfo.name}</p>
+                ) : (
+                  userAccounts && <p>{userAccounts}</p>
+                )}
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {/* Display User Balance */}
+              <DropdownMenuItem>
+                Manna Balance: {formattedBalance}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {/* Buy Manna */}
+              <div className="px-4 py-2">
+                <input
+                  type="text"
+                  value={etherAmount}
+                  onChange={(e) => setEtherAmount(e.target.value)}
+                  placeholder="Ether amount"
+                  className="border rounded w-full px-2 py-1 mb-2 text-black"
+                />
+                <Button onClick={handleBuyManna} className="w-full">
+                  Buy Manna
+                </Button>
+              </div>
               <DropdownMenuSeparator />
               {/* Profile Button */}
               <DropdownMenuItem>Profile</DropdownMenuItem>
-
               <DropdownMenuSeparator />
               {/* Logout Button */}
               <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>

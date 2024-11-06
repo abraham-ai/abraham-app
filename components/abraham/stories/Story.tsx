@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// Story.tsx
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { StoryItem } from "@/types";
 import { FlameIcon } from "lucide-react";
@@ -6,6 +7,7 @@ import PraiseIcon from "@/components/customIcons/PraiseIcon";
 import { useAuth } from "@/context/AuthContext";
 import BlessDialog from "./BlessDialog";
 import Link from "next/link";
+import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 
 export default function Story({ story }: { story: StoryItem }) {
   const { idToken, loggedIn, userAccounts } = useAuth();
@@ -13,78 +15,110 @@ export default function Story({ story }: { story: StoryItem }) {
   const [burnsCount, setBurnsCount] = useState(story.burns.length);
   const [blessingsCount, setBlessingsCount] = useState(story.blessings.length);
   const [hasPraised, setHasPraised] = useState(
-    story.praises.includes(userAccounts) // Replace with actual user id
+    story.praises.includes(userAccounts || "")
   );
   const [hasBurned, setHasBurned] = useState(
-    story.burns.includes(userAccounts) // Replace with actual user id
+    story.burns.includes(userAccounts || "")
   );
 
-  const handleReaction = async (actionType: string) => {
-    console.log("User accounts:", userAccounts);
-    if (!idToken) {
-      throw new Error("User not authenticated");
-    }
-    const response = await fetch("/api/artlabproxy/stories", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({
-        story_id: story.id,
-        action: actionType,
-        address: userAccounts,
-      }),
-    });
+  const {
+    praise: praiseTransaction,
+    burn: burnTransaction,
+    balance,
+    getMannaBalance,
+  } = useMannaTransactions();
 
-    if (!response.ok) {
-      throw new Error("Error reacting to story");
+  const [formattedBalance, setFormattedBalance] = useState<bigint>(BigInt(0));
+
+  useEffect(() => {
+    if (balance) {
+      setFormattedBalance(BigInt(balance));
     }
-  };
+  }, [balance]);
 
   const handlePraiseClick = async () => {
+    if (!loggedIn) {
+      alert("Please log in to praise a story.");
+      return;
+    }
     try {
+      const amount = BigInt("1000000000000000000"); // 1 Manna (assuming 18 decimals)
+      const amountString = "1";
+      if (formattedBalance < amount) {
+        alert("Insufficient Manna balance to praise this story.");
+        return;
+      }
+
       if (hasPraised) {
-        // User is unpraising
-        await handleReaction("unpraise");
-        setPraisesCount(praisesCount - 1);
-        setHasPraised(false);
+        alert("You have already praised this story.");
       } else {
         if (hasBurned) {
-          // User had burned, need to unburn first
-          await handleReaction("unburn");
-          setBurnsCount(burnsCount - 1);
-          setHasBurned(false);
+          alert("You have already burned this story.");
+          return;
         }
-        await handleReaction("praise");
+
+        // Ensure story.id is valid
+        //if (!story.id || isNaN(Number(story.id))) {
+        //  console.error("Invalid story ID:", story.id);
+        //  alert("Invalid story. Cannot perform action.");
+        //  if (isNaN(Number(story.id))) {
+        //    alert("Stroy Id is null");
+        //  }
+        //  return;
+        //}
+        //const creationId = BigInt(story.id);
+        //console.log("Praising creationId:", creationId.toString());
+
+        await praiseTransaction(1, amount.toString()); //use default id for now
         setPraisesCount(praisesCount + 1);
         setHasPraised(true);
+        await getMannaBalance();
       }
     } catch (error) {
-      console.error(error);
+      console.error("Error praising the story:", error);
+      alert("Failed to praise the story. Please try again.");
     }
   };
 
   const handleBurnClick = async () => {
+    if (!loggedIn) {
+      alert("Please log in to burn a story.");
+      return;
+    }
     try {
+      const amount = BigInt("1000000000000000000"); // 1 Manna
+      const amountString = amount.toString();
+      if (formattedBalance < amount) {
+        alert("Insufficient Manna balance to burn this story.");
+        return;
+      }
+
       if (hasBurned) {
-        // User is unburning
-        await handleReaction("unburn");
-        setBurnsCount(burnsCount - 1);
-        setHasBurned(false);
+        alert("You have already burned this story.");
       } else {
         if (hasPraised) {
-          // User had praised, need to unpraise first
-          await handleReaction("unpraise");
-          setPraisesCount(praisesCount - 1);
-          setHasPraised(false);
+          alert("You have already praised this story.");
+          return;
         }
-        await handleReaction("burn");
+
+        // Ensure story.id is valid
+        // if (!story.id || isNaN(Number(story.id))) {
+        //   console.error("Invalid story ID:", story.id);
+        //   alert("Invalid story. Cannot perform action.");
+        //   return;
+        //}
+        const creationId = BigInt(story.id);
+        console.log("Burning creationId:", creationId.toString());
+
+        //await burnTransaction(Number(creationId), amountString);
+        await burnTransaction(1, amountString); //use default id for now
         setBurnsCount(burnsCount + 1);
         setHasBurned(true);
+        await getMannaBalance();
       }
     } catch (error) {
-      console.error(error);
+      console.error("Error burning the story:", error);
+      alert("Failed to burn the story. Please try again.");
     }
   };
 
@@ -115,11 +149,11 @@ export default function Story({ story }: { story: StoryItem }) {
         <div className="flex items-center mt-6 mb-4">
           <button
             onClick={handlePraiseClick}
-            disabled={!loggedIn}
+            disabled={!loggedIn || hasPraised}
             className={`cursor-pointer ${
               loggedIn
                 ? hasPraised
-                  ? "text-blue-500"
+                  ? "text-blue-500 cursor-not-allowed"
                   : "text-gray-500"
                 : "text-gray-300 cursor-not-allowed"
             }`}
@@ -131,11 +165,11 @@ export default function Story({ story }: { story: StoryItem }) {
           </span>
           <button
             onClick={handleBurnClick}
-            disabled={!loggedIn}
+            disabled={!loggedIn || hasBurned}
             className={`ml-10 cursor-pointer ${
               loggedIn
                 ? hasBurned
-                  ? "text-red-500"
+                  ? "text-red-500 cursor-not-allowed"
                   : "text-gray-500"
                 : "text-gray-300 cursor-not-allowed"
             }`}
