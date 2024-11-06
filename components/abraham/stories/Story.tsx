@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { StoryItem } from "@/types";
-import { FlameIcon } from "lucide-react";
+import { FlameIcon, Loader2Icon } from "lucide-react";
 import PraiseIcon from "@/components/customIcons/PraiseIcon";
 import { useAuth } from "@/context/AuthContext";
 import BlessDialog from "./BlessDialog";
@@ -13,6 +13,8 @@ export default function Story({ story }: { story: StoryItem }) {
   const { idToken, loggedIn, userAccounts } = useAuth();
   const [praisesCount, setPraisesCount] = useState(story.praises.length);
   const [burnsCount, setBurnsCount] = useState(story.burns.length);
+  const [loadingPraise, setLoadingPraise] = useState(false);
+  const [loadingBurn, setLoadingBurn] = useState(false);
   const [blessingsCount, setBlessingsCount] = useState(story.blessings.length);
   const [hasPraised, setHasPraised] = useState(
     story.praises.includes(userAccounts || "")
@@ -36,14 +38,37 @@ export default function Story({ story }: { story: StoryItem }) {
     }
   }, [balance]);
 
+  const handleReaction = async (actionType: string) => {
+    console.log("User accounts:", userAccounts);
+    if (!idToken) {
+      throw new Error("User not authenticated");
+    }
+    const response = await fetch("/api/artlabproxy/stories", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        story_id: story.id,
+        action: actionType,
+        address: userAccounts,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Error reacting to story");
+    }
+  };
+
   const handlePraiseClick = async () => {
+    setLoadingPraise(true);
     if (!loggedIn) {
       alert("Please log in to praise a story.");
       return;
     }
     try {
       const amount = BigInt("1000000000000000000"); // 1 Manna (assuming 18 decimals)
-      const amountString = "1";
       if (formattedBalance < amount) {
         alert("Insufficient Manna balance to praise this story.");
         return;
@@ -56,23 +81,12 @@ export default function Story({ story }: { story: StoryItem }) {
           alert("You have already burned this story.");
           return;
         }
-
-        // Ensure story.id is valid
-        //if (!story.id || isNaN(Number(story.id))) {
-        //  console.error("Invalid story ID:", story.id);
-        //  alert("Invalid story. Cannot perform action.");
-        //  if (isNaN(Number(story.id))) {
-        //    alert("Stroy Id is null");
-        //  }
-        //  return;
-        //}
-        //const creationId = BigInt(story.id);
-        //console.log("Praising creationId:", creationId.toString());
-
         await praiseTransaction(1, amount.toString()); //use default id for now
+        await handleReaction("praise");
         setPraisesCount(praisesCount + 1);
         setHasPraised(true);
         await getMannaBalance();
+        setLoadingPraise(false);
       }
     } catch (error) {
       console.error("Error praising the story:", error);
@@ -81,13 +95,13 @@ export default function Story({ story }: { story: StoryItem }) {
   };
 
   const handleBurnClick = async () => {
+    setLoadingBurn(true);
     if (!loggedIn) {
       alert("Please log in to burn a story.");
       return;
     }
     try {
       const amount = BigInt("1000000000000000000"); // 1 Manna
-      const amountString = amount.toString();
       if (formattedBalance < amount) {
         alert("Insufficient Manna balance to burn this story.");
         return;
@@ -100,21 +114,12 @@ export default function Story({ story }: { story: StoryItem }) {
           alert("You have already praised this story.");
           return;
         }
-
-        // Ensure story.id is valid
-        // if (!story.id || isNaN(Number(story.id))) {
-        //   console.error("Invalid story ID:", story.id);
-        //   alert("Invalid story. Cannot perform action.");
-        //   return;
-        //}
-        const creationId = BigInt(story.id);
-        console.log("Burning creationId:", creationId.toString());
-
-        //await burnTransaction(Number(creationId), amountString);
-        await burnTransaction(1, amountString); //use default id for now
+        await burnTransaction(1, amount.toString()); //use default id for now
+        await handleReaction("burn");
         setBurnsCount(burnsCount + 1);
         setHasBurned(true);
         await getMannaBalance();
+        setLoadingBurn(false);
       }
     } catch (error) {
       console.error("Error burning the story:", error);
@@ -158,7 +163,8 @@ export default function Story({ story }: { story: StoryItem }) {
                 : "text-gray-300 cursor-not-allowed"
             }`}
           >
-            <PraiseIcon className="w-9 h-5 " />
+            {!loadingPraise && <PraiseIcon className="w-9 h-5 " />}
+            {loadingPraise && <Loader2Icon className="w-5 h-5 animate-spin" />}
           </button>
           <span className="ml-1 text-sm font-semibold text-gray-500">
             {praisesCount}
@@ -174,7 +180,8 @@ export default function Story({ story }: { story: StoryItem }) {
                 : "text-gray-300 cursor-not-allowed"
             }`}
           >
-            <FlameIcon className="w-5 h-5" />
+            {!loadingBurn && <FlameIcon className="w-5 h-5" />}
+            {loadingBurn && <Loader2Icon className="w-5 h-5 animate-spin" />}
           </button>
           <span className="ml-1 text-sm font-semibold text-gray-500">
             {burnsCount}
