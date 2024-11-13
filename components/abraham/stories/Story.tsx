@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import BlessDialog from "./BlessDialog";
 import Link from "next/link";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { parseUnits } from "viem";
 
 export default function Story({ story }: { story: StoryItem }) {
   const { idToken, loggedIn, userAccounts } = useAuth();
@@ -69,11 +70,15 @@ export default function Story({ story }: { story: StoryItem }) {
     }
     try {
       const amount = BigInt("1000000000000000000"); // 1 Manna (assuming 18 decimals)
-      if (formattedBalance < amount) {
-        alert("Insufficient Manna balance to praise this story.");
+      // Convert formatted balance to wei (BigInt)
+      const balanceInWei = parseUnits(balance || "0", 18);
+
+      if (balanceInWei < amount) {
+        alert("Insufficient Manna balance to bless this story.");
         return;
       }
-      await praiseTransaction(1, amount.toString()); //use default id for now
+
+      await praiseTransaction(1, amount.toString()); // use default id 1 for now
       await handleReaction("praise");
       setPraisesCount(praisesCount + 1);
       setHasPraised(true);
@@ -108,8 +113,10 @@ export default function Story({ story }: { story: StoryItem }) {
     }
     try {
       const amount = BigInt("1000000000000000000"); // 1 Manna
-      if (formattedBalance < amount) {
-        alert("Insufficient Manna balance to burn this story.");
+      const balanceInWei = parseUnits(balance || "0", 18);
+
+      if (balanceInWei < amount) {
+        alert("Insufficient Manna balance to bless this story.");
         return;
       }
 
