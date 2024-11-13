@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { parseUnits } from "viem";
 
 export default function BlessDialog({
   story,
@@ -48,18 +49,27 @@ export default function BlessDialog({
 
     try {
       const amount = BigInt("1000000000000000000"); // 1 Manna (assuming 18 decimals)
-      if (formattedBalance < amount) {
+      const balanceInWei = parseUnits(balance || "0", 18);
+
+      if (balanceInWei < amount) {
         alert("Insufficient Manna balance to bless this story.");
-        setIsSubmitting(false);
         return;
       }
-
       // Perform blockchain bless transaction
       await blessTransaction(1, blessingText); // use default id 1 for now
 
       // Handle server-side reaction
       const response = await fetch("/api/artlabproxy/stories/bless", {
-        // ... existing code ...
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`, // JWT for authentication
+        },
+        body: JSON.stringify({
+          story_id: story.id, // Story ID
+          blessing: blessingText, // User's blessing/comment
+          address: userAccounts, // User's public address
+        }),
       });
 
       if (response.ok) {
