@@ -470,6 +470,24 @@ export const MannaTokenAbi = [
   },
   {
     inputs: [],
+    name: "getContractBalances",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "mannaBalance",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "ethBalance",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "name",
     outputs: [
       {

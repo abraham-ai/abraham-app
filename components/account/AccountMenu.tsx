@@ -22,7 +22,7 @@ function AccountMenu() {
 
   const { balance, buyManna, getMannaBalance } = useMannaTransactions(); // Use the custom hook
 
-  const [etherAmount, setEtherAmount] = useState("0.01"); // State to hold the amount of Ether to spend
+  const [etherAmount, setEtherAmount] = useState("0.001"); // State to hold the amount of Ether to spend
   const [formattedBalance, setFormattedBalance] = useState<string>("0");
 
   // Format the balance for display
@@ -32,6 +32,11 @@ function AccountMenu() {
       setFormattedBalance(formatted);
     }
   }, [balance]);
+
+  //get balance
+  useEffect(() => {
+    getMannaBalance();
+  }, []);
 
   const handleBuyManna = async () => {
     if (
@@ -45,7 +50,7 @@ function AccountMenu() {
     try {
       await buyManna(etherAmount);
       await getMannaBalance(); // Refresh the balance after buying
-      setEtherAmount("0.01"); // Reset the input field
+      setEtherAmount("0.001"); // Reset the input field
       alert("Successfully purchased Manna tokens!");
     } catch (error) {
       console.error("Error buying Manna:", error);

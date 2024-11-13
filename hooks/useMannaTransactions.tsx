@@ -1,19 +1,20 @@
 // useMannaTransactions.tsx
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { MannaTokenAbi } from "@/lib/abis/MannaToken";
+import { MannaTokenAbi } from "@/lib/abis/MannaToken"; // Ensure this ABI includes the new function
 import {
   createPublicClient,
   createWalletClient,
   custom,
   parseEther,
-  encodeFunctionData,
+  formatEther,
+  formatUnits,
 } from "viem";
 import { Chain } from "viem/chains";
 
 // Define the Base Sepolia Testnet chain
 const baseSepolia = {
-  id: 84532, //testnet- FOrm mainnet use: 84531
+  id: 84532, // Testnet - For mainnet use: 84531
   name: "Base Sepolia",
   nativeCurrency: {
     decimals: 18,
@@ -32,7 +33,7 @@ const baseSepolia = {
 export function useMannaTransactions() {
   const { provider } = useAuth();
   const [balance, setBalance] = useState<string>("0");
-  const contractAddress = "0xA9e452769C784197eE84a37e490d7ac55110A8F1";
+  const contractAddress = "0x44afFF32983b8759D9465bC4675a979432000f96"; // Update with your contract address
 
   // Initialize Viem clients
   const publicClient = createPublicClient({
@@ -63,11 +64,29 @@ export function useMannaTransactions() {
         functionName: "balanceOf",
         args: [address],
       });
-      // Cast the balance to bigint since we know it returns a number
       const balanceValue = balance as bigint;
       setBalance(balanceValue.toString());
     } catch (error) {
       console.error("Error fetching Manna balance:", error);
+    }
+  };
+
+  // New function to get contract balances
+  const getContractBalances = async () => {
+    if (!provider || !contractAddress) return;
+    try {
+      const [mannaBalance, ethBalance] = (await publicClient.readContract({
+        address: contractAddress as `0x${string}`,
+        abi: MannaTokenAbi,
+        functionName: "getContractBalances",
+      })) as [bigint, bigint];
+
+      return {
+        mannaBalance: formatUnits(mannaBalance, 18), // Convert to readable format
+        ethBalance: formatEther(ethBalance), // Convert to Ether
+      };
+    } catch (error) {
+      console.error("Error fetching contract balances:", error);
     }
   };
 
@@ -76,6 +95,7 @@ export function useMannaTransactions() {
     if (!provider || !contractAddress) return;
     try {
       const [address] = await walletClient.getAddresses();
+
       const txHash = await walletClient.writeContract({
         account: address,
         address: contractAddress as `0x${string}`,
@@ -92,43 +112,20 @@ export function useMannaTransactions() {
     }
   };
 
-  // Function to praise a creation
-  const praise = async (creationId: number, amount: string) => {
-    if (!provider || !contractAddress) return;
-    try {
-      const [address] = await walletClient.getAddresses();
-      const txHash = await walletClient.writeContract({
-        account: address,
-        address: contractAddress as `0x${string}`,
-        abi: MannaTokenAbi,
-        functionName: "praise",
-        args: [BigInt(creationId), BigInt(amount)],
-      });
-      // Wait for transaction to be mined
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      // Update balance after transaction
-      await getMannaBalance();
-    } catch (error) {
-      console.error("Error praising creation:", error);
-    }
+  // Function to calculate the amount of Manna tokens to be received for a given Ether amount
+  const calculateMannaForEther = (etherAmount: string) => {
+    const MANNA_PRICE = BigInt("100000000000000"); // 0.0001 Ether in Wei
+    const etherAmountWei = parseEther(etherAmount);
+    const mannaAmount = (etherAmountWei * BigInt(10 ** 18)) / MANNA_PRICE;
+    return mannaAmount.toString();
   };
 
-  // Function to bless a creation
-  const bless = async (creationId: number, comment: string) => {
-    if (!provider || !contractAddress) return;
-    try {
-      const [address] = await walletClient.getAddresses();
-      const txHash = await walletClient.writeContract({
-        account: address,
-        address: contractAddress as `0x${string}`,
-        abi: MannaTokenAbi,
-        functionName: "bless",
-        args: [BigInt(creationId), comment],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-    } catch (error) {
-      console.error("Error blessing creation:", error);
-    }
+  // Function to calculate the amount of Ether to be received for a given Manna amount
+  const calculateEtherForManna = (mannaAmount: string) => {
+    const MANNA_PRICE = BigInt("100000000000000"); // 0.0001 Ether in Wei
+    const mannaAmountBigInt = BigInt(mannaAmount);
+    const etherAmountWei = (mannaAmountBigInt * MANNA_PRICE) / BigInt(10 ** 18);
+    return formatEther(etherAmountWei);
   };
 
   // Function to sell Manna tokens
@@ -136,6 +133,7 @@ export function useMannaTransactions() {
     if (!provider || !contractAddress) return;
     try {
       const [address] = await walletClient.getAddresses();
+
       const txHash = await walletClient.writeContract({
         account: address,
         address: contractAddress as `0x${string}`,
@@ -151,11 +149,36 @@ export function useMannaTransactions() {
     }
   };
 
-  // Function to burn a creating - not to be confused with burning tokens
-  const burn = async (creationId: number, amount: string) => {
+  // Function to praise a creation
+  const praise = async (
+    creationId: number | bigint,
+    amount: string | bigint
+  ) => {
     if (!provider || !contractAddress) return;
     try {
       const [address] = await walletClient.getAddresses();
+
+      const txHash = await walletClient.writeContract({
+        account: address,
+        address: contractAddress as `0x${string}`,
+        abi: MannaTokenAbi,
+        functionName: "praise",
+        args: [BigInt(creationId), BigInt(amount)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      // Update balance after transaction
+      await getMannaBalance();
+    } catch (error) {
+      console.error("Error praising creation:", error);
+    }
+  };
+
+  // Function to burn a creation (not to be confused with burning tokens)
+  const burn = async (creationId: number | bigint, amount: string | bigint) => {
+    if (!provider || !contractAddress) return;
+    try {
+      const [address] = await walletClient.getAddresses();
+
       const txHash = await walletClient.writeContract({
         account: address,
         address: contractAddress as `0x${string}`,
@@ -167,7 +190,26 @@ export function useMannaTransactions() {
       // Update balance after transaction
       await getMannaBalance();
     } catch (error) {
-      console.error("Error burning Manna:", error);
+      console.error("Error burning creation:", error);
+    }
+  };
+
+  // Function to bless a creation
+  const bless = async (creationId: number | bigint, comment: string) => {
+    if (!provider || !contractAddress) return;
+    try {
+      const [address] = await walletClient.getAddresses();
+
+      const txHash = await walletClient.writeContract({
+        account: address,
+        address: contractAddress as `0x${string}`,
+        abi: MannaTokenAbi,
+        functionName: "bless",
+        args: [BigInt(creationId), comment],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+    } catch (error) {
+      console.error("Error blessing creation:", error);
     }
   };
 
@@ -189,11 +231,14 @@ export function useMannaTransactions() {
   return {
     balance,
     getMannaBalance,
+    getContractBalances,
+    calculateMannaForEther,
+    calculateEtherForManna,
     buyManna,
-    praise,
-    bless,
     sellManna,
+    praise,
     burn,
+    bless,
     getTotalSupply,
   };
 }

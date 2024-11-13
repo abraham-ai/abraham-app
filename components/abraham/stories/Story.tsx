@@ -73,21 +73,27 @@ export default function Story({ story }: { story: StoryItem }) {
         alert("Insufficient Manna balance to praise this story.");
         return;
       }
+      await praiseTransaction(1, amount.toString()); //use default id for now
+      await handleReaction("praise");
+      setPraisesCount(praisesCount + 1);
+      setHasPraised(true);
+      await getMannaBalance();
+      setLoadingPraise(false);
 
-      if (hasPraised) {
-        alert("You have already praised this story.");
-      } else {
-        if (hasBurned) {
-          alert("You have already burned this story.");
-          return;
-        }
-        await praiseTransaction(1, amount.toString()); //use default id for now
-        await handleReaction("praise");
-        setPraisesCount(praisesCount + 1);
-        setHasPraised(true);
-        await getMannaBalance();
-        setLoadingPraise(false);
-      }
+      //if (hasPraised) {
+      //  alert("You have already praised this story.");
+      //} else {
+      //  if (hasBurned) {
+      //    alert("You have already burned this story.");
+      //    return;
+      //  }
+      //  await praiseTransaction(1, amount.toString()); //use default id for now
+      //  await handleReaction("praise");
+      //  setPraisesCount(praisesCount + 1);
+      //  setHasPraised(true);
+      //  await getMannaBalance();
+      //  setLoadingPraise(false);
+      //}
     } catch (error) {
       console.error("Error praising the story:", error);
       alert("Failed to praise the story. Please try again.");
@@ -107,20 +113,27 @@ export default function Story({ story }: { story: StoryItem }) {
         return;
       }
 
-      if (hasBurned) {
-        alert("You have already burned this story.");
-      } else {
-        if (hasPraised) {
-          alert("You have already praised this story.");
-          return;
-        }
-        await burnTransaction(1, amount.toString()); //use default id for now
-        await handleReaction("burn");
-        setBurnsCount(burnsCount + 1);
-        setHasBurned(true);
-        await getMannaBalance();
-        setLoadingBurn(false);
-      }
+      await burnTransaction(1, amount.toString()); //use default id for now
+      await handleReaction("burn");
+      setBurnsCount(burnsCount + 1);
+      setHasBurned(true);
+      await getMannaBalance();
+      setLoadingBurn(false);
+
+      //if (hasBurned) {
+      //  alert("You have already burned this story.");
+      //} else {
+      //  if (hasPraised) {
+      //    alert("You have already praised this story.");
+      //    return;
+      //  }
+      //  await burnTransaction(1, amount.toString()); //use default id for now
+      //  await handleReaction("burn");
+      //  setBurnsCount(burnsCount + 1);
+      //  setHasBurned(true);
+      //  await getMannaBalance();
+      //  setLoadingBurn(false);
+      //}
     } catch (error) {
       console.error("Error burning the story:", error);
       alert("Failed to burn the story. Please try again.");
