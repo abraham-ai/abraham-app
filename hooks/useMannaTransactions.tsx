@@ -65,7 +65,9 @@ export function useMannaTransactions() {
         args: [address],
       });
       const balanceValue = balance as bigint;
-      setBalance(balanceValue.toString());
+      const formattedBalance = formatUnits(balanceValue, 18); // Format balance using token decimals
+      setBalance(formattedBalance); // Set the formatted balance
+      return formattedBalance; // Return the formatted balance
     } catch (error) {
       console.error("Error fetching Manna balance:", error);
     }
