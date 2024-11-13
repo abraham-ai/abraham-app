@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+"use client";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import { MessageCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
+import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 
 export default function BlessDialog({
   story,
@@ -24,6 +26,18 @@ export default function BlessDialog({
   const { loggedIn, userInfo, idToken, userAccounts } = useAuth();
   const [blessingText, setBlessingText] = useState(""); // State for blessing text
   const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for submit button
+  const {
+    bless: blessTransaction,
+    balance,
+    getMannaBalance,
+  } = useMannaTransactions();
+  const [formattedBalance, setFormattedBalance] = useState<bigint>(BigInt(0));
+
+  useEffect(() => {
+    if (balance) {
+      setFormattedBalance(BigInt(balance));
+    }
+  }, [balance]);
 
   const handleBlessSubmit = async () => {
     if (!idToken) {
@@ -33,29 +47,31 @@ export default function BlessDialog({
     setIsSubmitting(true);
 
     try {
+      const amount = BigInt("1000000000000000000"); // 1 Manna (assuming 18 decimals)
+      if (formattedBalance < amount) {
+        alert("Insufficient Manna balance to bless this story.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Perform blockchain bless transaction
+      await blessTransaction(1, blessingText); // use default id 1 for now
+
+      // Handle server-side reaction
       const response = await fetch("/api/artlabproxy/stories/bless", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`, // JWT for authentication
-        },
-        body: JSON.stringify({
-          story_id: story.id, // Story ID
-          blessing: blessingText, // User's blessing/comment
-          address: userAccounts, // User's public address
-        }),
+        // ... existing code ...
       });
 
       if (response.ok) {
-        setBlessingsCount(blessingsCount + 1); // Update blessing count after successful submission
+        setBlessingsCount(blessingsCount + 1);
+        await getMannaBalance(); // Update balance after blessing
+        setBlessingText(""); // Reset blessing text
       } else {
         throw new Error("Error submitting blessing");
       }
-
-      // Reset blessing text after successful submission
-      setBlessingText("");
     } catch (error) {
       console.error("Error submitting blessing:", error);
+      alert("Failed to bless the story. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

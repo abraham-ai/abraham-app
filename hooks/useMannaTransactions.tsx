@@ -210,6 +210,8 @@ export function useMannaTransactions() {
         args: [BigInt(creationId), comment],
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
+      // Update balance after transaction
+      await getMannaBalance();
     } catch (error) {
       console.error("Error blessing creation:", error);
     }
