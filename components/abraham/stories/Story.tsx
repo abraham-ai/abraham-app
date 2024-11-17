@@ -1,23 +1,43 @@
-import React, { useState } from "react";
+"use client";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { StoryItem } from "@/types";
-import { FlameIcon } from "lucide-react";
+import { FlameIcon, Loader2Icon } from "lucide-react";
 import PraiseIcon from "@/components/customIcons/PraiseIcon";
 import { useAuth } from "@/context/AuthContext";
 import BlessDialog from "./BlessDialog";
 import Link from "next/link";
+import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { parseUnits } from "viem";
 
 export default function Story({ story }: { story: StoryItem }) {
   const { idToken, loggedIn, userAccounts } = useAuth();
   const [praisesCount, setPraisesCount] = useState(story.praises.length);
   const [burnsCount, setBurnsCount] = useState(story.burns.length);
+  const [loadingPraise, setLoadingPraise] = useState(false);
+  const [loadingBurn, setLoadingBurn] = useState(false);
   const [blessingsCount, setBlessingsCount] = useState(story.blessings.length);
   const [hasPraised, setHasPraised] = useState(
-    story.praises.includes(userAccounts) // Replace with actual user id
+    story.praises.includes(userAccounts || "")
   );
   const [hasBurned, setHasBurned] = useState(
-    story.burns.includes(userAccounts) // Replace with actual user id
+    story.burns.includes(userAccounts || "")
   );
+
+  const {
+    praise: praiseTransaction,
+    burn: burnTransaction,
+    balance,
+    getMannaBalance,
+  } = useMannaTransactions();
+
+  const [formattedBalance, setFormattedBalance] = useState<bigint>(BigInt(0));
+
+  useEffect(() => {
+    if (balance) {
+      setFormattedBalance(BigInt(balance));
+    }
+  }, [balance]);
 
   const handleReaction = async (actionType: string) => {
     console.log("User accounts:", userAccounts);
@@ -43,48 +63,87 @@ export default function Story({ story }: { story: StoryItem }) {
   };
 
   const handlePraiseClick = async () => {
+    setLoadingPraise(true);
+    if (!loggedIn) {
+      alert("Please log in to praise a story.");
+      return;
+    }
     try {
-      if (hasPraised) {
-        // User is unpraising
-        await handleReaction("unpraise");
-        setPraisesCount(praisesCount - 1);
-        setHasPraised(false);
-      } else {
-        if (hasBurned) {
-          // User had burned, need to unburn first
-          await handleReaction("unburn");
-          setBurnsCount(burnsCount - 1);
-          setHasBurned(false);
-        }
-        await handleReaction("praise");
-        setPraisesCount(praisesCount + 1);
-        setHasPraised(true);
+      const amount = BigInt("1000000000000000000"); // 1 Manna (assuming 18 decimals)
+      // Convert formatted balance to wei (BigInt)
+      const balanceInWei = parseUnits(balance || "0", 18);
+
+      if (balanceInWei < amount) {
+        alert("Insufficient Manna balance to bless this story.");
+        return;
       }
+
+      await praiseTransaction(1, amount.toString()); // use default id 1 for now
+      await handleReaction("praise");
+      setPraisesCount(praisesCount + 1);
+      setHasPraised(true);
+      await getMannaBalance();
+      setLoadingPraise(false);
+
+      //if (hasPraised) {
+      //  alert("You have already praised this story.");
+      //} else {
+      //  if (hasBurned) {
+      //    alert("You have already burned this story.");
+      //    return;
+      //  }
+      //  await praiseTransaction(1, amount.toString()); //use default id for now
+      //  await handleReaction("praise");
+      //  setPraisesCount(praisesCount + 1);
+      //  setHasPraised(true);
+      //  await getMannaBalance();
+      //  setLoadingPraise(false);
+      //}
     } catch (error) {
-      console.error(error);
+      console.error("Error praising the story:", error);
+      alert("Failed to praise the story. Please try again.");
     }
   };
 
   const handleBurnClick = async () => {
+    setLoadingBurn(true);
+    if (!loggedIn) {
+      alert("Please log in to burn a story.");
+      return;
+    }
     try {
-      if (hasBurned) {
-        // User is unburning
-        await handleReaction("unburn");
-        setBurnsCount(burnsCount - 1);
-        setHasBurned(false);
-      } else {
-        if (hasPraised) {
-          // User had praised, need to unpraise first
-          await handleReaction("unpraise");
-          setPraisesCount(praisesCount - 1);
-          setHasPraised(false);
-        }
-        await handleReaction("burn");
-        setBurnsCount(burnsCount + 1);
-        setHasBurned(true);
+      const amount = BigInt("1000000000000000000"); // 1 Manna
+      const balanceInWei = parseUnits(balance || "0", 18);
+
+      if (balanceInWei < amount) {
+        alert("Insufficient Manna balance to bless this story.");
+        return;
       }
+
+      await burnTransaction(1, amount.toString()); //use default id for now
+      await handleReaction("burn");
+      setBurnsCount(burnsCount + 1);
+      setHasBurned(true);
+      await getMannaBalance();
+      setLoadingBurn(false);
+
+      //if (hasBurned) {
+      //  alert("You have already burned this story.");
+      //} else {
+      //  if (hasPraised) {
+      //    alert("You have already praised this story.");
+      //    return;
+      //  }
+      //  await burnTransaction(1, amount.toString()); //use default id for now
+      //  await handleReaction("burn");
+      //  setBurnsCount(burnsCount + 1);
+      //  setHasBurned(true);
+      //  await getMannaBalance();
+      //  setLoadingBurn(false);
+      //}
     } catch (error) {
-      console.error(error);
+      console.error("Error burning the story:", error);
+      alert("Failed to burn the story. Please try again.");
     }
   };
 
@@ -115,32 +174,34 @@ export default function Story({ story }: { story: StoryItem }) {
         <div className="flex items-center mt-6 mb-4">
           <button
             onClick={handlePraiseClick}
-            disabled={!loggedIn}
+            disabled={!loggedIn || hasPraised}
             className={`cursor-pointer ${
               loggedIn
                 ? hasPraised
-                  ? "text-blue-500"
+                  ? "text-blue-500 cursor-not-allowed"
                   : "text-gray-500"
                 : "text-gray-300 cursor-not-allowed"
             }`}
           >
-            <PraiseIcon className="w-9 h-5 " />
+            {!loadingPraise && <PraiseIcon className="w-9 h-5 " />}
+            {loadingPraise && <Loader2Icon className="w-5 h-5 animate-spin" />}
           </button>
           <span className="ml-1 text-sm font-semibold text-gray-500">
             {praisesCount}
           </span>
           <button
             onClick={handleBurnClick}
-            disabled={!loggedIn}
+            disabled={!loggedIn || hasBurned}
             className={`ml-10 cursor-pointer ${
               loggedIn
                 ? hasBurned
-                  ? "text-red-500"
+                  ? "text-red-500 cursor-not-allowed"
                   : "text-gray-500"
                 : "text-gray-300 cursor-not-allowed"
             }`}
           >
-            <FlameIcon className="w-5 h-5" />
+            {!loadingBurn && <FlameIcon className="w-5 h-5" />}
+            {loadingBurn && <Loader2Icon className="w-5 h-5 animate-spin" />}
           </button>
           <span className="ml-1 text-sm font-semibold text-gray-500">
             {burnsCount}

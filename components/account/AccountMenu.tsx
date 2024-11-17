@@ -1,5 +1,7 @@
+// AccountMenu.tsx
 "use client";
-import React from "react";
+
+import React, { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import {
@@ -12,11 +14,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { Button } from "@/components/ui/button";
-import { Loader2Icon } from "lucide-react";
+import { Loader2Icon, CoinsIcon } from "lucide-react";
+import { useManna } from "@/context/MannaContext";
+import { GetMannaDialog } from "@/components/account/GetMannaDialog";
 
 function AccountMenu() {
   const { login, logout, loggedIn, userInfo, userAccounts, loadingAuth } =
     useAuth();
+
+  const { balance, getMannaBalance } = useManna();
+
+  // Fetch balance when the component mounts
+  useEffect(() => {
+    getMannaBalance();
+  }, [getMannaBalance]);
 
   return (
     <div className="m-3">
@@ -24,17 +35,16 @@ function AccountMenu() {
         <div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div>
-                {userInfo?.profileImage && (
+              <div className="cursor-pointer">
+                {userInfo?.profileImage ? (
                   <Image
-                    src={userInfo?.profileImage}
-                    alt={"user image"}
+                    src={userInfo.profileImage}
+                    alt="user image"
                     width={32}
                     height={32}
                     className="rounded-full"
                   />
-                )}
-                {!userInfo?.profileImage && (
+                ) : (
                   <div className="rounded-full overflow-hidden">
                     <RandomPixelAvatar
                       username={userAccounts || "username"}
@@ -44,15 +54,29 @@ function AccountMenu() {
                 )}
               </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-64">
               <DropdownMenuLabel>
-                {userInfo?.name && <p>{userInfo.name}</p>}
-                {!userInfo?.name && userAccounts && <p>{userAccounts}</p>}
+                <div className="truncate w-full">
+                  <p className="text-sm  text-ellipsis overflow-hidden">
+                    {userInfo?.name
+                      ? userInfo.name
+                      : userAccounts || "username"}
+                  </p>
+                </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {/* Profile Button */}
+              {/* Display User Balance */}
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault(); // Prevent the menu from closing
+                }}
+              >
+                <CoinsIcon className="w-5 h-5" />
+                <p className="ml-2 text-base">{balance} Manna</p>
+                <GetMannaDialog />
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem>Profile</DropdownMenuItem>
-
               <DropdownMenuSeparator />
               {/* Logout Button */}
               <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>

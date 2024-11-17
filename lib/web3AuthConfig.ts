@@ -8,13 +8,13 @@ const clientId =
 
 const chainConfig = {
   chainNamespace: CHAIN_NAMESPACES.EIP155,
-  chainId: "0xaa36a7", // Ethereum Sepolia Testnet Chain ID
-  rpcTarget: "https://rpc.ankr.com/eth_sepolia", // Public RPC endpoint for Sepolia Testnet
-  displayName: "Ethereum Sepolia Testnet",
-  blockExplorerUrl: "https://sepolia.etherscan.io",
+  chainId: "0x14a34", //Base Sepolia Testnet Chain ID
+  rpcTarget: "https://rpc.ankr.com/base_sepolia", // Public RPC endpoint for Sepolia Testnet
+  displayName: "Base Sepolia Testnet",
+  blockExplorerUrl: "https://sepolia.basescan.org",
   ticker: "ETH",
-  tickerName: "Ethereum",
-  logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+  tickerName: "ETH",
+  logo: "https://github.com/base-org/brand-kit/blob/main/logo/symbol/Base_Symbol_Blue.svg",
 };
 
 const privateKeyProvider = new EthereumPrivateKeyProvider({
