@@ -4,7 +4,7 @@ import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
-export default function ContractBalancesPage() {
+export default function Manna() {
   const { provider } = useAuth();
   const { getContractBalances } = useMannaTransactions();
   const [balances, setBalances] = useState({

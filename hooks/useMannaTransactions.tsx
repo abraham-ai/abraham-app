@@ -1,4 +1,4 @@
-// useMannaTransactions.tsx
+"use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { MannaTokenAbi } from "@/lib/abis/MannaToken"; // Ensure this ABI includes the new function
@@ -35,16 +35,38 @@ export function useMannaTransactions() {
   const [balance, setBalance] = useState<string>("0");
   const contractAddress = "0x44afFF32983b8759D9465bC4675a979432000f96"; // Update with your contract address
 
-  // Initialize Viem clients
-  const publicClient = createPublicClient({
-    chain: baseSepolia,
-    transport: custom(provider || (window as any).ethereum),
-  });
+  // Initialize Viem clients inside useEffect
+  const [publicClient, setPublicClient] = useState<any>(null);
+  const [walletClient, setWalletClient] = useState<any>(null);
 
-  const walletClient = createWalletClient({
-    chain: baseSepolia,
-    transport: custom(provider || (window as any).ethereum),
-  });
+  useEffect(() => {
+    if (provider) {
+      const pc = createPublicClient({
+        chain: baseSepolia,
+        transport: custom(provider),
+      });
+      const wc = createWalletClient({
+        chain: baseSepolia,
+        transport: custom(provider),
+      });
+      setPublicClient(pc);
+      setWalletClient(wc);
+    }
+  }, [provider]);
+
+  // Initialize Viem clients
+  // const publicClient = createPublicClient({
+  //   chain: baseSepolia,
+  //   transport: custom(
+  //     provider ||
+  //       (typeof window !== "undefined" ? (window as any).ethereum : undefined)
+  //   ),
+  // });
+
+  // const walletClient = createWalletClient({
+  //   chain: baseSepolia,
+  //   transport: custom(provider || (window as any).ethereum),
+  // });
 
   useEffect(() => {
     if (provider) {
