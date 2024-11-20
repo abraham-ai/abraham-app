@@ -52,7 +52,7 @@ export function GetMannaDialog() {
       const etherAmount = calculateEtherForManna(mannaAmount);
       await buyManna(etherAmount);
       await getMannaBalance(); // Refresh the shared balance
-      alert("Successfully purchased Manna tokens!");
+      //alert("Successfully purchased Manna tokens!");
       setIsDialogOpen(false); // Close the dialog
     } catch (error) {
       console.error("Error buying Manna:", error);
