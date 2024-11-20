@@ -8,7 +8,6 @@ import { useAuth } from "@/context/AuthContext";
 import BlessDialog from "./BlessDialog";
 import Link from "next/link";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
-import { parseUnits } from "viem";
 
 export default function Story({ story }: { story: StoryItem }) {
   const { idToken, loggedIn, userAccounts } = useAuth();
@@ -27,20 +26,16 @@ export default function Story({ story }: { story: StoryItem }) {
   const {
     praise: praiseTransaction,
     burn: burnTransaction,
-    balance,
+    balance, // BigInt balance in wei
     getMannaBalance,
   } = useMannaTransactions();
 
-  const [formattedBalance, setFormattedBalance] = useState<bigint>(BigInt(0));
-
+  // Fetch balance when the component mounts
   useEffect(() => {
-    if (balance) {
-      setFormattedBalance(BigInt(balance));
-    }
-  }, [balance]);
+    getMannaBalance();
+  }, [getMannaBalance]);
 
   const handleReaction = async (actionType: string) => {
-    console.log("User accounts:", userAccounts);
     if (!idToken) {
       throw new Error("User not authenticated");
     }
@@ -66,42 +61,28 @@ export default function Story({ story }: { story: StoryItem }) {
     setLoadingPraise(true);
     if (!loggedIn) {
       alert("Please log in to praise a story.");
+      setLoadingPraise(false);
       return;
     }
     try {
-      const amount = BigInt("1000000000000000000"); // 1 Manna (assuming 18 decimals)
-      // Convert formatted balance to wei (BigInt)
-      const balanceInWei = parseUnits(balance || "0", 18);
+      const amount = BigInt("1000000000000000000"); // 1 Manna in wei
 
-      if (balanceInWei < amount) {
-        alert("Insufficient Manna balance to bless this story.");
+      if (!balance || BigInt(balance) < 1) {
+        alert("Insufficient Manna balance to praise this story.");
+        setLoadingPraise(false);
         return;
       }
 
-      await praiseTransaction(1, amount.toString()); // use default id 1 for now
+      await praiseTransaction(1, amount);
       await handleReaction("praise");
       setPraisesCount(praisesCount + 1);
       setHasPraised(true);
       await getMannaBalance();
-      setLoadingPraise(false);
-
-      //if (hasPraised) {
-      //  alert("You have already praised this story.");
-      //} else {
-      //  if (hasBurned) {
-      //    alert("You have already burned this story.");
-      //    return;
-      //  }
-      //  await praiseTransaction(1, amount.toString()); //use default id for now
-      //  await handleReaction("praise");
-      //  setPraisesCount(praisesCount + 1);
-      //  setHasPraised(true);
-      //  await getMannaBalance();
-      //  setLoadingPraise(false);
-      //}
     } catch (error) {
       console.error("Error praising the story:", error);
       alert("Failed to praise the story. Please try again.");
+    } finally {
+      setLoadingPraise(false);
     }
   };
 
@@ -109,41 +90,28 @@ export default function Story({ story }: { story: StoryItem }) {
     setLoadingBurn(true);
     if (!loggedIn) {
       alert("Please log in to burn a story.");
+      setLoadingBurn(false);
       return;
     }
     try {
-      const amount = BigInt("1000000000000000000"); // 1 Manna
-      const balanceInWei = parseUnits(balance || "0", 18);
+      const amount = BigInt("1000000000000000000"); // 1 Manna in wei
 
-      if (balanceInWei < amount) {
-        alert("Insufficient Manna balance to bless this story.");
+      if (!balance || BigInt(balance) < 1) {
+        alert("Insufficient Manna balance to burn this story.");
+        setLoadingBurn(false);
         return;
       }
 
-      await burnTransaction(1, amount.toString()); //use default id for now
+      await burnTransaction(1, amount);
       await handleReaction("burn");
       setBurnsCount(burnsCount + 1);
       setHasBurned(true);
       await getMannaBalance();
-      setLoadingBurn(false);
-
-      //if (hasBurned) {
-      //  alert("You have already burned this story.");
-      //} else {
-      //  if (hasPraised) {
-      //    alert("You have already praised this story.");
-      //    return;
-      //  }
-      //  await burnTransaction(1, amount.toString()); //use default id for now
-      //  await handleReaction("burn");
-      //  setBurnsCount(burnsCount + 1);
-      //  setHasBurned(true);
-      //  await getMannaBalance();
-      //  setLoadingBurn(false);
-      //}
     } catch (error) {
       console.error("Error burning the story:", error);
       alert("Failed to burn the story. Please try again.");
+    } finally {
+      setLoadingBurn(false);
     }
   };
 
