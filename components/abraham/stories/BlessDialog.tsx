@@ -13,7 +13,6 @@ import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
-import { parseUnits } from "viem";
 
 export default function BlessDialog({
   story,
@@ -29,16 +28,13 @@ export default function BlessDialog({
   const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for submit button
   const {
     bless: blessTransaction,
-    balance,
+    balance, // BigInt balance in wei
     getMannaBalance,
   } = useMannaTransactions();
-  const [formattedBalance, setFormattedBalance] = useState<bigint>(BigInt(0));
 
   useEffect(() => {
-    if (balance) {
-      setFormattedBalance(BigInt(balance));
-    }
-  }, [balance]);
+    getMannaBalance();
+  }, [getMannaBalance]);
 
   const handleBlessSubmit = async () => {
     if (!idToken) {
@@ -48,15 +44,16 @@ export default function BlessDialog({
     setIsSubmitting(true);
 
     try {
-      const amount = BigInt("1000000000000000000"); // 1 Manna (assuming 18 decimals)
-      const balanceInWei = parseUnits(balance || "0", 18);
+      const amount = BigInt("1000000000000000000"); // 1 Manna in wei
 
-      if (balanceInWei < amount) {
+      if (!balance || BigInt(balance) < 1) {
         alert("Insufficient Manna balance to bless this story.");
+        setIsSubmitting(false);
         return;
       }
+
       // Perform blockchain bless transaction
-      await blessTransaction(1, blessingText); // use default id 1 for now
+      await blessTransaction(1, blessingText);
 
       // Handle server-side reaction
       const response = await fetch("/api/artlabproxy/stories/bless", {
@@ -124,16 +121,15 @@ export default function BlessDialog({
         <div className="grid grid-cols-12">
           <div className="col-span-1 flex flex-col mr-3">
             <div>
-              {userInfo?.profileImage && (
+              {userInfo?.profileImage ? (
                 <Image
-                  src={userInfo?.profileImage}
+                  src={userInfo.profileImage}
                   alt={"user image"}
                   width={100}
                   height={100}
                   className="rounded-full aspect-[1] object-cover border"
                 />
-              )}
-              {!userInfo?.profileImage && (
+              ) : (
                 <div className="rounded-full overflow-hidden">
                   <RandomPixelAvatar
                     username={userAccounts || "username"}
