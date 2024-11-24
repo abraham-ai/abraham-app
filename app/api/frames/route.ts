@@ -126,6 +126,15 @@ export async function POST(request: {
 
 function generateFrameHtml(story: { poster_image: any; logline: any }) {
   const framePostUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/frames`;
+  function escapeHtml(unsafe: string): string {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  const safeLogline = escapeHtml(story.logline);
 
   return `
     <!DOCTYPE html>
@@ -145,7 +154,7 @@ function generateFrameHtml(story: { poster_image: any; logline: any }) {
         <div style="text-align: center;">
           <h1>Abraham Creation</h1>
           <img src="${story.poster_image}" alt="${story.logline}" style="max-width: 100%;" />
-          <p>${story.logline}</p>
+          <p>${safeLogline}</p>
         </div>
       </body>
     </html>
