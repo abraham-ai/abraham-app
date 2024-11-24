@@ -1,7 +1,7 @@
 import axios from "axios";
 import { NextResponse } from "next/server";
 
-let storiesCache: string | any[] = [];
+let storiesCache: string[] = [];
 let currentIndex = 0;
 
 // Fetch stories from the external API
@@ -24,7 +24,7 @@ async function fetchStories() {
 }
 
 // Send reaction to the external API
-async function sendReaction(story_id: any, action: string) {
+async function sendReaction(story_id: string, action: string) {
   const apiUrl = "https://edenartlab--abraham-fastapi-app.modal.run/react";
   const actionData = {
     story_id,
@@ -56,10 +56,10 @@ async function sendReaction(story_id: any, action: string) {
 /**
  * GET /api/abraham-frame - Fetch the current story frame
  */
-export async function GET(request: any) {
+export async function GET(request: Request) {
   try {
     const stories = await fetchStories();
-    const currentStory = stories[currentIndex];
+    const currentStory = JSON.parse(stories[currentIndex]);
     const frameHtml = generateFrameHtml(currentStory);
 
     return new Response(frameHtml, {
@@ -82,9 +82,7 @@ export async function GET(request: any) {
 /**
  * POST /api/abraham-frame - Handle user interactions with the story
  */
-export async function POST(request: {
-  json: () => PromiseLike<{ untrustedData: any }> | { untrustedData: any };
-}) {
+export async function POST(request: Request) {
   try {
     const { untrustedData } = await request.json();
     const buttonIndex = untrustedData.buttonIndex;
@@ -93,9 +91,9 @@ export async function POST(request: {
     const currentStory = stories[currentIndex];
 
     if (buttonIndex === 1) {
-      await sendReaction(currentStory.id, "praise");
-    } else if (buttonIndex === 2) {
-      await sendReaction(currentStory.id, "burn");
+      const parsedStory = JSON.parse(currentStory);
+      await sendReaction(parsedStory.id, "praise");
+      await sendReaction(parsedStory.id, "burn");
     } else if (buttonIndex === 3) {
       currentIndex = (currentIndex + 1) % stories.length;
     } else {
@@ -106,7 +104,8 @@ export async function POST(request: {
     }
 
     const newStory = stories[currentIndex];
-    const frameHtml = generateFrameHtml(newStory);
+    const parsedNewStory = JSON.parse(newStory);
+    const frameHtml = generateFrameHtml(parsedNewStory);
     return new Response(frameHtml, {
       headers: { "Content-Type": "text/html" },
       status: 200,
@@ -124,7 +123,7 @@ export async function POST(request: {
   }
 }
 
-function generateFrameHtml(story: { poster_image: any; logline: any }) {
+function generateFrameHtml(story: { poster_image: string; logline: string }) {
   const framePostUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/frames`;
 
   return `
