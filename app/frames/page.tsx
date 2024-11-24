@@ -39,7 +39,7 @@ export default async function AbrahamFrame() {
       <body>
         {/* Content for web browsers */}
         <div style={{ textAlign: "center" }}>
-          <h1>Abraham's Creation</h1>
+          <h1>{"Abraham's Creation"}</h1>
           <img
             src={story.poster_image}
             alt={story.logline}
