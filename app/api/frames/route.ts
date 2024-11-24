@@ -143,7 +143,7 @@ function generateFrameHtml(story: { poster_image: any; logline: any }) {
       </head>
       <body>
         <div style="text-align: center;">
-          <h1>Abraham's Creation</h1>
+          <h1>Abraham Creation</h1>
           <img src="${story.poster_image}" alt="${story.logline}" style="max-width: 100%;" />
           <p>${story.logline}</p>
         </div>
