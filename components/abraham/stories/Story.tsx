@@ -129,20 +129,22 @@ export default function Story({ story }: { story: StoryItem }) {
         </div>
       </Link>
       <div className="col-span-11 flex flex-col ">
-        <Link href={`/story/${story.id}`}>
-          <p className="mb-1 mr-8">{story.logline}</p>
-          <Image
-            src={story.poster_image}
-            alt={story.logline}
-            width={500}
-            height={500}
-            className="rounded-lg aspect-[1] object-cover mt-2 border"
-          />
-        </Link>
+        <div className="flex flex-col items-center pr-8">
+          <Link href={`/story/${story.id}`}>
+            <p className="mb-1 ">{story.logline}</p>
+            <Image
+              src={story.poster_image}
+              alt={story.logline}
+              width={500}
+              height={300}
+              className="w-full rounded-lg aspect-[5/4] object-cover mt-2 border"
+            />
+          </Link>
+        </div>
         <div className="flex items-center mt-6 mb-4">
           <button
             onClick={handlePraiseClick}
-            disabled={!loggedIn || hasPraised}
+            disabled={!loggedIn}
             className={`cursor-pointer ${
               loggedIn
                 ? hasPraised
@@ -151,15 +153,19 @@ export default function Story({ story }: { story: StoryItem }) {
                 : "text-gray-300 cursor-not-allowed"
             }`}
           >
-            {!loadingPraise && <PraiseIcon className="w-9 h-5 " />}
+            {!loadingPraise && <p> 🙌 </p>}
             {loadingPraise && <Loader2Icon className="w-5 h-5 animate-spin" />}
           </button>
-          <span className="ml-1 text-sm font-semibold text-gray-500">
+          <span
+            className={`ml-1 text-sm font-semibold  ${
+              loggedIn && hasPraised ? "text-blue-500" : "text-gray-500"
+            }`}
+          >
             {praisesCount}
           </span>
           <button
             onClick={handleBurnClick}
-            disabled={!loggedIn || hasBurned}
+            disabled={!loggedIn}
             className={`ml-10 cursor-pointer ${
               loggedIn
                 ? hasBurned
@@ -168,10 +174,14 @@ export default function Story({ story }: { story: StoryItem }) {
                 : "text-gray-300 cursor-not-allowed"
             }`}
           >
-            {!loadingBurn && <FlameIcon className="w-5 h-5" />}
+            {!loadingBurn && <p> 🔥</p>}
             {loadingBurn && <Loader2Icon className="w-5 h-5 animate-spin" />}
           </button>
-          <span className="ml-1 text-sm font-semibold text-gray-500">
+          <span
+            className={`ml-1 text-sm font-semibold  ${
+              loggedIn && hasBurned ? "text-blue-500" : "text-gray-500"
+            }`}
+          >
             {burnsCount}
           </span>
           <div className={`ml-10 cursor-pointer text-gray-500`}>

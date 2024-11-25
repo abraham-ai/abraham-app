@@ -88,18 +88,24 @@ export default function BlessDialog({
     <Dialog>
       {loggedIn ? (
         <DialogTrigger asChild>
-          <MessageCircle
-            className={`w-5 h-5 ${
+          <p
+            className={`${
               loggedIn ? "text-gray-500" : "text-gray-300 cursor-not-allowed"
             }`}
-          />
+          >
+            {" "}
+            🙏{" "}
+          </p>
         </DialogTrigger>
       ) : (
-        <MessageCircle
-          className={`w-5 h-5 ${
+        <p
+          className={`${
             loggedIn ? "text-gray-500" : "text-gray-300 cursor-not-allowed"
           }`}
-        />
+        >
+          {" "}
+          🙏{" "}
+        </p>
       )}
       <DialogContent className="sm:max-w-xl bg-white">
         <div className="grid grid-cols-12 mt-1">
