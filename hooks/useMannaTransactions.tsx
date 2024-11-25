@@ -174,11 +174,10 @@ export function useMannaTransactions() {
   };
 
   // Function to praise a creation
-  const praise = async (
-    creationId: number | bigint,
-    amount: string | bigint
-  ) => {
-    if (!provider || !contractAddress) return;
+  const praise = async (creationId: number | bigint, amount: bigint) => {
+    if (!provider || !contractAddress || !publicClient || !walletClient) {
+      throw new Error("Required dependencies are missing");
+    }
     try {
       const [address] = await walletClient.getAddresses();
 
@@ -187,19 +186,22 @@ export function useMannaTransactions() {
         address: contractAddress as `0x${string}`,
         abi: MannaTokenAbi,
         functionName: "praise",
-        args: [BigInt(creationId), BigInt(amount)],
+        args: [BigInt(creationId), amount],
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       // Update balance after transaction
       await getMannaBalance();
     } catch (error) {
       console.error("Error praising creation:", error);
+      throw error; // Re-throw the error to propagate it to the calling function
     }
   };
 
-  // Function to burn a creation (not to be confused with burning tokens)
-  const burn = async (creationId: number | bigint, amount: string | bigint) => {
-    if (!provider || !contractAddress) return;
+  // Function to burn a creation
+  const burn = async (creationId: number | bigint, amount: bigint) => {
+    if (!provider || !contractAddress || !publicClient || !walletClient) {
+      throw new Error("Required dependencies are missing");
+    }
     try {
       const [address] = await walletClient.getAddresses();
 
@@ -208,13 +210,14 @@ export function useMannaTransactions() {
         address: contractAddress as `0x${string}`,
         abi: MannaTokenAbi,
         functionName: "burn",
-        args: [BigInt(creationId), BigInt(amount)],
+        args: [BigInt(creationId), amount],
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       // Update balance after transaction
       await getMannaBalance();
     } catch (error) {
       console.error("Error burning creation:", error);
+      throw error; // Re-throw the error to propagate it to the calling function
     }
   };
 
