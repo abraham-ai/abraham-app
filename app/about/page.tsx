@@ -40,7 +40,13 @@ export default function AboutPage() {
           </h2>
           <p className="text-gray-700">
             {
-              "Abraham is an open and collaborative project aimed at creating anautonomous artificial artist (AAA). By leveraging the collective imagination of a decentralized network, Abraham produces original, unique, and unreplicable works of art."
+              "Abraham is an open and collaborative project aimed at creating an "
+            }{" "}
+            <a href="https://medium.com/@genekogan/artist-in-the-cloud-8384824a75c7">
+              {"autonomous artificial artist (AAA). "}
+            </a>
+            {
+              "By leveraging the collective imagination of a decentralized network, Abraham produces original, unique, and unreplicable works of art."
             }
           </p>
 
