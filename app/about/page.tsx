@@ -17,7 +17,7 @@ export default function AboutPage() {
 
         <header className="mt-8 text-center">
           {/* Embedded Video */}
-          <div className="mt-12 w-full w-96">
+          <div className="mt-12 w-96">
             <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden">
               <video
                 autoPlay
