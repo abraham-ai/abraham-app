@@ -1,3 +1,4 @@
+// Story.tsx
 "use client";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
@@ -7,9 +8,18 @@ import { useAuth } from "@/context/AuthContext";
 import BlessDialog from "./BlessDialog";
 import Link from "next/link";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function Story({ story }: { story: StoryItem }) {
-  const { idToken, loggedIn, userAccounts } = useAuth();
+  const { idToken, loggedIn, userAccounts, login, loadingAuth } = useAuth();
   const [praisesCount, setPraisesCount] = useState(story.praises.length);
   const [burnsCount, setBurnsCount] = useState(story.burns.length);
   const [loadingPraise, setLoadingPraise] = useState(false);
@@ -21,6 +31,7 @@ export default function Story({ story }: { story: StoryItem }) {
   const [hasBurned, setHasBurned] = useState(
     story.burns.includes(userAccounts || "")
   );
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
   const {
     praise: praiseTransaction,
@@ -59,7 +70,7 @@ export default function Story({ story }: { story: StoryItem }) {
   const handlePraiseClick = async () => {
     setLoadingPraise(true);
     if (!loggedIn) {
-      alert("Please log in to praise a story.");
+      setIsLoginDialogOpen(true);
       setLoadingPraise(false);
       return;
     }
@@ -88,7 +99,7 @@ export default function Story({ story }: { story: StoryItem }) {
   const handleBurnClick = async () => {
     setLoadingBurn(true);
     if (!loggedIn) {
-      alert("Please log in to burn a story.");
+      setIsLoginDialogOpen(true);
       setLoadingBurn(false);
       return;
     }
@@ -115,86 +126,115 @@ export default function Story({ story }: { story: StoryItem }) {
   };
 
   return (
-    <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
-      <Link href={`/story/${story.id}`}>
-        <div className="col-span-1 flex flex-col mr-3">
-          <Image
-            src={"/abrahamlogo.png"}
-            alt={story.logline}
-            width={100}
-            height={100}
-            className="rounded-full aspect-[1] object-cover border"
-          />
-        </div>
-      </Link>
-      <div className="col-span-11 flex flex-col ">
-        <div className="flex flex-col items-center pr-8">
-          <Link href={`/story/${story.id}`}>
-            <p className="mb-1 ">{story.logline}</p>
+    <>
+      <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
+        <Link href={`/story/${story.id}`}>
+          <div className="col-span-1 flex flex-col mr-3">
             <Image
-              src={story.poster_image}
+              src={"/abrahamlogo.png"}
               alt={story.logline}
-              width={500}
-              height={300}
-              className="w-full rounded-lg aspect-[5/4] object-cover mt-2 border"
-            />
-          </Link>
-        </div>
-        <div className="flex items-center mt-6 mb-4">
-          <button
-            onClick={handlePraiseClick}
-            disabled={!loggedIn}
-            className={`cursor-pointer ${
-              loggedIn
-                ? hasPraised
-                  ? "text-blue-500 cursor-not-allowed"
-                  : "text-gray-500"
-                : "text-gray-300 cursor-not-allowed"
-            }`}
-          >
-            {!loadingPraise && <p> 🙌 </p>}
-            {loadingPraise && <Loader2Icon className="w-5 h-5 animate-spin" />}
-          </button>
-          <span
-            className={`ml-1 text-sm font-semibold  ${
-              loggedIn && hasPraised ? "text-blue-600" : "text-gray-500"
-            }`}
-          >
-            {praisesCount}
-          </span>
-          <button
-            onClick={handleBurnClick}
-            disabled={!loggedIn}
-            className={`ml-10 cursor-pointer ${
-              loggedIn
-                ? hasBurned
-                  ? "text-red-500 cursor-not-allowed"
-                  : "text-gray-500"
-                : "text-gray-300 cursor-not-allowed"
-            }`}
-          >
-            {!loadingBurn && <p> 🔥</p>}
-            {loadingBurn && <Loader2Icon className="w-5 h-5 animate-spin" />}
-          </button>
-          <span
-            className={`ml-1 text-sm font-semibold  ${
-              loggedIn && hasBurned ? "text-blue-600" : "text-gray-500"
-            }`}
-          >
-            {burnsCount}
-          </span>
-          <div className={`ml-10 cursor-pointer text-gray-500`}>
-            <BlessDialog
-              story={story}
-              blessingsCount={blessingsCount}
-              setBlessingsCount={setBlessingsCount}
+              width={100}
+              height={100}
+              className="rounded-full aspect-[1] object-cover border"
             />
           </div>
-          <span className="ml-1 text-sm font-semibold text-gray-500">
-            {blessingsCount}
-          </span>
+        </Link>
+        <div className="col-span-11 flex flex-col ">
+          <div className="flex flex-col items-center pr-8">
+            <Link href={`/story/${story.id}`}>
+              <p className="mb-1 ">{story.logline}</p>
+              <Image
+                src={story.poster_image}
+                alt={story.logline}
+                width={500}
+                height={300}
+                className="w-full rounded-lg aspect-[5/4] object-cover mt-2 border"
+              />
+            </Link>
+          </div>
+          <div className="flex items-center mt-6 mb-4">
+            <button
+              onClick={handlePraiseClick}
+              disabled={loggedIn && hasPraised}
+              className={`cursor-pointer ${
+                loggedIn
+                  ? hasPraised
+                    ? "text-blue-500 cursor-not-allowed"
+                    : "text-gray-500"
+                  : "text-gray-500"
+              }`}
+            >
+              {!loadingPraise && <p> 🙌 </p>}
+              {loadingPraise && (
+                <Loader2Icon className="w-5 h-5 animate-spin" />
+              )}
+            </button>
+            <span
+              className={`ml-1 text-sm font-semibold  ${
+                loggedIn && hasPraised ? "text-blue-600" : "text-gray-500"
+              }`}
+            >
+              {praisesCount}
+            </span>
+            <button
+              onClick={handleBurnClick}
+              disabled={loggedIn && hasBurned}
+              className={`ml-10 cursor-pointer ${
+                loggedIn
+                  ? hasBurned
+                    ? "text-red-500 cursor-not-allowed"
+                    : "text-gray-500"
+                  : "text-gray-500"
+              }`}
+            >
+              {!loadingBurn && <p> 🔥</p>}
+              {loadingBurn && <Loader2Icon className="w-5 h-5 animate-spin" />}
+            </button>
+            <span
+              className={`ml-1 text-sm font-semibold  ${
+                loggedIn && hasBurned ? "text-blue-600" : "text-gray-500"
+              }`}
+            >
+              {burnsCount}
+            </span>
+            <div className={`ml-10 cursor-pointer text-gray-500`}>
+              {loggedIn ? (
+                <BlessDialog
+                  story={story}
+                  blessingsCount={blessingsCount}
+                  setBlessingsCount={setBlessingsCount}
+                />
+              ) : (
+                <button
+                  onClick={() => setIsLoginDialogOpen(true)}
+                  className="text-gray-500"
+                >
+                  <p>🙏</p>
+                </button>
+              )}
+            </div>
+            <span className="ml-1 text-sm font-semibold text-gray-500">
+              {blessingsCount}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent className="bg-white">
+          <DialogHeader>
+            <DialogTitle>Authentication Required</DialogTitle>
+            <DialogDescription>
+              You need to log in to perform this action.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={login} disabled={loadingAuth}>
+              {loadingAuth ? "Logging in..." : "Log In"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

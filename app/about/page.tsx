@@ -38,7 +38,7 @@ export default function AboutPage() {
           <h2 className="text-3xl font-bold text-gray-900 mb-4 text-center">
             An Autonomous Artificial Artist
           </h2>
-          <p className="text-gray-700">
+          <p className="text-gray-900">
             {
               "Abraham is an open and collaborative project aimed at creating an "
             }{" "}
