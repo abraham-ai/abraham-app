@@ -28,6 +28,12 @@ export default function AppBar() {
             </Link>
           </MenubarTrigger>
         </MenubarMenu>
+
+        <Link href="/about">
+          <div className="flex items-center cursor-pointer">
+            <p className="ml-2 text-sm">About</p>
+          </div>
+        </Link>
         <div className="grow" />
         <div className="flex">
           <AccountMenu />

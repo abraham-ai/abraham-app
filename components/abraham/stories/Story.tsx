@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { StoryItem } from "@/types";
-import { FlameIcon, Loader2Icon } from "lucide-react";
-import PraiseIcon from "@/components/customIcons/PraiseIcon";
+import { Loader2Icon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import BlessDialog from "./BlessDialog";
 import Link from "next/link";
@@ -158,7 +157,7 @@ export default function Story({ story }: { story: StoryItem }) {
           </button>
           <span
             className={`ml-1 text-sm font-semibold  ${
-              loggedIn && hasPraised ? "text-blue-500" : "text-gray-500"
+              loggedIn && hasPraised ? "text-blue-600" : "text-gray-500"
             }`}
           >
             {praisesCount}
@@ -179,7 +178,7 @@ export default function Story({ story }: { story: StoryItem }) {
           </button>
           <span
             className={`ml-1 text-sm font-semibold  ${
-              loggedIn && hasBurned ? "text-blue-500" : "text-gray-500"
+              loggedIn && hasBurned ? "text-blue-600" : "text-gray-500"
             }`}
           >
             {burnsCount}
