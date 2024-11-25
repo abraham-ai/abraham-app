@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import StoryList from "@/components/abraham/stories/StoryList";
-import AccountMenu from "@/components/account/AccountMenu";
+import AppBar from "@/components/layout/AppBar";
 
 export default function Home() {
   const [stories, setStories] = useState([]);
@@ -17,10 +17,8 @@ export default function Home() {
   return (
     <>
       <div>
-        <div className="fixed top-0 right-0">
-          <AccountMenu />
-        </div>
-        <div className=" flex flex-col items-center justify-center w-full">
+        <AppBar />
+        <div className="mt-12 flex flex-col items-center justify-center w-full">
           <StoryList stories={stories || []} />
         </div>
       </div>
