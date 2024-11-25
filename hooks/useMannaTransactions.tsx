@@ -116,7 +116,9 @@ export function useMannaTransactions() {
 
   // Function to buy Manna tokens
   const buyManna = async (etherAmount: string) => {
-    if (!provider || !contractAddress) return;
+    if (!provider || !contractAddress || !publicClient || !walletClient) {
+      throw new Error("Required dependencies are missing");
+    }
     try {
       const [address] = await walletClient.getAddresses();
 
@@ -133,6 +135,7 @@ export function useMannaTransactions() {
       await getMannaBalance();
     } catch (error) {
       console.error("Error buying Manna:", error);
+      throw error; // Re-throw the error to propagate it to the calling function
     }
   };
 
