@@ -5,6 +5,8 @@ interface Story {
   id: string;
   poster_image: string;
   logline: string;
+  praises: string[];
+  burns: string[];
 }
 
 let storiesCache: Story[] = [];
@@ -133,7 +135,12 @@ export async function POST(request: Request) {
   }
 }
 
-function generateFrameHtml(story: { poster_image: string; logline: string }) {
+function generateFrameHtml(story: {
+  praises: any;
+  burns: any;
+  poster_image: string;
+  logline: string;
+}) {
   const framePostUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/frames`;
 
   return `
@@ -144,8 +151,12 @@ function generateFrameHtml(story: { poster_image: string; logline: string }) {
         <meta property="fc:frame:image" content="${story.poster_image}" />
         <meta property="og:image" content="${story.poster_image}" />
 
-        <meta property="fc:frame:button:1" content=" 🙌 praise" />
-        <meta property="fc:frame:button:2" content="🔥 burn" />
+        <meta property="fc:frame:button:1" content=" 🙌 (${
+          story.praises.length || 0
+        })" />
+        <meta property="fc:frame:button:2" content="🔥 (${
+          story.burns.length || 0
+        })" />
         <meta property="fc:frame:button:3" content="Next" />
 
         <meta property="fc:frame:post_url" content="${framePostUrl}" />
@@ -153,7 +164,9 @@ function generateFrameHtml(story: { poster_image: string; logline: string }) {
       <body>
         <div style="text-align: center;">
           <h1>Abraham's Creation</h1>
-          <img src="${story.poster_image}" alt="${story.logline}" style="max-width: 100%;" />
+          <img src="${story.poster_image}" alt="${
+    story.logline
+  }" style="max-width: 100%;" />
           <p>${story.logline}</p>
         </div>
       </body>
