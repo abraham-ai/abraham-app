@@ -144,8 +144,8 @@ function generateFrameHtml(story: { poster_image: string; logline: string }) {
         <meta property="fc:frame:image" content="${story.poster_image}" />
         <meta property="og:image" content="${story.poster_image}" />
 
-        <meta property="fc:frame:button:1" content="Praise" />
-        <meta property="fc:frame:button:2" content="Burn" />
+        <meta property="fc:frame:button:1" content=" 🙌 praise" />
+        <meta property="fc:frame:button:2" content="🔥 burn" />
         <meta property="fc:frame:button:3" content="Next" />
 
         <meta property="fc:frame:post_url" content="${framePostUrl}" />
