@@ -29,8 +29,8 @@ export default async function AbrahamFrame() {
         <meta property="og:image" content={story.poster_image} />
 
         {/* Buttons */}
-        <meta property="fc:frame:button:1" content="Praise" />
-        <meta property="fc:frame:button:2" content="Burn" />
+        <meta property="fc:frame:button:1" content="🙌 praise" />
+        <meta property="fc:frame:button:2" content="🔥 burn" />
         <meta property="fc:frame:button:3" content="Next" />
 
         {/* Post URL for handling button clicks */}
