@@ -1,17 +1,29 @@
 import axios from "axios";
 import { NextResponse } from "next/server";
 
-let storiesCache: string[] = [];
+interface Story {
+  id: string;
+  poster_image: string;
+  logline: string;
+}
+
+let storiesCache: Story[] = [];
 let currentIndex = 0;
 
 // Fetch stories from the external API
 async function fetchStories() {
   if (storiesCache.length === 0) {
     try {
-      const response = await axios.get(
+      const response = await fetch(
         "https://edenartlab--abraham-fastapi-app.modal.run/get_stories"
       );
-      storiesCache = response.data;
+
+      if (!response.ok) {
+        throw new Error(`Error fetching stories: ${response.statusText}`);
+      }
+
+      const stories = await response.json();
+      storiesCache = stories;
     } catch (error) {
       if (error instanceof Error) {
         console.error("Error fetching stories:", error.message);
@@ -59,7 +71,7 @@ async function sendReaction(story_id: string, action: string) {
 export async function GET(request: Request) {
   try {
     const stories = await fetchStories();
-    const currentStory = JSON.parse(stories[currentIndex]);
+    const currentStory = stories[currentIndex];
     const frameHtml = generateFrameHtml(currentStory);
 
     return new Response(frameHtml, {
@@ -91,9 +103,8 @@ export async function POST(request: Request) {
     const currentStory = stories[currentIndex];
 
     if (buttonIndex === 1) {
-      const parsedStory = JSON.parse(currentStory);
-      await sendReaction(parsedStory.id, "praise");
-      await sendReaction(parsedStory.id, "burn");
+      await sendReaction(currentStory.id, "praise");
+      await sendReaction(currentStory.id, "burn");
     } else if (buttonIndex === 3) {
       currentIndex = (currentIndex + 1) % stories.length;
     } else {
@@ -104,8 +115,7 @@ export async function POST(request: Request) {
     }
 
     const newStory = stories[currentIndex];
-    const parsedNewStory = JSON.parse(newStory);
-    const frameHtml = generateFrameHtml(parsedNewStory);
+    const frameHtml = generateFrameHtml(newStory);
     return new Response(frameHtml, {
       headers: { "Content-Type": "text/html" },
       status: 200,
