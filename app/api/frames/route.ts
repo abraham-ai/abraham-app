@@ -105,7 +105,12 @@ export async function POST(request: Request) {
     const currentStory = stories[currentIndex];
 
     if (buttonIndex === 1) {
+      // Add a dummy praise for demonstration purposes
+      currentStory.praises.push("dummy_user"); // Update the local cache
       await sendReaction(currentStory.id, "praise");
+    } else if (buttonIndex === 2) {
+      // Add a dummy burn for demonstration purposes
+      currentStory.burns.push("dummy_user"); // Update the local cache
       await sendReaction(currentStory.id, "burn");
     } else if (buttonIndex === 3) {
       currentIndex = (currentIndex + 1) % stories.length;
