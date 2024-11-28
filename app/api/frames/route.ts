@@ -151,12 +151,12 @@ function generateFrameHtml(story: {
         <meta property="fc:frame:image" content="${story.poster_image}" />
         <meta property="og:image" content="${story.poster_image}" />
 
-        <meta property="fc:frame:button:1" content=" 🙌 (${
+        <meta property="fc:frame:button:1" content=" 🙌 ${
           story.praises.length || 0
-        })" />
-        <meta property="fc:frame:button:2" content="🔥 (${
+        }" />
+        <meta property="fc:frame:button:2" content="🔥 ${
           story.burns.length || 0
-        })" />
+        }" />
         <meta property="fc:frame:button:3" content="Next" />
 
         <meta property="fc:frame:post_url" content="${framePostUrl}" />
