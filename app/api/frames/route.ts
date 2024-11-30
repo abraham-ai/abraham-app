@@ -1,47 +1,64 @@
 import axios from "axios";
 import { NextResponse } from "next/server";
 
-interface Story {
+interface Creation {
   id: string;
-  poster_image: string;
-  logline: string;
+  artwork: {
+    title: string;
+    description: string;
+    visual_aesthetic: string;
+  };
+  result: {
+    output: [
+      {
+        mediaAttributes: {
+          mimeType: string;
+          width: number;
+          height: number;
+          aspectRatio: number;
+        };
+        url: string;
+      }
+    ];
+    status: string;
+  };
   praises: string[];
   burns: string[];
 }
 
-let storiesCache: Story[] = [];
+let creationsCache: Creation[] = [];
 let currentIndex = 0;
 
-// Fetch stories from the external API
-async function fetchStories() {
-  if (storiesCache.length === 0) {
+// Fetch creations from the external API
+async function fetchCreations() {
+  if (creationsCache.length === 0) {
     try {
       const response = await fetch(
-        "https://edenartlab--abraham-fastapi-app.modal.run/get_stories"
+        "https://edenartlab--abraham2-fastapi-app.modal.run/get_creations"
       );
 
       if (!response.ok) {
-        throw new Error(`Error fetching stories: ${response.statusText}`);
+        throw new Error(`Error fetching creations: ${response.statusText}`);
       }
 
-      const stories = await response.json();
-      storiesCache = stories;
+      const creations = await response.json();
+      creationsCache = creations;
     } catch (error) {
       if (error instanceof Error) {
-        console.error("Error fetching stories:", error.message);
+        console.error("Error fetching creations:", error.message);
       } else {
-        console.error("Error fetching stories:", error);
+        console.error("Error fetching creations:", error);
       }
     }
   }
-  return storiesCache;
+  return creationsCache;
 }
 
 // Send reaction to the external API
-async function sendReaction(story_id: string, action: string) {
-  const apiUrl = "https://edenartlab--abraham-fastapi-app.modal.run/react";
+async function sendReaction(creation_id: string, action: string) {
+  const apiUrl = "https://edenartlab--abraham2-fastapi-app.modal.run/react";
   const actionData = {
-    story_id,
+    creation_id,
     action,
     user: "anonymous",
   };
@@ -57,24 +74,27 @@ async function sendReaction(story_id: string, action: string) {
   } catch (error) {
     if (error instanceof Error) {
       console.error(
-        `Error performing ${action} on story ${story_id}:`,
+        `Error performing ${action} on creation ${creation_id}:`,
         error.message
       );
     } else {
-      console.error(`Error performing ${action} on story ${story_id}:`, error);
+      console.error(
+        `Error performing ${action} on creation ${creation_id}:`,
+        error
+      );
     }
     throw error;
   }
 }
 
 /**
- * GET /api/abraham-frame - Fetch the current story frame
+ * GET /api/frames - Fetch the current creation frame
  */
 export async function GET(request: Request) {
   try {
-    const stories = await fetchStories();
-    const currentStory = stories[currentIndex];
-    const frameHtml = generateFrameHtml(currentStory);
+    const creations = await fetchCreations();
+    const currentCreation = creations[currentIndex];
+    const frameHtml = generateFrameHtml(currentCreation);
 
     return new Response(frameHtml, {
       headers: { "Content-Type": "text/html" },
@@ -82,9 +102,9 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     if (error instanceof Error) {
-      console.error("Error fetching story frame:", error.message);
+      console.error("Error fetching creation frame:", error.message);
     } else {
-      console.error("Error fetching story frame:", error);
+      console.error("Error fetching creation frame:", error);
     }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
@@ -94,26 +114,26 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST /api/abraham-frame - Handle user interactions with the story
+ * POST /api/frames - Handle user interactions with the creation
  */
 export async function POST(request: Request) {
   try {
     const { untrustedData } = await request.json();
     const buttonIndex = untrustedData.buttonIndex;
 
-    const stories = await fetchStories();
-    const currentStory = stories[currentIndex];
+    const creations = await fetchCreations();
+    const currentCreation = creations[currentIndex];
 
     if (buttonIndex === 1) {
       // Add a dummy praise for demonstration purposes
-      currentStory.praises.push("dummy_user"); // Update the local cache
-      await sendReaction(currentStory.id, "praise");
+      currentCreation.praises.push("dummy_user"); // Update the local cache
+      await sendReaction(currentCreation.id, "praise");
     } else if (buttonIndex === 2) {
       // Add a dummy burn for demonstration purposes
-      currentStory.burns.push("dummy_user"); // Update the local cache
-      await sendReaction(currentStory.id, "burn");
+      currentCreation.burns.push("dummy_user"); // Update the local cache
+      await sendReaction(currentCreation.id, "burn");
     } else if (buttonIndex === 3) {
-      currentIndex = (currentIndex + 1) % stories.length;
+      currentIndex = (currentIndex + 1) % creations.length;
     } else {
       return NextResponse.json(
         { error: "Invalid button index" },
@@ -121,8 +141,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const newStory = stories[currentIndex];
-    const frameHtml = generateFrameHtml(newStory);
+    const newCreation = creations[currentIndex];
+    const frameHtml = generateFrameHtml(newCreation);
     return new Response(frameHtml, {
       headers: { "Content-Type": "text/html" },
       status: 200,
@@ -140,28 +160,24 @@ export async function POST(request: Request) {
   }
 }
 
-function generateFrameHtml(story: {
-  praises: any;
-  burns: any;
-  poster_image: string;
-  logline: string;
-}) {
+function generateFrameHtml(creation: Creation) {
   const framePostUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/frames`;
+
+  const imageUrl = creation.result.output[0]?.url || "";
+  const title = creation.artwork.title;
+  const praisesCount = creation.praises.length || 0;
+  const burnsCount = creation.burns.length || 0;
 
   return `
     <!DOCTYPE html>
     <html>
       <head>
         <meta property="fc:frame" content="vNext" />
-        <meta property="fc:frame:image" content="${story.poster_image}" />
-        <meta property="og:image" content="${story.poster_image}" />
+        <meta property="fc:frame:image" content="${imageUrl}" />
+        <meta property="og:image" content="${imageUrl}" />
 
-        <meta property="fc:frame:button:1" content=" 🙌 ${
-          story.praises.length || 0
-        }" />
-        <meta property="fc:frame:button:2" content="🔥 ${
-          story.burns.length || 0
-        }" />
+        <meta property="fc:frame:button:1" content=" 🙌 ${praisesCount}" />
+        <meta property="fc:frame:button:2" content="🔥 ${burnsCount}" />
         <meta property="fc:frame:button:3" content="Next" />
 
         <meta property="fc:frame:post_url" content="${framePostUrl}" />
@@ -169,10 +185,8 @@ function generateFrameHtml(story: {
       <body>
         <div style="text-align: center;">
           <h1>Abraham's Creation</h1>
-          <img src="${story.poster_image}" alt="${
-    story.logline
-  }" style="max-width: 100%;" />
-          <p>${story.logline}</p>
+          <img src="${imageUrl}" alt="${title}" style="max-width: 100%;" />
+          <p>${title}</p>
         </div>
       </body>
     </html>

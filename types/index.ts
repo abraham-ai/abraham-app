@@ -1,12 +1,29 @@
-export interface StoryItem {
-  id: string;
-  logline: string;
-  poster_image: string;
-  poster_thumbnail: string;
+export interface CreationItem {
+  _id: string;
+  creation: {
+    title: string;
+    description: string;
+    visual_aesthetic: string;
+  };
+  result: {
+    output: Array<{
+      mediaAttributes: {
+        mimeType: string;
+        width: number;
+        height: number;
+        aspectRatio: number;
+      };
+      url: string;
+    }>;
+    status: string;
+  };
   praises: string[];
   burns: string[];
-  blessings: Blessing[];
-  stills: string[];
+  blessings: Array<{
+    blessing: string;
+    user: string;
+  }>;
+  stills?: string[]; // If applicable
 }
 
 export interface Blessing {

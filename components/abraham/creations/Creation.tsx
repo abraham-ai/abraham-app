@@ -1,8 +1,9 @@
-// Story.tsx
+// File: /components/abraham/creations/Creation.tsx
+
 "use client";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { StoryItem } from "@/types";
+import { CreationItem } from "@/types";
 import { Loader2Icon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import BlessDialog from "./BlessDialog";
@@ -18,18 +19,20 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-export default function Story({ story }: { story: StoryItem }) {
+export default function Creation({ creation }: { creation: CreationItem }) {
   const { idToken, loggedIn, userAccounts, login, loadingAuth } = useAuth();
-  const [praisesCount, setPraisesCount] = useState(story.praises.length);
-  const [burnsCount, setBurnsCount] = useState(story.burns.length);
+  const [praisesCount, setPraisesCount] = useState(creation.praises.length);
+  const [burnsCount, setBurnsCount] = useState(creation.burns.length);
   const [loadingPraise, setLoadingPraise] = useState(false);
   const [loadingBurn, setLoadingBurn] = useState(false);
-  const [blessingsCount, setBlessingsCount] = useState(story.blessings.length);
+  const [blessingsCount, setBlessingsCount] = useState(
+    creation.blessings.length
+  );
   const [hasPraised, setHasPraised] = useState(
-    story.praises.includes(userAccounts || "")
+    creation.praises.includes(userAccounts || "")
   );
   const [hasBurned, setHasBurned] = useState(
-    story.burns.includes(userAccounts || "")
+    creation.burns.includes(userAccounts || "")
   );
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
@@ -49,6 +52,7 @@ export default function Story({ story }: { story: StoryItem }) {
     if (!idToken) {
       throw new Error("User not authenticated");
     }
+    console.log("Creeation id", creation._id);
     const response = await fetch("/api/artlabproxy/stories", {
       method: "POST",
       headers: {
@@ -56,14 +60,14 @@ export default function Story({ story }: { story: StoryItem }) {
         Authorization: `Bearer ${idToken}`,
       },
       body: JSON.stringify({
-        story_id: story.id,
+        creation_id: creation._id,
         action: actionType,
         address: userAccounts,
       }),
     });
 
     if (!response.ok) {
-      throw new Error("Error reacting to story");
+      throw new Error("Error reacting to creation");
     }
   };
 
@@ -78,7 +82,7 @@ export default function Story({ story }: { story: StoryItem }) {
       const amount = BigInt("1000000000000000000"); // 1 Manna in wei
 
       if (!balance || BigInt(balance) < 1) {
-        alert("Insufficient Manna balance to praise this story.");
+        alert("Insufficient Manna balance to praise this creation.");
         setLoadingPraise(false);
         return;
       }
@@ -89,8 +93,8 @@ export default function Story({ story }: { story: StoryItem }) {
       setHasPraised(true);
       await getMannaBalance();
     } catch (error) {
-      console.error("Error praising the story:", error);
-      alert("Failed to praise the story. Please try again.");
+      console.error("Error praising the creation:", error);
+      alert("Failed to praise the creation. Please try again.");
     } finally {
       setLoadingPraise(false);
     }
@@ -107,7 +111,7 @@ export default function Story({ story }: { story: StoryItem }) {
       const amount = BigInt("1000000000000000000"); // 1 Manna in wei
 
       if (!balance || BigInt(balance) < 1) {
-        alert("Insufficient Manna balance to burn this story.");
+        alert("Insufficient Manna balance to burn this creation.");
         setLoadingBurn(false);
         return;
       }
@@ -118,8 +122,8 @@ export default function Story({ story }: { story: StoryItem }) {
       setHasBurned(true);
       await getMannaBalance();
     } catch (error) {
-      console.error("Error burning the story:", error);
-      alert("Failed to burn the story. Please try again.");
+      console.error("Error burning the creation:", error);
+      alert("Failed to burn the creation. Please try again.");
     } finally {
       setLoadingBurn(false);
     }
@@ -128,11 +132,11 @@ export default function Story({ story }: { story: StoryItem }) {
   return (
     <>
       <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
-        <Link href={`/story/${story.id}`}>
+        <Link href={`/creation/${creation._id}`}>
           <div className="col-span-1 flex flex-col mr-3">
             <Image
               src={"/abrahamlogo.png"}
-              alt={story.logline}
+              alt={creation.creation.title}
               width={100}
               height={100}
               className="rounded-full aspect-[1] object-cover border"
@@ -141,11 +145,11 @@ export default function Story({ story }: { story: StoryItem }) {
         </Link>
         <div className="col-span-11 flex flex-col ">
           <div className="flex flex-col items-center pr-8">
-            <Link href={`/story/${story.id}`}>
-              <p className="mb-1 ">{story.logline}</p>
+            <Link href={`/creation/${creation._id}`}>
+              <p className="mb-1 ">{creation.creation.description}</p>
               <Image
-                src={story.poster_image}
-                alt={story.logline}
+                src={creation.result.output[0]?.url}
+                alt={creation.creation.title}
                 width={500}
                 height={300}
                 className="w-full rounded-lg aspect-[5/4] object-cover mt-2 border"
@@ -200,7 +204,7 @@ export default function Story({ story }: { story: StoryItem }) {
             <div className={`ml-10 cursor-pointer text-gray-500`}>
               {loggedIn ? (
                 <BlessDialog
-                  story={story}
+                  creation={creation}
                   blessingsCount={blessingsCount}
                   setBlessingsCount={setBlessingsCount}
                 />
