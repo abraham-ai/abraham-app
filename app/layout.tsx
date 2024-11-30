@@ -18,6 +18,24 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Abraham",
   description: "An Autonomous Artificial Artist",
+  openGraph: {
+    title: "Abraham",
+    description: "An Autonomous Artificial Artist",
+    images: [
+      {
+        url: "/abrahamlogo.png",
+        width: 1200,
+        height: 630,
+        alt: "Abraham Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Abraham",
+    description: "An Autonomous Artificial Artist",
+    images: ["/abrahamlogo.png"],
+  },
 };
 
 export default function RootLayout({
