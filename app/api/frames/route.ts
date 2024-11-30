@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 interface Creation {
   id: string;
-  artwork: {
+  creation: {
     title: string;
     description: string;
     visual_aesthetic: string;
@@ -164,7 +164,7 @@ function generateFrameHtml(creation: Creation) {
   const framePostUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/frames`;
 
   const imageUrl = creation.result.output[0]?.url || "";
-  const title = creation.artwork.title;
+  const title = creation.creation.title;
   const praisesCount = creation.praises.length || 0;
   const burnsCount = creation.burns.length || 0;
 

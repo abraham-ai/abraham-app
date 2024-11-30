@@ -18,7 +18,7 @@ export default async function AbrahamFrame() {
   const creation = creations[0]; // Start with the first creation
 
   const imageUrl = creation.result.output[0]?.url || "";
-  const title = creation.artwork.title;
+  const title = creation.creation.title;
   const praisesCount = creation.praises.length || 0;
   const burnsCount = creation.burns.length || 0;
 
