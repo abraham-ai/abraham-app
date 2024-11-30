@@ -2,7 +2,7 @@ import axios from "axios";
 import { NextResponse } from "next/server";
 
 interface Creation {
-  id: string;
+  _id: string;
   creation: {
     title: string;
     description: string;
@@ -127,11 +127,11 @@ export async function POST(request: Request) {
     if (buttonIndex === 1) {
       // Add a dummy praise for demonstration purposes
       currentCreation.praises.push("dummy_user"); // Update the local cache
-      await sendReaction(currentCreation.id, "praise");
+      await sendReaction(currentCreation._id, "praise");
     } else if (buttonIndex === 2) {
       // Add a dummy burn for demonstration purposes
       currentCreation.burns.push("dummy_user"); // Update the local cache
-      await sendReaction(currentCreation.id, "burn");
+      await sendReaction(currentCreation._id, "burn");
     } else if (buttonIndex === 3) {
       currentIndex = (currentIndex + 1) % creations.length;
     } else {
