@@ -8,24 +8,23 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { MessageCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 
 export default function BlessDialog({
-  story,
+  creation,
   blessingsCount,
   setBlessingsCount,
 }: {
-  story: { id: string; logline: string };
+  creation: { _id: string; creation: { title: string; description: string } };
   blessingsCount: number;
   setBlessingsCount: (count: number) => void;
 }) {
   const { loggedIn, userInfo, idToken, userAccounts } = useAuth();
-  const [blessingText, setBlessingText] = useState(""); // State for blessing text
-  const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for submit button
+  const [blessingText, setBlessingText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     bless: blessTransaction,
     balance, // BigInt balance in wei
@@ -47,7 +46,7 @@ export default function BlessDialog({
       const amount = BigInt("1000000000000000000"); // 1 Manna in wei
 
       if (!balance || BigInt(balance) < 1) {
-        alert("Insufficient Manna balance to bless this story.");
+        alert("Insufficient Manna balance to bless this creation.");
         setIsSubmitting(false);
         return;
       }
@@ -60,12 +59,12 @@ export default function BlessDialog({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`, // JWT for authentication
+          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          story_id: story.id, // Story ID
-          blessing: blessingText, // User's blessing/comment
-          address: userAccounts, // User's public address
+          creation_id: creation._id,
+          blessing: blessingText,
+          address: userAccounts,
         }),
       });
 
@@ -78,7 +77,7 @@ export default function BlessDialog({
       }
     } catch (error) {
       console.error("Error submitting blessing:", error);
-      alert("Failed to bless the story. Please try again.");
+      alert("Failed to bless the creation. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +111,7 @@ export default function BlessDialog({
           <div className="col-span-1 flex flex-col mr-3">
             <Image
               src={"/abrahamlogo.png"}
-              alt={story.logline}
+              alt={creation.creation.title}
               width={100}
               height={100}
               className="rounded-full aspect-[1] object-cover border"
@@ -120,7 +119,7 @@ export default function BlessDialog({
             <div className="py-4 ml-4 border-l h-full"></div>
           </div>
           <div className="col-span-11 flex flex-col">
-            <p className="text-gray-700 ">{story.logline}</p>
+            <p className="text-gray-700 ">{creation.creation.description}</p>
             <div className="py-3"></div>
           </div>
         </div>
@@ -148,7 +147,7 @@ export default function BlessDialog({
           <div className="col-span-11 flex flex-col ">
             <Textarea
               value={blessingText}
-              onChange={(e) => setBlessingText(e.target.value)} // Update state on text change
+              onChange={(e) => setBlessingText(e.target.value)}
               className="w-full border-0 text-lg -mt-2 -ml-3"
               placeholder="Share a blessing or a kind thought..."
             />
@@ -160,7 +159,7 @@ export default function BlessDialog({
               type="submit"
               className="px-8"
               onClick={handleBlessSubmit}
-              disabled={isSubmitting || !blessingText} // Disable while submitting or if text is empty
+              disabled={isSubmitting || !blessingText}
             >
               {isSubmitting ? "Blessing..." : "Bless"}
             </Button>
