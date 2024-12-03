@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { MannaTokenAbi } from "@/lib/abis/MannaToken"; // Ensure this ABI includes the new function
+import { MannaTokenAbi } from "@/lib/abis/MannaToken";
 import {
   createPublicClient,
   createWalletClient,
@@ -12,9 +12,8 @@ import {
 } from "viem";
 import { Chain } from "viem/chains";
 
-// Define the Base Sepolia Testnet chain
 const baseSepolia = {
-  id: 84532, // Testnet - For mainnet use: 84531
+  id: 84532,
   name: "Base Sepolia",
   nativeCurrency: {
     decimals: 18,
@@ -31,11 +30,11 @@ const baseSepolia = {
 } as const satisfies Chain;
 
 export function useMannaTransactions() {
-  const { provider } = useAuth();
+  const { provider, accountAbstractionProvider } = useAuth();
   const [balance, setBalance] = useState<string>("0");
-  const contractAddress = "0x44afFF32983b8759D9465bC4675a979432000f96"; // Update with your contract address
+  const contractAddress = "0x44afFF32983b8759D9465bC4675a979432000f96"; //contract address
 
-  // Initialize Viem clients inside useEffect
+  // Initialize Viem clients
   const [publicClient, setPublicClient] = useState<any>(null);
   const [walletClient, setWalletClient] = useState<any>(null);
 
@@ -54,32 +53,41 @@ export function useMannaTransactions() {
     }
   }, [provider]);
 
-  // Initialize Viem clients
-  // const publicClient = createPublicClient({
-  //   chain: baseSepolia,
-  //   transport: custom(
-  //     provider ||
-  //       (typeof window !== "undefined" ? (window as any).ethereum : undefined)
-  //   ),
-  // });
-
-  // const walletClient = createWalletClient({
-  //   chain: baseSepolia,
-  //   transport: custom(provider || (window as any).ethereum),
-  // });
-
   useEffect(() => {
-    if (provider) {
+    if (provider && accountAbstractionProvider) {
       // Fetch the user's MannaToken balance when provider or contractAddress changes
       getMannaBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider, contractAddress]);
+  }, [provider, contractAddress, accountAbstractionProvider]);
 
   const getMannaBalance = async () => {
-    if (!provider || !contractAddress) return;
+    if (
+      !provider ||
+      !contractAddress ||
+      !publicClient ||
+      !accountAbstractionProvider
+    )
+      return;
     try {
-      const [address] = await walletClient.getAddresses();
+      //const smartAccount = accountAbstractionProvider.smartAccount!;
+      //const address = await smartAccount.getAddress(); // Get the smart account address
+      let address: string;
+
+      if (
+        accountAbstractionProvider &&
+        accountAbstractionProvider.smartAccount
+      ) {
+        const smartAccount = accountAbstractionProvider.smartAccount!;
+        address = await smartAccount.getAddress(); // Get the smart account address
+      } else if (walletClient) {
+        const [addr] = await walletClient.getAddresses();
+        address = addr;
+      } else {
+        // Use the provider to get the address
+        const accounts = await provider.request({ method: "eth_accounts" });
+        address = (accounts as string[])[0];
+      }
       const balance = await publicClient.readContract({
         address: contractAddress as `0x${string}`,
         abi: MannaTokenAbi,
@@ -87,9 +95,9 @@ export function useMannaTransactions() {
         args: [address],
       });
       const balanceValue = balance as bigint;
-      const formattedBalance = formatUnits(balanceValue, 18); // Format balance using token decimals
-      setBalance(formattedBalance); // Set the formatted balance
-      return formattedBalance; // Return the formatted balance
+      const formattedBalance = formatUnits(balanceValue, 18);
+      setBalance(formattedBalance);
+      return formattedBalance;
     } catch (error) {
       console.error("Error fetching Manna balance:", error);
     }
@@ -97,7 +105,7 @@ export function useMannaTransactions() {
 
   // New function to get contract balances
   const getContractBalances = async () => {
-    if (!provider || !contractAddress) return;
+    if (!provider || !contractAddress || !publicClient) return;
     try {
       const [mannaBalance, ethBalance] = (await publicClient.readContract({
         address: contractAddress as `0x${string}`,
@@ -106,15 +114,15 @@ export function useMannaTransactions() {
       })) as [bigint, bigint];
 
       return {
-        mannaBalance: formatUnits(mannaBalance, 18), // Convert to readable format
-        ethBalance: formatEther(ethBalance), // Convert to Ether
+        mannaBalance: formatUnits(mannaBalance, 18),
+        ethBalance: formatEther(ethBalance),
       };
     } catch (error) {
       console.error("Error fetching contract balances:", error);
     }
   };
 
-  // Function to buy Manna tokens
+  // Function to buy Manna tokens - not using Account Abstraction
   const buyManna = async (etherAmount: string) => {
     if (!provider || !contractAddress || !publicClient || !walletClient) {
       throw new Error("Required dependencies are missing");
@@ -155,7 +163,7 @@ export function useMannaTransactions() {
     return formatEther(etherAmountWei);
   };
 
-  // Function to sell Manna tokens
+  // Function to sell Manna tokens - not using Account Abstraction
   const sellManna = async (mannaAmount: string) => {
     if (!provider || !contractAddress) return;
     try {
@@ -178,66 +186,128 @@ export function useMannaTransactions() {
 
   // Function to praise a creation
   const praise = async (creationId: number | bigint, amount: bigint) => {
-    if (!provider || !contractAddress || !publicClient || !walletClient) {
+    if (!provider || !contractAddress || !publicClient) {
       throw new Error("Required dependencies are missing");
     }
     try {
-      const [address] = await walletClient.getAddresses();
+      if (
+        accountAbstractionProvider &&
+        accountAbstractionProvider.smartAccount
+      ) {
+        // Use Account Abstraction
+        const bundlerClient = accountAbstractionProvider.bundlerClient!;
+        const smartAccount = accountAbstractionProvider.smartAccount!;
 
-      const txHash = await walletClient.writeContract({
-        account: address,
-        address: contractAddress as `0x${string}`,
-        abi: MannaTokenAbi,
-        functionName: "praise",
-        args: [BigInt(creationId), amount],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      // Update balance after transaction
-      await getMannaBalance();
+        const userOpHash = await bundlerClient.sendUserOperation({
+          account: smartAccount,
+          calls: [
+            {
+              to: contractAddress,
+              abi: MannaTokenAbi,
+              functionName: "praise",
+              args: [BigInt(creationId), amount],
+            },
+          ],
+        });
+
+        await bundlerClient.waitForUserOperationReceipt({
+          hash: userOpHash,
+        });
+
+        // Update balance after transaction
+        await getMannaBalance();
+      } else if (walletClient) {
+        // Use walletClient with provider
+        const [address] = await walletClient.getAddresses();
+
+        const txHash = await walletClient.writeContract({
+          account: address,
+          address: contractAddress as `0x${string}`,
+          abi: MannaTokenAbi,
+          functionName: "praise",
+          args: [BigInt(creationId), amount],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        // Update balance after transaction
+        await getMannaBalance();
+      } else {
+        throw new Error(
+          "No account abstraction provider or wallet client available"
+        );
+      }
     } catch (error) {
       console.error("Error praising creation:", error);
-      throw error; // Re-throw the error to propagate it to the calling function
+      throw error;
     }
   };
 
   // Function to burn a creation
   const burn = async (creationId: number | bigint, amount: bigint) => {
-    if (!provider || !contractAddress || !publicClient || !walletClient) {
+    if (
+      !provider ||
+      !contractAddress ||
+      !publicClient ||
+      !accountAbstractionProvider
+    ) {
       throw new Error("Required dependencies are missing");
     }
     try {
-      const [address] = await walletClient.getAddresses();
+      const bundlerClient = accountAbstractionProvider.bundlerClient!;
+      const smartAccount = accountAbstractionProvider.smartAccount!;
 
-      const txHash = await walletClient.writeContract({
-        account: address,
-        address: contractAddress as `0x${string}`,
-        abi: MannaTokenAbi,
-        functionName: "burn",
-        args: [BigInt(creationId), amount],
+      const userOpHash = await bundlerClient.sendUserOperation({
+        account: smartAccount,
+        calls: [
+          {
+            to: contractAddress,
+            abi: MannaTokenAbi,
+            functionName: "burn",
+            args: [BigInt(creationId), amount],
+          },
+        ],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+      await bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
+
       // Update balance after transaction
       await getMannaBalance();
     } catch (error) {
       console.error("Error burning creation:", error);
-      throw error; // Re-throw the error to propagate it to the calling function
+      throw error;
     }
   };
 
   // Function to bless a creation
   const bless = async (creationId: number | bigint, comment: string) => {
-    if (!provider || !contractAddress) return;
+    if (
+      !provider ||
+      !contractAddress ||
+      !publicClient ||
+      !accountAbstractionProvider
+    )
+      return;
     try {
-      const [address] = await walletClient.getAddresses();
+      const bundlerClient = accountAbstractionProvider.bundlerClient!;
+      const smartAccount = accountAbstractionProvider.smartAccount!;
 
-      const txHash = await walletClient.writeContract({
-        account: address,
-        address: contractAddress as `0x${string}`,
-        abi: MannaTokenAbi,
-        functionName: "bless",
-        args: [BigInt(creationId), comment],
+      const userOpHash = await bundlerClient.sendUserOperation({
+        account: smartAccount,
+        calls: [
+          {
+            to: contractAddress,
+            abi: MannaTokenAbi,
+            functionName: "bless",
+            args: [BigInt(creationId), comment],
+          },
+        ],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+      await bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
+
       // Update balance after transaction
       await getMannaBalance();
     } catch (error) {
@@ -247,7 +317,7 @@ export function useMannaTransactions() {
 
   // Function to get total supply of Manna tokens
   const getTotalSupply = async () => {
-    if (!provider || !contractAddress) return;
+    if (!provider || !contractAddress || !publicClient) return;
     try {
       const totalSupply = (await publicClient.readContract({
         address: contractAddress as `0x${string}`,

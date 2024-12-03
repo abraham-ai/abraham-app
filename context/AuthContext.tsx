@@ -7,8 +7,13 @@ import React, {
   useMemo,
 } from "react";
 import { IProvider } from "@web3auth/base";
-import { web3auth, configureWeb3AuthAdapters } from "@/lib/web3AuthConfig";
+import {
+  web3auth,
+  configureWeb3AuthAdapters,
+  accountAbstractionProvider,
+} from "@/lib/web3AuthConfig";
 import RPC from "@/lib/ethersRPC";
+import { AccountAbstractionProvider } from "@web3auth/account-abstraction-provider";
 
 // Define the AuthContext type
 interface AuthContextType {
@@ -20,6 +25,7 @@ interface AuthContextType {
   userAccounts: any | null;
   loadingAuth: boolean;
   provider: IProvider | null;
+  accountAbstractionProvider: AccountAbstractionProvider | null;
 }
 
 // Create the AuthContext
@@ -55,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initWeb3Auth = async () => {
       try {
-        await configureWeb3AuthAdapters(); // Configure adapters
+        await configureWeb3AuthAdapters();
         await web3auth.initModal();
         setProvider(web3auth.provider);
         setWeb3AuthInitialized(true);
@@ -79,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const tokenCheckInterval = setInterval(() => {
       if (idToken && isTokenExpired(idToken)) {
-        resetAuthState(); // Clear state and storage on token expiry
+        resetAuthState();
         logout();
       }
     }, 60000); // Check every 60 seconds
@@ -164,8 +170,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userAccounts,
       loadingAuth,
       provider,
+      accountAbstractionProvider,
     }),
-    [idToken, loggedIn, userInfo, userAccounts, loadingAuth, provider]
+    [
+      idToken,
+      loggedIn,
+      userInfo,
+      userAccounts,
+      loadingAuth,
+      provider,
+      accountAbstractionProvider,
+    ]
   );
 
   return (
