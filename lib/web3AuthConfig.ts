@@ -1,3 +1,5 @@
+// web3AuthConfig.ts
+
 import { CHAIN_NAMESPACES, IAdapter, WEB3AUTH_NETWORK } from "@web3auth/base";
 import { EthereumPrivateKeyProvider } from "@web3auth/ethereum-provider";
 import {
@@ -8,7 +10,7 @@ import { Web3Auth, Web3AuthOptions } from "@web3auth/modal";
 import { getDefaultExternalAdapters } from "@web3auth/default-evm-adapter";
 
 const clientId =
-  "BN4xtlFarFBC8IfJuRxssGkBnUCR9Hn3P_3JuxnhVZkZQ6L74ahm2GhMCls0YRepY1KkgXr-dbLcHAEBE_GSvbE"; // Replace with your Web3Auth client ID
+  "BN4xtlFarFBC8IfJuRxssGkBnUCR9Hn3P_3JuxnhVZkZQ6L74ahm2GhMCls0YRepY1KkgXr-dbLcHAEBE_GSvbE";
 
 const chainConfig = {
   chainNamespace: CHAIN_NAMESPACES.EIP155,
@@ -20,23 +22,17 @@ const chainConfig = {
   tickerName: "ETH",
   logo: "https://github.com/base-org/brand-kit/blob/main/logo/symbol/Base_Symbol_Blue.svg",
 };
-const pimlicoAPIKey = "API KEY"; // Replace with your Pimlico API key
 
+// Initialize Account Abstraction Provider
 export const accountAbstractionProvider = new AccountAbstractionProvider({
   config: {
     chainConfig,
     smartAccountInit: new SafeSmartAccount(),
     bundlerConfig: {
-      url: `https://api.pimlico.io/v2/${parseInt(
-        chainConfig.chainId,
-        16
-      )}/rpc?apikey=${pimlicoAPIKey}`,
+      url: "/api/accountabstraction/bundler",
     },
     paymasterConfig: {
-      url: `https://api.pimlico.io/v2/${parseInt(
-        chainConfig.chainId,
-        16
-      )}/rpc?apikey=${pimlicoAPIKey}`,
+      url: "/api/accountabstraction/paymaster",
     },
   },
 });
@@ -51,7 +47,7 @@ export const web3AuthOptions: Web3AuthOptions = {
   chainConfig,
   privateKeyProvider,
   accountAbstractionProvider,
-  useAAWithExternalWallet: true, // Ensures AA is used only with embedded wallets
+  useAAWithExternalWallet: false, // Ensures AA is used only with embedded wallets
 };
 
 // Initialize Web3Auth instance

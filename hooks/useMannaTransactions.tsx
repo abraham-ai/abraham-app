@@ -72,22 +72,7 @@ export function useMannaTransactions() {
     try {
       //const smartAccount = accountAbstractionProvider.smartAccount!;
       //const address = await smartAccount.getAddress(); // Get the smart account address
-      let address: string;
-
-      if (
-        accountAbstractionProvider &&
-        accountAbstractionProvider.smartAccount
-      ) {
-        const smartAccount = accountAbstractionProvider.smartAccount!;
-        address = await smartAccount.getAddress(); // Get the smart account address
-      } else if (walletClient) {
-        const [addr] = await walletClient.getAddresses();
-        address = addr;
-      } else {
-        // Use the provider to get the address
-        const accounts = await provider.request({ method: "eth_accounts" });
-        address = (accounts as string[])[0];
-      }
+      const [address] = await walletClient.getAddresses();
       const balance = await publicClient.readContract({
         address: contractAddress as `0x${string}`,
         abi: MannaTokenAbi,
@@ -194,7 +179,7 @@ export function useMannaTransactions() {
         accountAbstractionProvider &&
         accountAbstractionProvider.smartAccount
       ) {
-        // Use Account Abstraction
+        // User is connected with an embedded wallet; use AA to sponsor gas fees
         const bundlerClient = accountAbstractionProvider.bundlerClient!;
         const smartAccount = accountAbstractionProvider.smartAccount!;
 
@@ -217,7 +202,7 @@ export function useMannaTransactions() {
         // Update balance after transaction
         await getMannaBalance();
       } else if (walletClient) {
-        // Use walletClient with provider
+        // User is connected with an external wallet; they will pay gas fees
         const [address] = await walletClient.getAddresses();
 
         const txHash = await walletClient.writeContract({
@@ -227,12 +212,14 @@ export function useMannaTransactions() {
           functionName: "praise",
           args: [BigInt(creationId), amount],
         });
+
         await publicClient.waitForTransactionReceipt({ hash: txHash });
+
         // Update balance after transaction
         await getMannaBalance();
       } else {
         throw new Error(
-          "No account abstraction provider or wallet client available"
+          "No wallet client or account abstraction provider available"
         );
       }
     } catch (error) {
@@ -241,38 +228,59 @@ export function useMannaTransactions() {
     }
   };
 
-  // Function to burn a creation
+  // Similarly, update the `burn` function
   const burn = async (creationId: number | bigint, amount: bigint) => {
-    if (
-      !provider ||
-      !contractAddress ||
-      !publicClient ||
-      !accountAbstractionProvider
-    ) {
+    if (!provider || !contractAddress || !publicClient) {
       throw new Error("Required dependencies are missing");
     }
     try {
-      const bundlerClient = accountAbstractionProvider.bundlerClient!;
-      const smartAccount = accountAbstractionProvider.smartAccount!;
+      if (
+        accountAbstractionProvider &&
+        accountAbstractionProvider.smartAccount
+      ) {
+        // User is connected with an embedded wallet; use AA to sponsor gas fees
+        const bundlerClient = accountAbstractionProvider.bundlerClient!;
+        const smartAccount = accountAbstractionProvider.smartAccount!;
 
-      const userOpHash = await bundlerClient.sendUserOperation({
-        account: smartAccount,
-        calls: [
-          {
-            to: contractAddress,
-            abi: MannaTokenAbi,
-            functionName: "burn",
-            args: [BigInt(creationId), amount],
-          },
-        ],
-      });
+        const userOpHash = await bundlerClient.sendUserOperation({
+          account: smartAccount,
+          calls: [
+            {
+              to: contractAddress,
+              abi: MannaTokenAbi,
+              functionName: "burn",
+              args: [BigInt(creationId), amount],
+            },
+          ],
+        });
 
-      await bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
-      });
+        await bundlerClient.waitForUserOperationReceipt({
+          hash: userOpHash,
+        });
 
-      // Update balance after transaction
-      await getMannaBalance();
+        // Update balance after transaction
+        await getMannaBalance();
+      } else if (walletClient) {
+        // User is connected with an external wallet; they will pay gas fees
+        const [address] = await walletClient.getAddresses();
+
+        const txHash = await walletClient.writeContract({
+          account: address,
+          address: contractAddress as `0x${string}`,
+          abi: MannaTokenAbi,
+          functionName: "burn",
+          args: [BigInt(creationId), amount],
+        });
+
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+        // Update balance after transaction
+        await getMannaBalance();
+      } else {
+        throw new Error(
+          "No wallet client or account abstraction provider available"
+        );
+      }
     } catch (error) {
       console.error("Error burning creation:", error);
       throw error;
