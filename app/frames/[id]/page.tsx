@@ -91,7 +91,7 @@ export default async function CreationFrame({ params }: PageProps) {
       <body>
         {/* Content for web browsers */}
         <div style={{ textAlign: "center" }}>
-          <h1>Abraham's Creation</h1>
+          <h1>{"Abraham's Creation"}</h1>
           <img src={imageUrl} alt={title} style={{ maxWidth: "100%" }} />
           <p>{title}</p>
         </div>
