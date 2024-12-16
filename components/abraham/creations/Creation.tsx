@@ -1,5 +1,3 @@
-// File: /components/abraham/creations/Creation.tsx
-
 "use client";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
@@ -37,9 +35,9 @@ export default function Creation({ creation }: { creation: CreationItem }) {
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
   const {
-    praise: praiseTransaction,
-    burn: burnTransaction,
-    balance, // BigInt balance in wei
+    praise,
+    burn,
+    balance, // string formatted balance
     getMannaBalance,
   } = useMannaTransactions();
 
@@ -52,7 +50,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
     if (!idToken) {
       throw new Error("User not authenticated");
     }
-    console.log("Creeation id", creation._id);
+
     const response = await fetch("/api/artlabproxy/stories", {
       method: "POST",
       headers: {
@@ -80,14 +78,15 @@ export default function Creation({ creation }: { creation: CreationItem }) {
     }
     try {
       const amount = BigInt("1000000000000000000"); // 1 Manna in wei
-
-      if (!balance || BigInt(balance) < 1) {
+      // balance is a string, parse it to check if user has at least 1 Manna
+      if (!balance || parseFloat(balance) < 1) {
         alert("Insufficient Manna balance to praise this creation.");
         setLoadingPraise(false);
         return;
       }
 
-      await praiseTransaction(1, amount);
+      // Call praise function from hook
+      await praise(1, amount); // Using creationId=1 for demo; replace with actual creation ID if needed
       await handleReaction("praise");
       setPraisesCount(praisesCount + 1);
       setHasPraised(true);
@@ -109,14 +108,14 @@ export default function Creation({ creation }: { creation: CreationItem }) {
     }
     try {
       const amount = BigInt("1000000000000000000"); // 1 Manna in wei
-
-      if (!balance || BigInt(balance) < 1) {
+      if (!balance || parseFloat(balance) < 1) {
         alert("Insufficient Manna balance to burn this creation.");
         setLoadingBurn(false);
         return;
       }
 
-      await burnTransaction(1, amount);
+      // Call burn function from hook
+      await burn(1, amount); // Using creationId=1 for demo; replace with actual creation ID if needed
       await handleReaction("burn");
       setBurnsCount(burnsCount + 1);
       setHasBurned(true);
@@ -148,7 +147,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
             <Link href={`/creation/${creation._id}`}>
               <p className="mb-1 ">{creation.creation.description}</p>
               <Image
-                src={creation.result.output[0]?.url}
+                src={creation.result.output[0]?.url || "/fallback.png"}
                 alt={creation.creation.title}
                 width={500}
                 height={300}

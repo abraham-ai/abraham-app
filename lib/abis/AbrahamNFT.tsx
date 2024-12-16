@@ -1,4 +1,4 @@
-export const MannaTokenAbi = [
+export const AbrahamNFTAbi = [
   {
     inputs: [
       {
@@ -6,30 +6,14 @@ export const MannaTokenAbi = [
         name: "initialOwner",
         type: "address",
       },
+      {
+        internalType: "string",
+        name: "baseURI",
+        type: "string",
+      },
     ],
     stateMutability: "nonpayable",
     type: "constructor",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "spender",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "allowance",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "needed",
-        type: "uint256",
-      },
-    ],
-    name: "ERC20InsufficientAllowance",
-    type: "error",
   },
   {
     inputs: [
@@ -40,16 +24,32 @@ export const MannaTokenAbi = [
       },
       {
         internalType: "uint256",
-        name: "balance",
+        name: "tokenId",
         type: "uint256",
       },
       {
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+    ],
+    name: "ERC721IncorrectOwner",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+      {
         internalType: "uint256",
-        name: "needed",
+        name: "tokenId",
         type: "uint256",
       },
     ],
-    name: "ERC20InsufficientBalance",
+    name: "ERC721InsufficientApproval",
     type: "error",
   },
   {
@@ -60,7 +60,29 @@ export const MannaTokenAbi = [
         type: "address",
       },
     ],
-    name: "ERC20InvalidApprover",
+    name: "ERC721InvalidApprover",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+    ],
+    name: "ERC721InvalidOperator",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+    ],
+    name: "ERC721InvalidOwner",
     type: "error",
   },
   {
@@ -71,7 +93,7 @@ export const MannaTokenAbi = [
         type: "address",
       },
     ],
-    name: "ERC20InvalidReceiver",
+    name: "ERC721InvalidReceiver",
     type: "error",
   },
   {
@@ -82,18 +104,18 @@ export const MannaTokenAbi = [
         type: "address",
       },
     ],
-    name: "ERC20InvalidSender",
+    name: "ERC721InvalidSender",
     type: "error",
   },
   {
     inputs: [
       {
-        internalType: "address",
-        name: "spender",
-        type: "address",
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
       },
     ],
-    name: "ERC20InvalidSpender",
+    name: "ERC721NonexistentToken",
     type: "error",
   },
   {
@@ -130,13 +152,13 @@ export const MannaTokenAbi = [
       {
         indexed: true,
         internalType: "address",
-        name: "spender",
+        name: "approved",
         type: "address",
       },
       {
-        indexed: false,
+        indexed: true,
         internalType: "uint256",
-        name: "value",
+        name: "tokenId",
         type: "uint256",
       },
     ],
@@ -149,17 +171,55 @@ export const MannaTokenAbi = [
       {
         indexed: true,
         internalType: "address",
-        name: "buyer",
+        name: "owner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "operator",
         type: "address",
       },
       {
         indexed: false,
+        internalType: "bool",
+        name: "approved",
+        type: "bool",
+      },
+    ],
+    name: "ApprovalForAll",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
         internalType: "uint256",
-        name: "amount",
+        name: "_fromTokenId",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "_toTokenId",
         type: "uint256",
       },
     ],
-    name: "BoughtManna",
+    name: "BatchMetadataUpdate",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "_tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "MetadataUpdate",
     type: "event",
   },
   {
@@ -187,31 +247,6 @@ export const MannaTokenAbi = [
       {
         indexed: true,
         internalType: "address",
-        name: "seller",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "mannaAmount",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "ethAmount",
-        type: "uint256",
-      },
-    ],
-    name: "SoldManna",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
         name: "from",
         type: "address",
       },
@@ -222,9 +257,9 @@ export const MannaTokenAbi = [
         type: "address",
       },
       {
-        indexed: false,
+        indexed: true,
         internalType: "uint256",
-        name: "value",
+        name: "tokenId",
         type: "uint256",
       },
     ],
@@ -232,76 +267,20 @@ export const MannaTokenAbi = [
     type: "event",
   },
   {
-    inputs: [],
-    name: "INITIAL_SUPPLY",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "MANNA_PRICE",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [
       {
         internalType: "address",
-        name: "owner",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "spender",
-        type: "address",
-      },
-    ],
-    name: "allowance",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "spender",
+        name: "to",
         type: "address",
       },
       {
         internalType: "uint256",
-        name: "value",
+        name: "tokenId",
         type: "uint256",
       },
     ],
     name: "approve",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
+    outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -309,7 +288,7 @@ export const MannaTokenAbi = [
     inputs: [
       {
         internalType: "address",
-        name: "account",
+        name: "owner",
         type: "address",
       },
     ],
@@ -327,57 +306,67 @@ export const MannaTokenAbi = [
   {
     inputs: [
       {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "getApproved",
+    outputs: [
+      {
         internalType: "address",
-        name: "account",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+    ],
+    name: "isApprovedForAll",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "to",
         type: "address",
       },
       {
         internalType: "uint256",
-        name: "amount",
+        name: "creationId",
         type: "uint256",
       },
+      {
+        internalType: "string",
+        name: "tokenUri",
+        type: "string",
+      },
     ],
-    name: "burnFrom",
+    name: "mintCreationNFT",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "buyManna",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "decimals",
-    outputs: [
-      {
-        internalType: "uint8",
-        name: "",
-        type: "uint8",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "getContractBalances",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "mannaBalance",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "ethBalance",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
     type: "function",
   },
   {
@@ -407,72 +396,28 @@ export const MannaTokenAbi = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "ownerOf",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "renounceOwnership",
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "mannaAmount",
-        type: "uint256",
-      },
-    ],
-    name: "sellManna",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "symbol",
-    outputs: [
-      {
-        internalType: "string",
-        name: "",
-        type: "string",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "totalSupply",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "to",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "value",
-        type: "uint256",
-      },
-    ],
-    name: "transfer",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -490,11 +435,83 @@ export const MannaTokenAbi = [
       },
       {
         internalType: "uint256",
-        name: "value",
+        name: "tokenId",
         type: "uint256",
       },
     ],
-    name: "transferFrom",
+    name: "safeTransferFrom",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "from",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "to",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+      {
+        internalType: "bytes",
+        name: "data",
+        type: "bytes",
+      },
+    ],
+    name: "safeTransferFrom",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+      {
+        internalType: "bool",
+        name: "approved",
+        type: "bool",
+      },
+    ],
+    name: "setApprovalForAll",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "baseURI",
+        type: "string",
+      },
+    ],
+    name: "setBaseURI",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes4",
+        name: "interfaceId",
+        type: "bytes4",
+      },
+    ],
+    name: "supportsInterface",
     outputs: [
       {
         internalType: "bool",
@@ -502,6 +519,61 @@ export const MannaTokenAbi = [
         type: "bool",
       },
     ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "symbol",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "tokenURI",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "from",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "to",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "transferFrom",
+    outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -517,9 +589,5 @@ export const MannaTokenAbi = [
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
-  },
-  {
-    stateMutability: "payable",
-    type: "receive",
   },
 ];
