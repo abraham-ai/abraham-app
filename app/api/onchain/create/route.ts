@@ -63,8 +63,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // imageBase64 should be something like: "data:image/png;base64,...."
-    // Let's parse out the base64 part
     const base64Pattern = /^data:(?<mime>image\/[a-zA-Z]+);base64,(?<data>.+)$/;
     const match = imageBase64.match(base64Pattern);
     if (!match || !match.groups) {
