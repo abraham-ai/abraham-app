@@ -148,10 +148,14 @@ export async function POST(request: Request) {
 
     if (buttonIndex === 1) {
       // Praise
-      await sendReaction(creationId, "praise");
+      //await sendReaction(creationId, "praise");
+      const praiseUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/onchain/praise?creationId=${creationId}`;
+      return NextResponse.redirect(praiseUrl);
     } else if (buttonIndex === 2) {
       // Burn
-      await sendReaction(creationId, "burn");
+      //await sendReaction(creationId, "burn");
+      const burnUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/onchain/burn?creationId=${creationId}`;
+      NextResponse.redirect(burnUrl);
     } else {
       return NextResponse.json(
         { error: "Invalid button index" },
