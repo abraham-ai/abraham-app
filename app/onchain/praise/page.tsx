@@ -1,5 +1,5 @@
+"use client";
 import React, { Suspense } from "react";
-
 // 1) The wrapper that Next.js sees as the "page" component
 export default function PraiseWrapper() {
   return (
