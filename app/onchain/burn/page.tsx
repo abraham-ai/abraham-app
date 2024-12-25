@@ -1,15 +1,23 @@
-// app/onchain/burn/page.tsx
-"use client";
+import React, { Suspense } from "react";
 
-import React, { useEffect } from "react";
+export default function BurnWrapper() {
+  return (
+    <Suspense fallback={<div>Loading On-Chain Burn...</div>}>
+      <BurnPage />
+    </Suspense>
+  );
+}
+
+("use client");
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 
-export default function BurnPage() {
+function BurnPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { burn, getMannaBalance } = useMannaTransactions();
 
+  const { burn, getMannaBalance } = useMannaTransactions();
   const creationId = searchParams.get("creationId") || "";
 
   useEffect(() => {
@@ -21,30 +29,27 @@ export default function BurnPage() {
 
     const doBurn = async () => {
       try {
-        // For example, burn 2 Manna => 2e18
-        const cost = BigInt("2000000000000000000");
+        const cost = BigInt("2000000000000000000"); // e.g. 2 Manna
 
-        // 1) Refresh user balance
+        // 1) Check user’s Manna
         const userBalance = await getMannaBalance();
         if (!userBalance) {
-          alert("Error fetching your Manna balance. Please try again.");
-          router.push(`/frames/${creationId}`);
-          return;
-        }
-        const userBalanceBig = BigInt(userBalance.toString());
-
-        // 2) Check if user has enough Manna
-        if (userBalanceBig < cost) {
-          alert("You do not have enough Manna to Burn this creation!");
+          alert("Error fetching Manna balance. Please try again.");
           router.push(`/frames/${creationId}`);
           return;
         }
 
-        // 3) Perform on-chain burn
-        await burn(BigInt(creationId), cost);
-        alert("Burn transaction complete!");
+        if (BigInt(userBalance) < cost) {
+          alert("Not enough Manna to Burn!");
+          router.push(`/frames/${creationId}`);
+          return;
+        }
 
-        // 4) redirect
+        // 2) Burn transaction
+        await burn(BigInt(1), cost);
+        alert("Burn transaction completed!");
+
+        // 3) redirect
         router.push(`/frames/${creationId}`);
       } catch (error) {
         console.error("Error burning creation:", error);
@@ -54,12 +59,12 @@ export default function BurnPage() {
     };
 
     doBurn();
-  }, [creationId, burn, router, getMannaBalance]);
+  }, [creationId, burn, getMannaBalance, router]);
 
   return (
     <div style={{ padding: 20 }}>
-      <h1>Burning Creation {creationId} On-Chain...</h1>
-      <p>Please wait, completing your transaction.</p>
+      <h1>On-Chain Burn</h1>
+      <p>Processing your transaction. Please wait...</p>
     </div>
   );
 }

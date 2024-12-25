@@ -1,15 +1,26 @@
-// app/onchain/praise/page.tsx
-"use client";
+import React, { Suspense } from "react";
 
-import React, { useEffect } from "react";
+// 1) The wrapper that Next.js sees as the "page" component
+export default function PraiseWrapper() {
+  return (
+    <Suspense fallback={<div>Loading On-Chain Praise...</div>}>
+      <PraisePage />
+    </Suspense>
+  );
+}
+
+// 2) The actual praising logic
+//    Marked "use client" to ensure it only runs in the browser
+("use client");
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 
-export default function PraisePage() {
+function PraisePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { praise, getMannaBalance, balance } = useMannaTransactions();
 
+  const { praise, getMannaBalance } = useMannaTransactions();
   const creationId = searchParams.get("creationId") || "";
 
   useEffect(() => {
@@ -21,31 +32,27 @@ export default function PraisePage() {
 
     const doPraise = async () => {
       try {
-        // For example, praising with 1 Manna => 1e18 wei
-        const cost = BigInt("1000000000000000000");
+        const cost = BigInt("1000000000000000000"); // 1 Manna
 
-        // 1) Refresh user balance
-        const userBalance = await getMannaBalance(); // returns BigInt or string
+        // 1) Check user’s Manna balance
+        const userBalance = await getMannaBalance();
         if (!userBalance) {
-          alert("Error fetching your Manna balance. Please try again.");
-          router.push(`/frames/${creationId}`);
-          return;
-        }
-        // Convert if needed
-        const userBalanceBig = BigInt(userBalance.toString());
-
-        // 2) Check if user has enough Manna
-        if (userBalanceBig < cost) {
-          alert("You do not have enough Manna to Praise!");
+          alert("Error fetching Manna balance. Please try again.");
           router.push(`/frames/${creationId}`);
           return;
         }
 
-        // 3) Execute on-chain praise
-        await praise(BigInt(creationId), cost);
-        alert("Praise transaction complete!");
+        if (BigInt(userBalance) < cost) {
+          alert("You don't have enough Manna to Praise!");
+          router.push(`/frames/${creationId}`);
+          return;
+        }
 
-        // 4) Redirect back to the frame
+        // 2) On-chain praise
+        await praise(BigInt(1), cost);
+        alert("Praise transaction completed!");
+
+        // 3) Redirect
         router.push(`/frames/${creationId}`);
       } catch (error) {
         console.error("Error praising creation:", error);
@@ -55,12 +62,12 @@ export default function PraisePage() {
     };
 
     doPraise();
-  }, [creationId, praise, router, getMannaBalance, balance]);
+  }, [creationId, router, praise, getMannaBalance]);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Praising Creation {creationId} On-Chain...</h1>
-      <p>Please wait, completing your transaction.</p>
+    <div style={{ padding: "20px" }}>
+      <h1>On-Chain Praise</h1>
+      <p>Processing your transaction on chain...</p>
     </div>
   );
 }
