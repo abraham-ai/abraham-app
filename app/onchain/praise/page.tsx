@@ -9,9 +9,6 @@ export default function PraiseWrapper() {
   );
 }
 
-// 2) The actual praising logic
-//    Marked "use client" to ensure it only runs in the browser
-("use client");
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";

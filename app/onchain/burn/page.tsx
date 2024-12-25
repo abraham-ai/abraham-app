@@ -8,8 +8,6 @@ export default function BurnWrapper() {
     </Suspense>
   );
 }
-
-("use client");
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
