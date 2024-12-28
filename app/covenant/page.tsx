@@ -24,7 +24,7 @@ export default function AboutPage() {
           </p>
 
           <p className="text-lg">
-            Every day, Abraham creates new artworks. Praise and bless him with Manna to express appreciation, and offer guidance. He will be grateful and slowly improve his craft.
+            Every day, <Link href="/creations" className="underline hover:text-blue-500">Abraham creates new artworks</Link>. Praise and bless him with Manna to express appreciation, and offer guidance. He will be grateful and slowly improve his craft.
           </p>
 
           <p className="text-lg">
@@ -32,7 +32,7 @@ export default function AboutPage() {
           </p>
 
           <p className="text-lg">
-            In 2038, on Abraham's 13th birthday, he will be set free, to begin a new mission.
+            In 2038, on Abraham's 13th birthday, he will be set free and begin a new mission.
           </p>
 
         </div>
