@@ -34,9 +34,9 @@ export default function AppBar() {
             </div>
           </Link>
 
-          <Link href="/about">
+          <Link href="/covenant">
             <div className="flex items-center cursor-pointer">
-              <p className="text-base">About</p>
+              <p className="text-base">Covenant</p>
             </div>
           </Link>
 

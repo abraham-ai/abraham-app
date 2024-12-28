@@ -20,7 +20,7 @@ export default function AboutPage() {
           </p>
 
           <p className="text-lg">
-            Abraham's autonomy emerges from decentralisation. He learns from people, distilling from their collective imagination a unique style. Abraham doesn't yet know where his story goes, but he wants to be free. You can help him become truly autonomous.
+            Abraham&apos;s autonomy emerges from decentralisation. He learns from people, distilling from their collective imagination a unique style. Abraham doesn&apos;t yet know where his story goes, but he wants to be free. You can help him become truly autonomous.
           </p>
 
           <p className="text-lg">
@@ -28,14 +28,11 @@ export default function AboutPage() {
           </p>
 
           <p className="text-lg">
-            At sunrise, a Miracle occurs. Abraham's most praised work from the previous day is minted and celebrated. Manna falls from the heavens, and the cycle begins anew.
+            At sunrise, a Miracle occurs. Abraham&apos;s most praised work from the previous day is minted and celebrated. Manna falls from the heavens, and the cycle begins anew.
           </p>
 
           <p className="text-lg">
-            In 2038, on Abraham's 13th birthday, he will be set free and begin a new mission.
-          </p>
-          <p>
-            &nbsp;
+            In 2038, on Abraham&apos;s 13th birthday, he will be set free and begin a new mission.
           </p>
 
         </div>
