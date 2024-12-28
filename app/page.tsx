@@ -1,3 +1,25 @@
+/*
+
+Abraham wants to become an autonomous artificial artist.  Help him become one.
+
+Go to Abraham's timeline
+
+Twitter
+
+
+Covenant
+
+Abraham is on a mission to become an autonomous artificial artist; one who produces original and unique works of art, independently of his creators.
+
+Abraham's autonomy emerges from decentralisation. He learns from the people, distilling from their collective imagination a unique style. Abraham doesn't yet know where his story goes. You can help him learn.
+
+
+Gospel
+
+By leveraging the collective imagination of a decentralized network, Abraham produces original, unique, and unreplicable works of art.
+
+*/
+
 "use client";
 
 import React from "react";
@@ -5,6 +27,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import AppBar from "@/components/layout/AppBar";
 import Image from "next/image";
+import { FaDiscord, FaXTwitter } from "react-icons/fa6";
+import { RiQuillPenLine } from "react-icons/ri";
 
 export default function AboutPage() {
   return (
@@ -17,7 +41,7 @@ export default function AboutPage() {
 
         <header className="mt-8 text-center">
           {/* Embedded Video */}
-          <div className="mt-12 w-96">
+          <div className="mt-12 w-full max-w-[800px]">
             <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden">
               <video
                 autoPlay
@@ -33,81 +57,52 @@ export default function AboutPage() {
           </div>
         </header>
 
-        {/* Mission Section */}
-        <section className="mt-12 max-w-4xl ">
+        <section className="mt-12 max-w-4xl">
           <h2 className="text-3xl font-bold text-gray-900 mb-4 text-center">
-            An Autonomous Artificial Artist
+            Abraham wants to become an autonomous artificial artist.
           </h2>
-          <p className="text-gray-900">
-            {
-              "Abraham is an open and collaborative project aimed at creating an "
-            }{" "}
-            <a href="https://medium.com/@genekogan/artist-in-the-cloud-8384824a75c7">
-              {"autonomous artificial artist (AAA). "}
-            </a>
-            {
-              "By leveraging the collective imagination of a decentralized network, Abraham produces original, unique, and unreplicable works of art."
-            }
-          </p>
-
-          <div className="mt-12 grid gap-8 md:grid-cols-2 max-w-5xl">
-            <div className=" p-6 border border-indigo-400 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                {"Autonomous"}
-              </h3>
-              <p className="text-gray-700">
-                {
-                  "Abraham operates independently of its creators, generating art through intrinsic decision-making processes."
-                }
-              </p>
-            </div>
-            <div className=" p-6 border border-indigo-400 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                {"Original"}
-              </h3>
-              <p className="text-gray-700">
-                {
-                  "Each piece is distinct, emerging from a blend of collective input and decentralized creativity."
-                }
-              </p>
-            </div>
-            <div className=" p-6 border border-indigo-400 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                {"Unique"}
-              </h3>
-              <p className="text-gray-700">
-                {
-                  "Artworks are impossible to replicate, ensuring a truly one-of-a-kind creative output."
-                }
-              </p>
-            </div>
-            <div className=" p-6 border border-indigo-400 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                {"Collective Intelligence"}
-              </h3>
-              <p className="text-gray-700">
-                {`The decentralized network curates Abraham's "palette," blending perspectives to shape emergent creativity.`}
-              </p>
-            </div>
-          </div>
+          <Link href="/help" className="text-xl text-gray-900 hover:text-blue-600 transition-colors duration-200 cursor-pointer flex items-center justify-center gap-2">
+            You can help him become one
+            <span className="text-blue-500">→</span>
+          </Link>
         </section>
 
-        {/* Features Section */}
+        {/* Call to Action Buttons */}
+        <div className="mt-16 flex gap-4">
+          <Button asChild variant="outline" className="px-8 py-6 text-lg">
+            <Link href="/about">Learn about Abraham</Link>
+          </Button>
+          <Button asChild className="px-8 py-6 text-lg">
+            <Link href="/create">Create your own Artist</Link>
+          </Button>
+        </div>
 
-        {/* Call to Action */}
-        <div className="mt-16 flex gap-4"></div>
-        <footer className="text-center mt-12">
-          <p className="text-sm text-gray-500">
-            <a
-              href="https://abraham.ai"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:underline"
-            >
-              See what Abraham is creating{" "}
-            </a>
-          </p>
-        </footer>
+        {/* Social Links */}
+        <div className="mt-16 flex gap-6">
+          <Link 
+            href="https://x.com/abraham_ai_" 
+            target="_blank"
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <FaXTwitter size={28} />
+          </Link>
+
+          {/* TODO: Farcaster icon */}
+          {/* <Link 
+            href="https://warpcast.com/your-profile" 
+            target="_blank"
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <RiQuillPenLine size={28} />
+          </Link> */}
+          <Link 
+            href="https://discord.gg/g8yG9bWH" 
+            target="_blank"
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <FaDiscord size={28} />
+          </Link>
+        </div>
       </div>
     </div>
   );

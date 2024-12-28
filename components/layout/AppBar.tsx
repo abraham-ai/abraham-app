@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import AccountMenu from "@/components/account/AccountMenu";
 import Link from "next/link";
 import Image from "next/image";
+import { FaDiscord, FaXTwitter } from "react-icons/fa6";
 
 export default function AppBar() {
   return (
@@ -16,28 +17,50 @@ export default function AppBar() {
               <div className="flex">
                 <Image
                   src={"/abrahamlogo.png"}
-                  width={32}
-                  height={32}
+                  width={40}
+                  height={40}
                   className="aspect-[1] object-cover"
                   alt={""}
                 />
-                <p className="p-1 whitespace-pre-wrap bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-center text-xl font-bold leading-none tracking-tighter text-transparent">
-                  abraham.ai
-                </p>
               </div>
             </Link>
           </MenubarTrigger>
         </MenubarMenu>
 
-        <Link href="/about">
-          <div className="flex items-center cursor-pointer">
-            <p className="ml-2 text-sm">About</p>
-          </div>
-        </Link>
-        <div className="grow" />
-        <div className="flex">
-          <AccountMenu />
+        <div className="flex items-center gap-8">
+          <Link href="/creations">
+            <div className="flex items-center cursor-pointer">
+              <p className="text-base">Creation</p>
+            </div>
+          </Link>
+
+          <Link href="/covenant">
+            <div className="flex items-center cursor-pointer">
+              <p className="text-base">Covenant</p>
+            </div>
+          </Link>
+
+          <Link 
+            href="https://twitter.com/abraham_ai_" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center hover:text-gray-900 text-gray-600 transition-colors"
+          >
+            <FaXTwitter size={20} />
+          </Link>
+
+          <Link 
+            href="https://discord.gg/g8yG9bWH" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center hover:text-gray-900 text-gray-600 transition-colors"
+          >
+            <FaDiscord size={20} />
+          </Link>
         </div>
+
+        <div className="grow" />
+        <AccountMenu />
       </Menubar>
     </div>
   );
