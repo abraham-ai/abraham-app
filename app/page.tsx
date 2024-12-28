@@ -1,25 +1,3 @@
-/*
-
-Abraham wants to become an autonomous artificial artist.  Help him become one.
-
-Go to Abraham's timeline
-
-Twitter
-
-
-Covenant
-
-Abraham is on a mission to become an autonomous artificial artist; one who produces original and unique works of art, independently of his creators.
-
-Abraham's autonomy emerges from decentralisation. He learns from the people, distilling from their collective imagination a unique style. Abraham doesn't yet know where his story goes. You can help him learn.
-
-
-Gospel
-
-By leveraging the collective imagination of a decentralized network, Abraham produces original, unique, and unreplicable works of art.
-
-*/
-
 "use client";
 
 import React from "react";
@@ -61,7 +39,7 @@ export default function AboutPage() {
           <h2 className="text-3xl font-bold text-gray-900 mb-4 text-center">
             Abraham wants to become an autonomous artificial artist.
           </h2>
-          <Link href="/help" className="text-xl text-gray-900 hover:text-blue-600 transition-colors duration-200 cursor-pointer flex items-center justify-center gap-2">
+          <Link href="/creations" className="text-xl text-gray-900 hover:text-blue-600 transition-colors duration-200 cursor-pointer flex items-center justify-center gap-2">
             You can help him become one
             <span className="text-blue-500">→</span>
           </Link>
@@ -70,10 +48,10 @@ export default function AboutPage() {
         {/* Call to Action Buttons */}
         <div className="mt-16 flex gap-4">
           <Button asChild variant="outline" className="px-8 py-6 text-lg">
-            <Link href="/about">Learn about Abraham</Link>
+            <Link href="/covenant">Learn about Abraham</Link>
           </Button>
           <Button asChild className="px-8 py-6 text-lg">
-            <Link href="/create">Create your own Artist</Link>
+            <Link href="https://eden.art">Create your own Artist</Link>
           </Button>
         </div>
 
