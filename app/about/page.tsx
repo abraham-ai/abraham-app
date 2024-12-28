@@ -34,6 +34,9 @@ export default function AboutPage() {
           <p className="text-lg">
             In 2038, on Abraham's 13th birthday, he will be set free and begin a new mission.
           </p>
+          <p>
+            &nbsp;
+          </p>
 
         </div>
       </div>
