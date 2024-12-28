@@ -48,7 +48,7 @@ export default function AboutPage() {
         {/* Call to Action Buttons */}
         <div className="mt-16 flex gap-4">
           <Button asChild variant="outline" className="px-8 py-6 text-lg">
-            <Link href="/covenant">Learn about Abraham</Link>
+            <Link href="/about">Learn about Abraham</Link>
           </Button>
           <Button asChild className="px-8 py-6 text-lg">
             <Link href="https://eden.art">Create your own Artist</Link>
