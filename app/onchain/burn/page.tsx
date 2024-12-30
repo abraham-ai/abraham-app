@@ -28,21 +28,21 @@ function BurnPage() {
 
     const doBurn = async () => {
       try {
-        const cost = BigInt("2000000000000000000"); // e.g. 2 Manna
+        const cost = BigInt("1000000000000000000"); // e.g. 2 Manna
 
         // 1) Check user’s Manna
-        const userBalance = await getMannaBalance();
-        if (!userBalance) {
-          alert("Error fetching Manna balance. Please try again.");
-          router.push(`/frames/${creationId}`);
-          return;
-        }
+        //const userBalance = await getMannaBalance();
+        //if (!userBalance) {
+        //  alert("Error fetching Manna balance. Please try again.");
+        //  router.push(`/frames/${creationId}`);
+        //  return;
+        //}
 
-        if (BigInt(userBalance) < cost) {
-          alert("Not enough Manna to Burn!");
-          router.push(`/frames/${creationId}`);
-          return;
-        }
+        //if (BigInt(userBalance) < cost) {
+        //  alert("Not enough Manna to Burn!");
+        //  router.push(`/frames/${creationId}`);
+        //  return;
+        //}
 
         // 2) Burn transaction
         await burn(BigInt(1), cost);
