@@ -1,5 +1,3 @@
-// File: /components/abraham/creations/Creation.tsx
-
 "use client";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
@@ -36,40 +34,12 @@ export default function Creation({ creation }: { creation: CreationItem }) {
   );
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
-  const {
-    praise: praiseTransaction,
-    burn: burnTransaction,
-    balance, // BigInt balance in wei
-    getMannaBalance,
-  } = useMannaTransactions();
+  const { praiseCreation, mannaBalance, getMannaBalance } =
+    useMannaTransactions();
 
-  // Fetch balance when the component mounts
   useEffect(() => {
     getMannaBalance();
   }, [getMannaBalance]);
-
-  const handleReaction = async (actionType: string) => {
-    if (!idToken) {
-      throw new Error("User not authenticated");
-    }
-    console.log("Creeation id", creation._id);
-    const response = await fetch("/api/artlabproxy/stories", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({
-        creation_id: creation._id,
-        action: actionType,
-        address: userAccounts,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Error reacting to creation");
-    }
-  };
 
   const handlePraiseClick = async () => {
     setLoadingPraise(true);
@@ -79,17 +49,10 @@ export default function Creation({ creation }: { creation: CreationItem }) {
       return;
     }
     try {
-      const amount = BigInt("1000000000000000000"); // 1 Manna in wei
-
-      if (!balance || BigInt(balance) < 1) {
-        alert("Insufficient Manna balance to praise this creation.");
-        setLoadingPraise(false);
-        return;
-      }
-
-      await praiseTransaction(1, amount);
-      await handleReaction("praise");
-      setPraisesCount(praisesCount + 1);
+      // Dynamically determined praise price fetched from the contract
+      const creationId = parseInt(creation._id, 10);
+      await praiseCreation(creationId);
+      setPraisesCount((prev) => prev + 1);
       setHasPraised(true);
       await getMannaBalance();
     } catch (error) {
@@ -100,34 +63,26 @@ export default function Creation({ creation }: { creation: CreationItem }) {
     }
   };
 
-  const handleBurnClick = async () => {
-    setLoadingBurn(true);
-    if (!loggedIn) {
-      setIsLoginDialogOpen(true);
-      setLoadingBurn(false);
-      return;
-    }
-    try {
-      const amount = BigInt("1000000000000000000"); // 1 Manna in wei
-
-      if (!balance || BigInt(balance) < 1) {
-        alert("Insufficient Manna balance to burn this creation.");
-        setLoadingBurn(false);
-        return;
-      }
-
-      await burnTransaction(1, amount);
-      await handleReaction("burn");
-      setBurnsCount(burnsCount + 1);
-      setHasBurned(true);
-      await getMannaBalance();
-    } catch (error) {
-      console.error("Error burning the creation:", error);
-      alert("Failed to burn the creation. Please try again.");
-    } finally {
-      setLoadingBurn(false);
-    }
-  };
+  // const handleBurnClick = async () => {
+  //   setLoadingBurn(true);
+  //   if (!loggedIn) {
+  //     setIsLoginDialogOpen(true);
+  //     setLoadingBurn(false);
+  //     return;
+  //   }
+  //   try {
+  //     const creationId = parseInt(creation._id, 10);
+  //     await burnCreation(creationId);
+  //     setBurnsCount((prev) => prev + 1);
+  //     setHasBurned(true);
+  //     await getMannaBalance();
+  //   } catch (error) {
+  //     console.error("Error burning the creation:", error);
+  //     alert("Failed to burn the creation. Please try again.");
+  //   } finally {
+  //     setLoadingBurn(false);
+  //   }
+  // };
 
   return (
     <>
@@ -143,10 +98,10 @@ export default function Creation({ creation }: { creation: CreationItem }) {
             />
           </div>
         </Link>
-        <div className="col-span-11 flex flex-col ">
+        <div className="col-span-11 flex flex-col">
           <div className="flex flex-col items-center pr-8">
             <Link href={`/creation/${creation._id}`}>
-              <p className="mb-1 ">{creation.creation.description}</p>
+              <p className="mb-1">{creation.creation.description}</p>
               <Image
                 src={creation.result.output[0]?.url}
                 alt={creation.creation.title}
@@ -168,20 +123,20 @@ export default function Creation({ creation }: { creation: CreationItem }) {
                   : "text-gray-500"
               }`}
             >
-              {!loadingPraise && <p> 🙌 </p>}
+              {!loadingPraise && <p>🙌</p>}
               {loadingPraise && (
                 <Loader2Icon className="w-5 h-5 animate-spin" />
               )}
             </button>
             <span
-              className={`ml-1 text-sm font-semibold  ${
+              className={`ml-1 text-sm font-semibold ${
                 loggedIn && hasPraised ? "text-blue-600" : "text-gray-500"
               }`}
             >
               {praisesCount}
             </span>
             <button
-              onClick={handleBurnClick}
+              //onClick={handleBurnClick}
               disabled={loggedIn && hasBurned}
               className={`ml-10 cursor-pointer ${
                 loggedIn
@@ -191,17 +146,17 @@ export default function Creation({ creation }: { creation: CreationItem }) {
                   : "text-gray-500"
               }`}
             >
-              {!loadingBurn && <p> 🔥</p>}
+              {!loadingBurn && <p>🔥</p>}
               {loadingBurn && <Loader2Icon className="w-5 h-5 animate-spin" />}
             </button>
             <span
-              className={`ml-1 text-sm font-semibold  ${
+              className={`ml-1 text-sm font-semibold ${
                 loggedIn && hasBurned ? "text-blue-600" : "text-gray-500"
               }`}
             >
               {burnsCount}
             </span>
-            <div className={`ml-10 cursor-pointer text-gray-500`}>
+            <div className="ml-10 cursor-pointer text-gray-500">
               {loggedIn ? (
                 <BlessDialog
                   creation={creation}

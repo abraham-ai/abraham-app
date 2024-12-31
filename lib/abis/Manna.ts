@@ -1,4 +1,4 @@
-export const MannaTokenAbi = [
+export const MannaAbi = [
   {
     inputs: [
       {
@@ -149,31 +149,6 @@ export const MannaTokenAbi = [
       {
         indexed: true,
         internalType: "address",
-        name: "user",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "string",
-        name: "comment",
-        type: "string",
-      },
-    ],
-    name: "Blessed",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
         name: "buyer",
         type: "address",
       },
@@ -193,31 +168,6 @@ export const MannaTokenAbi = [
       {
         indexed: true,
         internalType: "address",
-        name: "user",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-    ],
-    name: "Burned",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
         name: "previousOwner",
         type: "address",
       },
@@ -229,31 +179,6 @@ export const MannaTokenAbi = [
       },
     ],
     name: "OwnershipTransferred",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
-        name: "user",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-    ],
-    name: "Praised",
     type: "event",
   },
   {
@@ -402,27 +327,9 @@ export const MannaTokenAbi = [
   {
     inputs: [
       {
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-      {
-        internalType: "string",
-        name: "comment",
-        type: "string",
-      },
-    ],
-    name: "bless",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
+        internalType: "address",
+        name: "account",
+        type: "address",
       },
       {
         internalType: "uint256",
@@ -430,7 +337,7 @@ export const MannaTokenAbi = [
         type: "uint256",
       },
     ],
-    name: "burn",
+    name: "burnFrom",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -440,19 +347,6 @@ export const MannaTokenAbi = [
     name: "buyManna",
     outputs: [],
     stateMutability: "payable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-    ],
-    name: "createArt",
-    outputs: [],
-    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -510,24 +404,6 @@ export const MannaTokenAbi = [
       },
     ],
     stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-    ],
-    name: "praise",
-    outputs: [],
-    stateMutability: "nonpayable",
     type: "function",
   },
   {
