@@ -52,8 +52,8 @@ export default function Creation({ creation }: { creation: CreationItem }) {
     }
     try {
       // Dynamically determined praise price fetched from the contract
-      const creationId = parseInt(creation._id, 10);
-      await praiseCreation(creationId);
+      //const creationId = parseInt(1, 10);
+      await praiseCreation(1);
       setPraisesCount((prev) => (prev ?? 0) + 1);
       setHasPraised(true);
       await getMannaBalance();

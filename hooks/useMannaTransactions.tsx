@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { AbrahamAbi } from "@/lib/abis/Abraham"; // Ensure this ABI includes all necessary functions
+import { MannaAbi } from "@/lib/abis/Manna";
+import { AbrahamAbi } from "@/lib/abis/Abraham";
 import {
   createPublicClient,
   createWalletClient,
@@ -12,7 +13,6 @@ import {
 } from "viem";
 import { Chain } from "viem/chains";
 
-// Define the blockchain network configuration (Base Sepolia)
 const baseSepolia = {
   id: 84532,
   name: "Base Sepolia",
@@ -30,8 +30,8 @@ const baseSepolia = {
   },
 } as const satisfies Chain;
 
-// **Updated Abraham Contract Address**
-const ABRAHAM_ADDRESS = "0xA9929f23f38Ddcf2650345f61b3841dC6165e1fE";
+const MANNA_ADDRESS = "0x768CFd14Fe7F02Ef395620ACFAc8a0667d75d63E";
+const ABRAHAM_ADDRESS = "0xD7755cA5bCD99BC9D0c232d815cA139aBbB62280";
 
 export function useMannaTransactions() {
   const { provider, accountAbstractionProvider } = useAuth();
@@ -44,7 +44,6 @@ export function useMannaTransactions() {
   const [publicClient, setPublicClient] = useState<any>(null);
   const [walletClient, setWalletClient] = useState<any>(null);
 
-  // Initialize Public and Wallet Clients
   useEffect(() => {
     if (provider) {
       const pc = createPublicClient({
@@ -60,7 +59,6 @@ export function useMannaTransactions() {
     }
   }, [provider]);
 
-  // Fetch Balances when Provider and Wallet Client are ready
   useEffect(() => {
     if (provider && walletClient) {
       getMannaBalance();
@@ -69,16 +67,13 @@ export function useMannaTransactions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider, walletClient]);
 
-  /**
-   * Fetches the Manna balance of the connected user.
-   */
   const getMannaBalance = async () => {
     if (!provider || !publicClient || !walletClient) return;
     try {
       const [address] = await walletClient.getAddresses();
       const balance = await publicClient.readContract({
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
         functionName: "balanceOf",
         args: [address],
       });
@@ -92,15 +87,12 @@ export function useMannaTransactions() {
     }
   };
 
-  /**
-   * Fetches the contract's Manna and Ether balances.
-   */
   const getContractBalances = async () => {
     if (!provider || !publicClient) return;
     try {
       const [manna, eth] = (await publicClient.readContract({
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
         functionName: "getContractBalances",
       })) as [bigint, bigint];
 
@@ -117,55 +109,45 @@ export function useMannaTransactions() {
     }
   };
 
-  /**
-   * Buys Manna by sending Ether to the contract.
-   * @param etherAmount - The amount of Ether to send as a string (e.g., "0.1")
-   */
   const buyManna = async (etherAmount: string) => {
     if (!provider || !walletClient) return;
     try {
       const [address] = await walletClient.getAddresses();
       const txHash = await walletClient.writeContract({
         account: address,
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
         functionName: "buyManna",
         value: parseEther(etherAmount),
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       await getMannaBalance();
-      console.log("Manna purchased successfully!");
     } catch (error) {
       console.error("Error buying Manna:", error);
     }
   };
 
-  /**
-   * Sells Manna to receive Ether from the contract.
-   * @param mannaAmount - The amount of Manna to sell as a string representing a BigInt (e.g., "1000000000000000000")
-   */
   const sellManna = async (mannaAmount: string) => {
     if (!provider || !walletClient) return;
     try {
       const [address] = await walletClient.getAddresses();
       const txHash = await walletClient.writeContract({
         account: address,
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
         functionName: "sellManna",
         args: [BigInt(mannaAmount)],
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       await getMannaBalance();
-      console.log("Manna sold successfully!");
     } catch (error) {
       console.error("Error selling Manna:", error);
     }
   };
 
   /**
-   * Approves the Abraham contract to spend the user's Manna.
-   * @param amount - The maximum amount of Manna to approve as a bigint (use `2n ** 256n - 1n` for unlimited)
+   * Approves the Abraham contract to spend the user's Manna
+   * @param amount The max Manna amount to approve (use a big number or 2^256-1 if you want unlimited)
    */
   const approveMannaForAbraham = async (amount: bigint) => {
     if (!provider || !walletClient) return;
@@ -173,12 +155,12 @@ export function useMannaTransactions() {
       const [address] = await walletClient.getAddresses();
       const txHash = await walletClient.writeContract({
         account: address,
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
         functionName: "approve",
-        args: [ABRAHAM_ADDRESS, amount], // Approving Abraham to spend user's Manna
+        args: [ABRAHAM_ADDRESS, amount],
       });
-      console.log("Approval transaction hash:", txHash);
+      console.log("approve txHash:", txHash);
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       console.log("Manna approved for Abraham!");
     } catch (error) {
@@ -188,16 +170,16 @@ export function useMannaTransactions() {
 
   /**
    * Praises a creation by:
-   * 1. Approving Abraham to spend user's Manna (if not already approved).
-   * 2. Calling `praise(creationId)` on Abraham.
-   * @param creationId - The ID of the creation to praise.
+   * 1) Approving Abraham to spend user's Manna (if not already approved).
+   * 2) Calling `praise(creationId)` on Abraham.
    */
   const praiseCreation = async (creationId: number) => {
     if (!provider || !walletClient) return;
     try {
       const [address] = await walletClient.getAddresses();
 
-      // Step 1: Approve (unlimited) Manna for Abraham
+      // Step 1: Approve (unlimited) Manna for Abraham if you want:
+      // Use a large BigInt for max allowance
       const maxAllowance = BigInt(
         "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
       );
@@ -211,7 +193,7 @@ export function useMannaTransactions() {
         functionName: "praise",
         args: [creationId],
       });
-      console.log("Praise transaction hash:", txHash);
+      console.log("praise txHash:", txHash);
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       console.log(`Praised creationId ${creationId} successfully!`);
     } catch (error) {
@@ -219,10 +201,6 @@ export function useMannaTransactions() {
     }
   };
 
-  /**
-   * Unpraises a creation to receive a Manna refund.
-   * @param creationId - The ID of the creation to unpraise.
-   */
   const unpraiseCreation = async (creationId: number) => {
     if (!provider || !walletClient) return;
     try {
@@ -235,67 +213,9 @@ export function useMannaTransactions() {
         args: [creationId],
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
-      await getMannaBalance();
       console.log(`Unpraised creationId ${creationId} successfully!`);
     } catch (error) {
       console.error("Error unpraising creation:", error);
-    }
-  };
-
-  /**
-   * Lists user's praises for sale on the secondary market.
-   * @param creationId - The ID of the creation.
-   * @param amount - The number of praises to list for sale.
-   * @param pricePerPraise - The price per praise unit in Manna (as a string, e.g., "0.2").
-   */
-  const listPraiseForSale = async (
-    creationId: number,
-    amount: number,
-    pricePerPraise: string
-  ) => {
-    if (!provider || !walletClient) return;
-    try {
-      const [address] = await walletClient.getAddresses();
-      const pricePerPraiseWei = parseEther(pricePerPraise);
-
-      const txHash = await walletClient.writeContract({
-        account: address,
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
-        functionName: "listPraiseForSale",
-        args: [creationId, amount, pricePerPraiseWei],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      console.log(
-        `Listed ${amount} praises for sale at ${pricePerPraise} Manna each!`
-      );
-    } catch (error) {
-      console.error("Error listing praises for sale:", error);
-    }
-  };
-
-  /**
-   * Buys praises from a specified listing on the secondary market.
-   * @param listingId - The ID of the praise listing.
-   * @param amount - The number of praises to buy.
-   */
-  const buyPraise = async (listingId: number, amount: number) => {
-    if (!provider || !walletClient) return;
-    try {
-      const [address] = await walletClient.getAddresses();
-
-      const txHash = await walletClient.writeContract({
-        account: address,
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
-        functionName: "buyPraise",
-        args: [listingId, amount],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      console.log(`Bought ${amount} praises from listing ID ${listingId}!`);
-      await getMannaBalance();
-    } catch (error) {
-      console.error("Error buying praises:", error);
     }
   };
 
@@ -304,11 +224,8 @@ export function useMannaTransactions() {
     contractBalances,
     buyManna,
     sellManna,
-    approveMannaForAbraham,
     praiseCreation,
     unpraiseCreation,
-    listPraiseForSale,
-    buyPraise,
     getMannaBalance,
     getContractBalances,
   };
