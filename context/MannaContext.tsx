@@ -23,7 +23,7 @@ export const MannaProvider = ({ children }: MannaProviderProps) => {
     const newBalance = await fetchBalance();
     if (typeof newBalance === "string") {
       setBalance(newBalance);
-      console.log("Manna balance:", newBalance);
+      console;
     } else {
       console.error("fetchBalance did not return a string");
     }
