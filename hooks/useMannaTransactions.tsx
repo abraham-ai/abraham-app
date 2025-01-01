@@ -145,10 +145,47 @@ export function useMannaTransactions() {
     }
   };
 
+  /**
+   * Approves the Abraham contract to spend the user's Manna
+   * @param amount The max Manna amount to approve (use a big number or 2^256-1 if you want unlimited)
+   */
+  const approveMannaForAbraham = async (amount: bigint) => {
+    if (!provider || !walletClient) return;
+    try {
+      const [address] = await walletClient.getAddresses();
+      const txHash = await walletClient.writeContract({
+        account: address,
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
+        functionName: "approve",
+        args: [ABRAHAM_ADDRESS, amount],
+      });
+      console.log("approve txHash:", txHash);
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      console.log("Manna approved for Abraham!");
+    } catch (error) {
+      console.error("Error approving Manna for Abraham:", error);
+    }
+  };
+
+  /**
+   * Praises a creation by:
+   * 1) Approving Abraham to spend user's Manna (if not already approved).
+   * 2) Calling `praise(creationId)` on Abraham.
+   */
   const praiseCreation = async (creationId: number) => {
     if (!provider || !walletClient) return;
     try {
       const [address] = await walletClient.getAddresses();
+
+      // Step 1: Approve (unlimited) Manna for Abraham if you want:
+      // Use a large BigInt for max allowance
+      const maxAllowance = BigInt(
+        "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      );
+      await approveMannaForAbraham(maxAllowance);
+
+      // Step 2: Praise
       const txHash = await walletClient.writeContract({
         account: address,
         address: ABRAHAM_ADDRESS as `0x${string}`,
@@ -156,7 +193,9 @@ export function useMannaTransactions() {
         functionName: "praise",
         args: [creationId],
       });
+      console.log("praise txHash:", txHash);
       await publicClient.waitForTransactionReceipt({ hash: txHash });
+      console.log(`Praised creationId ${creationId} successfully!`);
     } catch (error) {
       console.error("Error praising creation:", error);
     }
@@ -174,6 +213,7 @@ export function useMannaTransactions() {
         args: [creationId],
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
+      console.log(`Unpraised creationId ${creationId} successfully!`);
     } catch (error) {
       console.error("Error unpraising creation:", error);
     }

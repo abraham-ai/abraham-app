@@ -19,7 +19,9 @@ import { Button } from "@/components/ui/button";
 
 export default function Creation({ creation }: { creation: CreationItem }) {
   const { idToken, loggedIn, userAccounts, login, loadingAuth } = useAuth();
-  const [praisesCount, setPraisesCount] = useState(creation.praises.length);
+  const [praisesCount, setPraisesCount] = useState(
+    creation.onchain?.praisePool
+  );
   const [burnsCount, setBurnsCount] = useState(creation.burns.length);
   const [loadingPraise, setLoadingPraise] = useState(false);
   const [loadingBurn, setLoadingBurn] = useState(false);
@@ -52,7 +54,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
       // Dynamically determined praise price fetched from the contract
       const creationId = parseInt(creation._id, 10);
       await praiseCreation(creationId);
-      setPraisesCount((prev) => prev + 1);
+      setPraisesCount((prev) => (prev ?? 0) + 1);
       setHasPraised(true);
       await getMannaBalance();
     } catch (error) {

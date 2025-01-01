@@ -24,6 +24,13 @@ export interface CreationItem {
     user: string;
   }>;
   stills?: string[]; // If applicable
+  onchain?: {
+    id: string;
+    metadataUri: string;
+    totalStaked: string;
+    praisePool: number;
+    conviction: string;
+  };
 }
 
 export interface Blessing {
