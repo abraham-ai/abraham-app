@@ -59,7 +59,7 @@ function PraisePage() {
     };
 
     doPraise();
-  }, [creationId, router, praise, getMannaBalance]);
+  }, [creationId, router, praiseCreation, getMannaBalance]);
 
   return (
     <div style={{ padding: "20px" }}>
