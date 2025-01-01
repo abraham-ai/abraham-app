@@ -100,6 +100,10 @@ export function useMannaTransactions() {
         mannaBalance: formatUnits(manna, 18),
         ethBalance: formatEther(eth),
       });
+      return {
+        mannaBalance: formatUnits(manna, 18),
+        ethBalance: formatEther(eth),
+      };
     } catch (error) {
       console.error("Error fetching contract balances:", error);
     }
