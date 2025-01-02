@@ -87,6 +87,7 @@ export async function GET() {
         variables: { uri: imageUrl },
         fetchPolicy: "network-only",
       });
+      console.log("CreationAdded event data:", data);
       const onchainId = data.creationAddeds[0].creationId;
 
       const onchainData = await abrahamContract.getCreation(onchainId);

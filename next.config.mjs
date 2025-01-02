@@ -16,6 +16,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "edenartlab-stage-data.s3.amazonaws.com",
       },
+      {
+        protocol: "https",
+        hostname: "ipfs.io",
+      },
     ],
   },
 };

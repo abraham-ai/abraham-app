@@ -1,10 +1,11 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { CreationItem } from "@/types";
 import { Loader2Icon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import BlessDialog from "./BlessDialog";
+import BlessDialog from "./BlessDialog"; // Optional: Remove if not needed
 import Link from "next/link";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 import {
@@ -16,31 +17,32 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ethers } from "ethers";
 
 export default function Creation({ creation }: { creation: CreationItem }) {
-  const { idToken, loggedIn, userAccounts, login, loadingAuth } = useAuth();
-  const [praisesCount, setPraisesCount] = useState(
-    creation.onchain?.praisePool
-  );
-  const [burnsCount, setBurnsCount] = useState(creation.burns.length);
+  const { loggedIn, userAccounts, login, loadingAuth } = useAuth();
+
+  // Format praisePool and conviction using ethers
+  const formattedMannaUsed = ethers.formatUnits(creation.praisePool, 18);
+  const formattedConviction = ethers.formatUnits(creation.conviction, 18);
+
+  // Parse totalStaked to get number of praises
+  const numberOfPraises = parseInt(creation.totalStaked, 10);
+
+  const [mannaUsed, setMannaUsed] = useState<string>(formattedMannaUsed);
+  const [conviction, setConviction] = useState<string>(formattedConviction);
+  const [numberOfPraisesState, setNumberOfPraisesState] =
+    useState<number>(numberOfPraises);
+
   const [loadingPraise, setLoadingPraise] = useState(false);
-  const [loadingBurn, setLoadingBurn] = useState(false);
-  const [blessingsCount, setBlessingsCount] = useState(
-    creation.blessings.length
-  );
-  const [hasPraised, setHasPraised] = useState(
-    creation.praises.includes(userAccounts || "")
-  );
-  const [hasBurned, setHasBurned] = useState(
-    creation.burns.includes(userAccounts || "")
-  );
+  // Remove hasPraised as we don't have the praises array
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
-  const { praiseCreation, mannaBalance, getMannaBalance } =
-    useMannaTransactions();
+  const { praiseCreation, getMannaBalance } = useMannaTransactions();
 
   useEffect(() => {
     getMannaBalance();
+    // Cannot determine if user has praised without 'praises' array
   }, [getMannaBalance]);
 
   const handlePraiseClick = async () => {
@@ -51,11 +53,17 @@ export default function Creation({ creation }: { creation: CreationItem }) {
       return;
     }
     try {
-      // Dynamically determined praise price fetched from the contract
-      //const creationId = parseInt(1, 10);
-      await praiseCreation(1);
-      setPraisesCount((prev) => (prev ?? 0) + 1);
-      setHasPraised(true);
+      await praiseCreation(parseInt(creation.creationId, 10)); // Ensure creationId is an integer
+
+      // Assuming praiseCreation adds 1 Manna
+      setMannaUsed((prev) => (parseFloat(prev) + 1).toString());
+
+      // Assuming each praise increments totalStaked by 1
+      setNumberOfPraisesState((prev) => prev + 1);
+
+      // Optionally, disable the praise button or handle 'hasPraised' via another method
+      // For now, allow multiple praises
+
       await getMannaBalance();
     } catch (error) {
       console.error("Error praising the creation:", error);
@@ -65,35 +73,14 @@ export default function Creation({ creation }: { creation: CreationItem }) {
     }
   };
 
-  // const handleBurnClick = async () => {
-  //   setLoadingBurn(true);
-  //   if (!loggedIn) {
-  //     setIsLoginDialogOpen(true);
-  //     setLoadingBurn(false);
-  //     return;
-  //   }
-  //   try {
-  //     const creationId = parseInt(creation._id, 10);
-  //     await burnCreation(creationId);
-  //     setBurnsCount((prev) => prev + 1);
-  //     setHasBurned(true);
-  //     await getMannaBalance();
-  //   } catch (error) {
-  //     console.error("Error burning the creation:", error);
-  //     alert("Failed to burn the creation. Please try again.");
-  //   } finally {
-  //     setLoadingBurn(false);
-  //   }
-  // };
-
   return (
     <>
-      <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
-        <Link href={`/creation/${creation._id}`}>
+      <div className="grid grid-cols-12 border-b border-x p-4 lg:w-[43vw] w-full">
+        <Link href={`/creation/${creation.creationId}`}>
           <div className="col-span-1 flex flex-col mr-3">
             <Image
               src={"/abrahamlogo.png"}
-              alt={creation.creation.title}
+              alt={creation.title || "Creation"}
               width={100}
               height={100}
               className="rounded-full aspect-[1] object-cover border"
@@ -102,41 +89,45 @@ export default function Creation({ creation }: { creation: CreationItem }) {
         </Link>
         <div className="col-span-11 flex flex-col">
           <div className="flex flex-col items-center pr-8">
-            <Link href={`/creation/${creation._id}`}>
-              <p className="mb-1">{creation.creation.description}</p>
-              <Image
-                src={creation.result.output[0]?.url}
-                alt={creation.creation.title}
-                width={500}
-                height={300}
-                className="w-full rounded-lg aspect-[5/4] object-cover mt-2 border"
-              />
+            <Link href={`/creation/${creation.creationId}`}>
+              <p className="mb-1">
+                {creation.description || "No description available."}
+              </p>
+              {creation.image && (
+                <Image
+                  src={creation.image}
+                  alt={creation.title || "Creation Image"}
+                  width={500}
+                  height={300}
+                  className="w-full rounded-lg aspect-[5/4] object-cover mt-2 border"
+                />
+              )}
             </Link>
           </div>
           <div className="flex items-center mt-6 mb-4">
             <button
               onClick={handlePraiseClick}
-              disabled={loggedIn && hasPraised}
+              disabled={loadingPraise}
               className={`cursor-pointer ${
                 loggedIn
-                  ? hasPraised
+                  ? loadingPraise
                     ? "text-blue-500 cursor-not-allowed"
-                    : "text-gray-500"
+                    : "text-gray-500 hover:text-blue-500"
                   : "text-gray-500"
-              }`}
+              } transition-colors duration-200`}
             >
-              {!loadingPraise && <p>🙌</p>}
-              {loadingPraise && (
+              {!loadingPraise ? (
+                <p>🙌</p>
+              ) : (
                 <Loader2Icon className="w-5 h-5 animate-spin" />
               )}
             </button>
-            <span
-              className={`ml-1 text-sm font-semibold ${
-                loggedIn && hasPraised ? "text-blue-600" : "text-gray-500"
-              }`}
-            >
-              {praisesCount}
+            <span className={`ml-1 text-sm font-semibold text-gray-500`}>
+              {numberOfPraisesState}
             </span>
+
+            {/* 
+            // Removed burns-related UI elements
             <button
               //onClick={handleBurnClick}
               disabled={loggedIn && hasBurned}
@@ -144,39 +135,44 @@ export default function Creation({ creation }: { creation: CreationItem }) {
                 loggedIn
                   ? hasBurned
                     ? "text-red-500 cursor-not-allowed"
-                    : "text-gray-500"
+                    : "text-gray-500 hover:text-red-500"
                   : "text-gray-500"
-              }`}
+              } transition-colors duration-200`}
             >
-              {!loadingBurn && <p>🔥</p>}
-              {loadingBurn && <Loader2Icon className="w-5 h-5 animate-spin" />}
+              {!loadingBurn ? <p>🔥</p> : <Loader2Icon className="w-5 h-5 animate-spin" />}
             </button>
             <span
               className={`ml-1 text-sm font-semibold ${
-                loggedIn && hasBurned ? "text-blue-600" : "text-gray-500"
+                loggedIn && hasBurned ? "text-red-600" : "text-gray-500"
               }`}
             >
               {burnsCount}
             </span>
-            <div className="ml-10 cursor-pointer text-gray-500">
+            */}
+
+            {/* <div className="ml-10 cursor-pointer text-gray-500">
               {loggedIn ? (
                 <BlessDialog
                   creation={creation}
-                  blessingsCount={blessingsCount}
-                  setBlessingsCount={setBlessingsCount}
+                  // blessingsCount={blessingsCount} // Removed blessings-related props
+                  // setBlessingsCount={setBlessingsCount}
                 />
               ) : (
                 <button
                   onClick={() => setIsLoginDialogOpen(true)}
-                  className="text-gray-500"
+                  className="text-gray-500 hover:text-blue-500 transition-colors duration-200"
                 >
                   <p>🙏</p>
                 </button>
               )}
+            </div> */}
+            {/* Removed the blessingsCount span as 'blessings' are not fetched */}
+
+            {/* Additional Display for Manna Used and Conviction */}
+            <div className="ml-10 flex flex-col">
+              <p className="text-sm text-gray-500">Manna Used: {mannaUsed}</p>
+              <p className="text-sm text-gray-500">Conviction: {conviction}</p>
             </div>
-            <span className="ml-1 text-sm font-semibold text-gray-500">
-              {blessingsCount}
-            </span>
           </div>
         </div>
       </div>
