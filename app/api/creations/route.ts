@@ -63,7 +63,10 @@ export async function GET(request: NextRequest) {
         data.creations.map(async (creation: SubgraphCreation) => {
           try {
             // Extract CID from metadataUri
-            const cid = creation.metadataUri.replace(/^ipfs:\/\//, "");
+            const cid = creation.metadataUri.replace(
+              /^ipfs:\/\/|^https:\/\/[^/]+\/ipfs\//,
+              ""
+            );
             console.log("CID:", cid);
 
             // Fetch metadata from IPFS
@@ -75,7 +78,10 @@ export async function GET(request: NextRequest) {
             }
 
             const metadata: Metadata = await metadataResponse.json();
-            const imageCid = metadata.image.replace(/^ipfs:\/\//, "");
+            const imageCid = metadata.image.replace(
+              /^ipfs:\/\/|^https:\/\/[^/]+\/ipfs\//,
+              ""
+            );
 
             return {
               ...creation,
