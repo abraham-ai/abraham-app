@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { CreationItem } from "@/types";
 import { Loader2Icon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import BlessDialog from "./BlessDialog"; // Optional: Remove if not needed
 import Link from "next/link";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 import {
@@ -19,31 +18,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { ethers } from "ethers";
 
-export default function Creation({ creation }: { creation: CreationItem }) {
-  const { loggedIn, userAccounts, login, loadingAuth } = useAuth();
+interface CreationProps {
+  creation: CreationItem;
+  hasPraised: boolean;
+}
 
-  // Format praisePool and conviction using ethers
+export default function Creation({ creation, hasPraised }: CreationProps) {
+  const { loggedIn, login, loadingAuth } = useAuth();
+  console.log("Has praised:", hasPraised);
+
   const formattedMannaUsed = ethers.formatUnits(creation.praisePool, 18);
   const formattedConviction = ethers.formatUnits(creation.conviction, 18);
-
-  // Parse totalStaked to get number of praises
-  const numberOfPraises = parseInt(creation.totalStaked, 10);
+  const initialPraises = parseInt(creation.totalStaked, 10);
 
   const [mannaUsed, setMannaUsed] = useState<string>(formattedMannaUsed);
   const [conviction, setConviction] = useState<string>(formattedConviction);
-  const [numberOfPraisesState, setNumberOfPraisesState] =
-    useState<number>(numberOfPraises);
+  const [numberOfPraises, setNumberOfPraises] =
+    useState<number>(initialPraises);
+  const [currentHasPraised, setCurrentHasPraised] =
+    useState<boolean>(hasPraised);
 
   const [loadingPraise, setLoadingPraise] = useState(false);
-  // Remove hasPraised as we don't have the praises array
+  const [loadingUnpraise, setLoadingUnpraise] = useState(false);
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
-  const { praiseCreation, getMannaBalance } = useMannaTransactions();
-
-  useEffect(() => {
-    getMannaBalance();
-    // Cannot determine if user has praised without 'praises' array
-  }, [getMannaBalance]);
+  const { praiseCreation, unpraiseCreation, getMannaBalance } =
+    useMannaTransactions();
 
   const handlePraiseClick = async () => {
     setLoadingPraise(true);
@@ -53,16 +53,11 @@ export default function Creation({ creation }: { creation: CreationItem }) {
       return;
     }
     try {
-      await praiseCreation(parseInt(creation.creationId, 10)); // Ensure creationId is an integer
+      await praiseCreation(parseInt(creation.creationId, 10));
 
-      // Assuming praiseCreation adds 1 Manna
       setMannaUsed((prev) => (parseFloat(prev) + 1).toString());
-
-      // Assuming each praise increments totalStaked by 1
-      setNumberOfPraisesState((prev) => prev + 1);
-
-      // Optionally, disable the praise button or handle 'hasPraised' via another method
-      // For now, allow multiple praises
+      setNumberOfPraises((prev) => prev + 1);
+      setCurrentHasPraised(true);
 
       await getMannaBalance();
     } catch (error) {
@@ -70,6 +65,29 @@ export default function Creation({ creation }: { creation: CreationItem }) {
       alert("Failed to praise the creation. Please try again.");
     } finally {
       setLoadingPraise(false);
+    }
+  };
+
+  const handleUnpraiseClick = async () => {
+    setLoadingUnpraise(true);
+    if (!loggedIn) {
+      setIsLoginDialogOpen(true);
+      setLoadingUnpraise(false);
+      return;
+    }
+    try {
+      await unpraiseCreation(parseInt(creation.creationId, 10));
+
+      setMannaUsed((prev) => (parseFloat(prev) - 1).toString());
+      setNumberOfPraises((prev) => (prev > 0 ? prev - 1 : 0));
+      setCurrentHasPraised(false);
+
+      await getMannaBalance();
+    } catch (error) {
+      console.error("Error unpraising the creation:", error);
+      alert("Failed to unpraise the creation. Please try again.");
+    } finally {
+      setLoadingUnpraise(false);
     }
   };
 
@@ -123,9 +141,8 @@ export default function Creation({ creation }: { creation: CreationItem }) {
               )}
             </button>
             <span className={`ml-1 text-sm font-semibold text-gray-500`}>
-              {numberOfPraisesState}
+              {numberOfPraises}
             </span>
-
             {/* 
             // Removed burns-related UI elements
             <button
@@ -149,7 +166,6 @@ export default function Creation({ creation }: { creation: CreationItem }) {
               {burnsCount}
             </span>
             */}
-
             {/* <div className="ml-10 cursor-pointer text-gray-500">
               {loggedIn ? (
                 <BlessDialog
@@ -167,12 +183,31 @@ export default function Creation({ creation }: { creation: CreationItem }) {
               )}
             </div> */}
             {/* Removed the blessingsCount span as 'blessings' are not fetched */}
-
             {/* Additional Display for Manna Used and Conviction */}
             <div className="ml-10 flex flex-col">
               <p className="text-sm text-gray-500">Manna Used: {mannaUsed}</p>
               <p className="text-sm text-gray-500">Conviction: {conviction}</p>
             </div>
+
+            {hasPraised && (
+              <button
+                onClick={handleUnpraiseClick}
+                disabled={loadingUnpraise}
+                className={`ml-10 cursor-pointer border rounded-lg px-6 py-1 ${
+                  loggedIn
+                    ? loadingUnpraise
+                      ? "text-red-500 cursor-not-allowed"
+                      : "text-gray-500 hover:text-red-500"
+                    : "text-gray-500"
+                } transition-colors duration-200`}
+              >
+                {!loadingUnpraise ? (
+                  <p className="text-sm">Unpraise</p>
+                ) : (
+                  <Loader2Icon className="w-5 h-5 animate-spin" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

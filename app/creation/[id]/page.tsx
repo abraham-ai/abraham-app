@@ -18,7 +18,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
     axios.get("/api/artlabproxy/stories").then((res) => {
       const filteredCreation: CreationItem | null =
         res.data.find((item: CreationItem) => {
-          return item._id === params.id;
+          return item.id === params.id;
         }) || null;
 
       setCreation(filteredCreation);
@@ -37,9 +37,9 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         <AppBar />
         <div className="mt-12 flex flex-col items-center justify-center w-full">
           <div className="flex flex-col items-center justify-center">
-            <div className="flex flex-col items-center justify-center border-x">
+            {/*<div className="flex flex-col items-center justify-center border-x">
               <div>{creation && <Creation creation={creation} />}</div>
-              {/* Stills */}
+            
               {creation?.stills && creation.stills.length > 0 && (
                 <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
                   <div className="col-span-1 flex flex-col mr-3">
@@ -54,7 +54,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                   <div className="col-span-11 flex flex-col pr-4">
                     <div className="grid grid-cols-12 ">
                       <div className="col-span-9 flex flex-col mr-0.5 mt-2">
-                        {/* Simple Carousel */}
+                     
                         <div className="flex flex-col items-center">
                           <div className="flex items-center justify-center">
                             <div>
@@ -73,11 +73,11 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                   </div>
                 </div>
               )}
-              {/* Blessings */}
+              
               <div>
                 <Blessings blessings={creation?.blessings || []} />
               </div>
-            </div>
+            </div>*/}
           </div>
         </div>
       </div>

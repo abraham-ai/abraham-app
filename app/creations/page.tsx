@@ -1,120 +1,89 @@
-// pages/index.tsx
-
 "use client";
 
 import React, { useEffect, useState } from "react";
 import CreationList from "@/components/abraham/creations/CreationList";
 import AppBar from "@/components/layout/AppBar";
-import { CreationItem, SubgraphCreation, Metadata } from "@/types";
+import { CreationItem } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Home() {
   const [creations, setCreations] = useState<CreationItem[]>([]);
+  const [userPraises, setUserPraises] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Replace with your actual subgraph endpoint
-  const GRAPHQL_ENDPOINT =
-    "https://api.studio.thegraph.com/query/99814/abraham/v0.0.2";
-
-  const GET_CREATIONS_QUERY = `
-    query GetCreations($first: Int!) {
-      creations(first: $first, orderBy: creationId, orderDirection: asc) {
-        id
-        creationId
-        metadataUri
-        totalStaked
-        praisePool
-        conviction
-        createdAt
-        updatedAt
-      }
-    }
-  `;
+  const { loggedIn, userAccounts } = useAuth();
 
   useEffect(() => {
     const fetchCreations = async () => {
       try {
-        // Fetch creations from the subgraph
-        const response = await fetch(GRAPHQL_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query: GET_CREATIONS_QUERY,
-            variables: {
-              first: 100, // Adjust based on expected number of creations
-            },
-          }),
-        });
+        const response = await fetch("/api/creations");
 
         if (!response.ok) {
+          const errorData = await response.json();
           throw new Error(
-            `Network response was not ok: ${response.statusText}`
+            errorData.error || `Network error: ${response.statusText}`
           );
         }
 
-        const { data, errors } = await response.json();
-
-        if (errors) {
-          console.error("GraphQL Errors:", errors);
-          setError(errors.map((err: any) => err.message).join(", "));
-          setLoading(false);
-          return;
-        }
-
-        if (data && data.creations) {
-          // Fetch metadata for each creation
-          const creationsWithMetadata: CreationItem[] = await Promise.all(
-            data.creations.map(async (creation: SubgraphCreation) => {
-              try {
-                const metadataResponse = await fetch(creation.metadataUri);
-                if (!metadataResponse.ok) {
-                  throw new Error(
-                    `Failed to fetch metadata: ${metadataResponse.statusText}`
-                  );
-                }
-                const metadata: Metadata = await metadataResponse.json();
-                return {
-                  ...creation,
-                  title: metadata.title,
-                  description: metadata.description,
-                  visual_aesthetic: metadata.visual_aesthetic,
-                  image: metadata.image,
-                };
-              } catch (metaError: any) {
-                console.error(
-                  `Error fetching metadata for creationId ${creation.creationId}:`,
-                  metaError
-                );
-                // Provide default values if metadata fetch fails
-                return {
-                  ...creation,
-                  title: "Unknown Title",
-                  description: "No description available.",
-                  visual_aesthetic: "Unknown",
-                  image:
-                    "https://ipfs.io/ipfs/bafybeifrq3n5h4onservz3jlcwaeodiy5izwodbxs3ce4z6x5k4i2z4qwy", // Ensure this image exists in your public folder
-                };
-              }
-            })
-          );
-
-          setCreations(creationsWithMetadata);
-          console.log("Creations with metadata:", creationsWithMetadata);
-        } else {
-          setError("No data returned from GraphQL query.");
-        }
+        const { creations } = await response.json();
+        setCreations(creations);
       } catch (err: any) {
         console.error("Fetch Error:", err);
         setError(err.message || "An unknown error occurred.");
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchCreations();
-  }, [GRAPHQL_ENDPOINT]);
+    const fetchUserPraises = async () => {
+      if (!loggedIn || !userAccounts || userAccounts.length === 0) return;
+      console.log("User Accounts: ", userAccounts);
+      const userAddress = userAccounts.toLowerCase();
+      console.log("User Address: ", userAddress);
+
+      const query = `
+        query GetUserPraises($user: Bytes!) {
+          praiseds(where: { user: $user }) {
+            creationId
+          }
+        }
+      `;
+
+      try {
+        const response = await fetch(
+          "https://api.studio.thegraph.com/query/99814/abraham/v0.0.2",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, variables: { user: userAddress } }),
+          }
+        );
+
+        if (!response.ok)
+          throw new Error(`Network error: ${response.statusText}`);
+
+        const { data, errors } = await response.json();
+        console.log("User Praises Data:", data);
+        if (errors) {
+          console.error("GraphQL Errors:", errors);
+          return;
+        }
+
+        const praisedIds = data.praiseds.map((p: any) => p.creationId);
+        setUserPraises(new Set(praisedIds));
+      } catch (err: any) {
+        console.error("Error fetching user praises:", err);
+      }
+    };
+
+    const fetchData = async () => {
+      setLoading(true);
+      await fetchCreations();
+      await fetchUserPraises();
+      setLoading(false);
+    };
+
+    fetchData();
+  }, [loggedIn, userAccounts]);
 
   if (loading) {
     return (
@@ -142,7 +111,7 @@ export default function Home() {
     <div>
       <AppBar />
       <div className="mt-12 flex flex-col items-center justify-center w-full">
-        <CreationList creations={creations} />
+        <CreationList creations={creations} userPraises={userPraises} />
       </div>
     </div>
   );
