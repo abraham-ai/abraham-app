@@ -5,7 +5,7 @@ import { CreationItem, SubgraphCreation, Metadata } from "@/types";
 
 // Environment variable for GraphQL endpoint
 const GRAPHQL_ENDPOINT =
-  "https://api.studio.thegraph.com/query/99814/abraham/v0.0.2";
+  "https://api.studio.thegraph.com/query/99814/abraham-ai/v0.0.2";
 
 // GraphQL query to fetch creations
 const GET_CREATIONS_QUERY = `

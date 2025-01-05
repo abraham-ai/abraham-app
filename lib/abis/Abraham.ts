@@ -223,80 +223,6 @@ export const AbrahamAbi = [
     anonymous: false,
     inputs: [
       {
-        indexed: false,
-        internalType: "uint256",
-        name: "listingId",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "seller",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "pricePerPraise",
-        type: "uint256",
-      },
-    ],
-    name: "PraiseListed",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "listingId",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "buyer",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "totalCost",
-        type: "uint256",
-      },
-    ],
-    name: "PraiseSold",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
         indexed: true,
         internalType: "uint256",
         name: "creationId",
@@ -399,6 +325,12 @@ export const AbrahamAbi = [
         indexed: false,
         internalType: "uint256",
         name: "mannaRefunded",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "unpraiseCost",
         type: "uint256",
       },
     ],
@@ -516,24 +448,6 @@ export const AbrahamAbi = [
     name: "buyManna",
     outputs: [],
     stateMutability: "payable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "listingId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-    ],
-    name: "buyPraise",
-    outputs: [],
-    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -659,41 +573,6 @@ export const AbrahamAbi = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "getPraiseListings",
-    outputs: [
-      {
-        components: [
-          {
-            internalType: "uint256",
-            name: "creationId",
-            type: "uint256",
-          },
-          {
-            internalType: "address",
-            name: "seller",
-            type: "address",
-          },
-          {
-            internalType: "uint256",
-            name: "amount",
-            type: "uint256",
-          },
-          {
-            internalType: "uint256",
-            name: "pricePerPraise",
-            type: "uint256",
-          },
-        ],
-        internalType: "struct Abraham.PraiseListing[]",
-        name: "",
-        type: "tuple[]",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [
       {
         internalType: "uint256",
@@ -732,7 +611,7 @@ export const AbrahamAbi = [
   },
   {
     inputs: [],
-    name: "initUnpraisePrice",
+    name: "initUnpraiseCost",
     outputs: [
       {
         internalType: "uint256",
@@ -741,29 +620,6 @@ export const AbrahamAbi = [
       },
     ],
     stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "pricePerPraise",
-        type: "uint256",
-      },
-    ],
-    name: "listPraiseForSale",
-    outputs: [],
-    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -825,27 +681,22 @@ export const AbrahamAbi = [
         name: "",
         type: "uint256",
       },
-    ],
-    name: "praiseListings",
-    outputs: [
       {
         internalType: "uint256",
-        name: "creationId",
+        name: "",
         type: "uint256",
       },
+    ],
+    name: "praiseStacks",
+    outputs: [
       {
         internalType: "address",
-        name: "seller",
+        name: "user",
         type: "address",
       },
       {
         internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "pricePerPraise",
+        name: "pricePaid",
         type: "uint256",
       },
     ],
@@ -868,6 +719,32 @@ export const AbrahamAbi = [
       },
     ],
     name: "sellManna",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "newPrice",
+        type: "uint256",
+      },
+    ],
+    name: "setInitPraisePrice",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "newCost",
+        type: "uint256",
+      },
+    ],
+    name: "setInitUnpraiseCost",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

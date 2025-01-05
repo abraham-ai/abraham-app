@@ -50,7 +50,7 @@ export default function Home() {
 
       try {
         const response = await fetch(
-          "https://api.studio.thegraph.com/query/99814/abraham/v0.0.2",
+          "https://api.studio.thegraph.com/query/99814/abraham-ai/v0.0.2",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

@@ -53,7 +53,7 @@ async function uploadFileToPinata(
 ) {
   const file = new File([fileData], fileName, { type: mimeType });
   const upload = await pinata.upload.file(file);
-  return `ipfs://${upload.IpfsHash}`;
+  return `https://ipfs.io/ipfs/${upload.IpfsHash}`;
 }
 
 // Helper function to upload metadata to Pinata
@@ -69,7 +69,7 @@ async function uploadMetadataToPinata(
   };
 
   const upload = await pinata.upload.json(metadata);
-  return `ipfs://${upload.IpfsHash}`;
+  return `https://ipfs.io/ipfs/${upload.IpfsHash}`;
 }
 
 // GET handler to process and create on-chain creations
