@@ -12,9 +12,6 @@ export default function CreationList({
   creations,
   userPraises,
 }: CreationListProps) {
-  if (creations.length === 0) {
-    return <p>No creations available.</p>;
-  }
   console.log("userPraises:", userPraises);
 
   return (
