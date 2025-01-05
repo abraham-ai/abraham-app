@@ -5,6 +5,7 @@ import CreationList from "@/components/abraham/creations/CreationList";
 import AppBar from "@/components/layout/AppBar";
 import { CreationItem } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import { Circle, CircleXIcon, Loader2Icon } from "lucide-react";
 
 export default function Home() {
   const [creations, setCreations] = useState<CreationItem[]>([]);
@@ -85,33 +86,23 @@ export default function Home() {
     fetchData();
   }, [loggedIn, userAccounts]);
 
-  if (loading) {
-    return (
-      <div>
-        <AppBar />
-        <div className="mt-12 flex flex-col items-center justify-center w-full">
-          <p>Loading creations...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div>
-        <AppBar />
-        <div className="mt-12 flex flex-col items-center justify-center w-full">
-          <p>Error fetching creations: {error}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div>
       <AppBar />
       <div className="mt-12 flex flex-col items-center justify-center w-full">
         <CreationList creations={creations} userPraises={userPraises} />
+        {loading && (
+          <div className="mt-12 flex flex-col items-center justify-center">
+            <Loader2Icon className="w-6 h-6 animate-spin text-primary" />
+            <p className="mt-2 text-sm">Loading creations</p>
+          </div>
+        )}
+        {error && (
+          <div className="mt-12 flex flex-col items-center justify-center">
+            <CircleXIcon className="w-6 h-6 text-red-500" />
+            <p className="mt-2 text-sm">{error}</p>
+          </div>
+        )}
       </div>
     </div>
   );
