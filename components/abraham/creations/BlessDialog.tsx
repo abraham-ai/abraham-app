@@ -25,7 +25,7 @@ export default function BlessDialog({
   const { loggedIn, userInfo, idToken, userAccounts } = useAuth();
   const [blessingText, setBlessingText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { mannaBalance: balance, getMannaBalance } = useMannaTransactions();
+  const { balance, getMannaBalance } = useMannaTransactions();
 
   useEffect(() => {
     getMannaBalance();
