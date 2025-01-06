@@ -17,7 +17,7 @@ function PraisePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const { praise, getMannaBalance } = useMannaTransactions();
+  const { praiseCreation, getMannaBalance } = useMannaTransactions();
   const creationId = searchParams.get("creationId") || "";
 
   useEffect(() => {
@@ -46,7 +46,7 @@ function PraisePage() {
         }
 
         // 2) On-chain praise
-        await praise(BigInt(1), cost);
+        await praiseCreation(1);
         alert("Praise transaction completed!");
 
         // 3) Redirect
@@ -59,7 +59,7 @@ function PraisePage() {
     };
 
     doPraise();
-  }, [creationId, router, praise, getMannaBalance]);
+  }, [creationId, router, praiseCreation, getMannaBalance]);
 
   return (
     <div style={{ padding: "20px" }}>

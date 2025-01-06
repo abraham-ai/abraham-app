@@ -25,11 +25,7 @@ export default function BlessDialog({
   const { loggedIn, userInfo, idToken, userAccounts } = useAuth();
   const [blessingText, setBlessingText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const {
-    bless: blessTransaction,
-    balance, // BigInt balance in wei
-    getMannaBalance,
-  } = useMannaTransactions();
+  const { balance, getMannaBalance } = useMannaTransactions();
 
   useEffect(() => {
     getMannaBalance();
@@ -52,7 +48,7 @@ export default function BlessDialog({
       }
 
       // Perform blockchain bless transaction
-      await blessTransaction(1, blessingText);
+      //await blessTransaction(1, blessingText);
 
       // Handle server-side reaction
       const response = await fetch("/api/artlabproxy/stories/bless", {

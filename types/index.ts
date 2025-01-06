@@ -1,30 +1,22 @@
-export interface CreationItem {
-  _id: string;
-  creation: {
-    title: string;
-    description: string;
-    visual_aesthetic: string;
-  };
-  result: {
-    output: Array<{
-      mediaAttributes: {
-        mimeType: string;
-        width: number;
-        height: number;
-        aspectRatio: number;
-      };
-      url: string;
-    }>;
-    status: string;
-  };
-  praises: string[];
-  burns: string[];
-  blessings: Array<{
-    blessing: string;
-    user: string;
-  }>;
-  stills?: string[]; // If applicable
+export interface SubgraphCreation {
+  id: string;
+  creationId: string;
+  metadataUri: string;
+  totalStaked: string; // Represented as a string because GraphQL's BigInt is returned as a string
+  praisePool: string;
+  conviction: string;
+  createdAt: string; // Unix timestamp as a string
+  updatedAt: string;
 }
+
+export interface Metadata {
+  title: string;
+  description: string;
+  visual_aesthetic: string;
+  image: string; // URL to the image
+}
+
+export interface CreationItem extends SubgraphCreation, Metadata {}
 
 export interface Blessing {
   user: string;
