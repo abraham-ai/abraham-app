@@ -33,7 +33,7 @@ function AccountMenu() {
     <div className="m-3">
       {!loadingAuth && loggedIn && (
         <div>
-          <DropdownMenu>
+          <DropdownMenu key={balance}>
             <DropdownMenuTrigger asChild>
               <div className="cursor-pointer">
                 {userInfo?.profileImage ? (

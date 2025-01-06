@@ -35,7 +35,7 @@ const ABRAHAM_ADDRESS = "0x3017258EB67f816F9504c7e0d41665022166d66E";
 
 export function useMannaTransactions() {
   const { provider, accountAbstractionProvider } = useAuth();
-  const [mannaBalance, setMannaBalance] = useState<string>("0");
+  const [balance, setMannaBalance] = useState<string>("0");
   const [contractBalances, setContractBalances] = useState({
     mannaBalance: "0",
     ethBalance: "0",
@@ -76,6 +76,7 @@ export function useMannaTransactions() {
     if (!provider || !publicClient || !walletClient) return;
     try {
       const [address] = await walletClient.getAddresses();
+      console.log("Fetching balance for Address:", address);
       const balance = await publicClient.readContract({
         address: ABRAHAM_ADDRESS as `0x${string}`,
         abi: AbrahamAbi,
@@ -178,6 +179,7 @@ export function useMannaTransactions() {
       console.log("Praise transaction hash:", txHash);
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       console.log(`Praised creationId ${creationId} successfully!`);
+      await getMannaBalance();
     } catch (error) {
       console.error("Error praising creation:", error);
     }
@@ -199,15 +201,15 @@ export function useMannaTransactions() {
         args: [creationId],
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
-      await getMannaBalance();
       console.log(`Unpraised creationId ${creationId} successfully!`);
+      await getMannaBalance();
     } catch (error) {
       console.error("Error unpraising creation:", error);
     }
   };
 
   return {
-    mannaBalance,
+    balance,
     contractBalances,
     buyManna,
     sellManna,

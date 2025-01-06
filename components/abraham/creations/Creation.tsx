@@ -42,10 +42,18 @@ export default function Creation({ creation, hasPraised }: CreationProps) {
   const [loadingUnpraise, setLoadingUnpraise] = useState(false);
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
-  const { praiseCreation, unpraiseCreation, getMannaBalance } =
+  const { praiseCreation, unpraiseCreation, getMannaBalance, balance } =
     useMannaTransactions();
 
   const handlePraiseClick = async () => {
+    //amount to praise is initPraisePrice(1) + (currentStaked * initPraisePrice(1));
+    const amount = ethers.parseUnits((1 + parseFloat(mannaUsed)).toString());
+
+    if (!balance || ethers.parseUnits(balance.toString(), 18) < amount) {
+      alert("Insufficient Manna balance to praise this creation.");
+      setLoadingPraise(false);
+      return;
+    }
     setLoadingPraise(true);
     if (!loggedIn) {
       setIsLoginDialogOpen(true);
@@ -54,8 +62,11 @@ export default function Creation({ creation, hasPraised }: CreationProps) {
     }
     try {
       await praiseCreation(parseInt(creation.creationId, 10));
-
-      setMannaUsed((prev) => (parseFloat(prev) + 1).toString());
+      setMannaUsed((prev) => {
+        const prevInBigInt = ethers.parseUnits(prev, 18); // Convert previous value to wei
+        const newAmount = prevInBigInt + amount; // Add the new praise amount
+        return ethers.formatUnits(newAmount, 18); // Convert back to string with decimals
+      });
       setNumberOfPraises((prev) => prev + 1);
       setCurrentHasPraised(true);
 
@@ -69,6 +80,7 @@ export default function Creation({ creation, hasPraised }: CreationProps) {
   };
 
   const handleUnpraiseClick = async () => {
+    const amount = ethers.parseUnits("1", 18);
     setLoadingUnpraise(true);
     if (!loggedIn) {
       setIsLoginDialogOpen(true);
@@ -78,8 +90,12 @@ export default function Creation({ creation, hasPraised }: CreationProps) {
     try {
       await unpraiseCreation(parseInt(creation.creationId, 10));
 
-      setMannaUsed((prev) => (parseFloat(prev) - 1).toString());
-      setNumberOfPraises((prev) => (prev > 0 ? prev - 1 : 0));
+      setMannaUsed((prev) => {
+        const prevInBigInt = ethers.parseUnits(prev, 18); // Convert to BigInt
+        const decrement = ethers.parseUnits("1", 18); // Unpraise decrements by 1 Manna
+        const newAmount = prevInBigInt - decrement; // Subtract 1 Manna
+        return ethers.formatUnits(newAmount, 18); // Convert back to string with decimals
+      });
       setCurrentHasPraised(false);
 
       await getMannaBalance();
@@ -185,7 +201,7 @@ export default function Creation({ creation, hasPraised }: CreationProps) {
             {/* Removed the blessingsCount span as 'blessings' are not fetched */}
             {/* Additional Display for Manna Used and Conviction */}
             <div className="ml-10 flex flex-col">
-              <p className="text-sm text-gray-500">Manna Used: {mannaUsed}</p>
+              <p className="text-sm text-gray-500">Manna Staked: {mannaUsed}</p>
               <p className="text-sm text-gray-500">Conviction: {conviction}</p>
             </div>
 

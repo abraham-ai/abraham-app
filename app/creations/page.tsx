@@ -5,11 +5,13 @@ import CreationList from "@/components/abraham/creations/CreationList";
 import AppBar from "@/components/layout/AppBar";
 import { CreationItem } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { Circle, CircleXIcon, Loader2Icon } from "lucide-react";
+import { Loader2Icon, CircleXIcon } from "lucide-react";
 
 export default function Home() {
   const [creations, setCreations] = useState<CreationItem[]>([]);
-  const [userPraises, setUserPraises] = useState<Set<string>>(new Set());
+  const [userPraises, setUserPraises] = useState<Map<string, number>>(
+    new Map()
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,15 +37,18 @@ export default function Home() {
       }
     };
 
-    const fetchUserPraises = async () => {
+    const fetchUserInteractions = async () => {
       if (!loggedIn || !userAccounts || userAccounts.length === 0) return;
-      console.log("User Accounts: ", userAccounts);
+
       const userAddress = userAccounts.toLowerCase();
       console.log("User Address: ", userAddress);
 
       const query = `
-        query GetUserPraises($user: Bytes!) {
+        query GetUserInteractions($user: Bytes!) {
           praiseds(where: { user: $user }) {
+            creationId
+          }
+          unpraiseds(where: { user: $user }) {
             creationId
           }
         }
@@ -63,23 +68,44 @@ export default function Home() {
           throw new Error(`Network error: ${response.statusText}`);
 
         const { data, errors } = await response.json();
-        console.log("User Praises Data:", data);
+
         if (errors) {
           console.error("GraphQL Errors:", errors);
           return;
         }
 
-        const praisedIds = data.praiseds.map((p: any) => p.creationId);
-        setUserPraises(new Set(praisedIds));
+        const praisedIds: string[] = data.praiseds.map(
+          (p: any) => p.creationId
+        );
+        const unpraisedIds: string[] = data.unpraiseds.map(
+          (u: any) => u.creationId
+        );
+
+        const praiseMap = new Map<string, number>();
+
+        praisedIds.forEach((id) => {
+          praiseMap.set(id, (praiseMap.get(id) || 0) + 1);
+        });
+
+        unpraisedIds.forEach((id) => {
+          praiseMap.set(id, (praiseMap.get(id) || 0) - 1);
+        });
+
+        // Ensure no negative praises
+        praiseMap.forEach((value, key) => {
+          if (value < 0) praiseMap.set(key, 0);
+        });
+
+        setUserPraises(praiseMap);
       } catch (err: any) {
-        console.error("Error fetching user praises:", err);
+        console.error("Error fetching user interactions:", err);
       }
     };
 
     const fetchData = async () => {
       setLoading(true);
       await fetchCreations();
-      await fetchUserPraises();
+      await fetchUserInteractions();
       setLoading(false);
     };
 
@@ -94,7 +120,7 @@ export default function Home() {
         {loading && (
           <div className="mt-12 flex flex-col items-center justify-center">
             <Loader2Icon className="w-6 h-6 animate-spin text-primary" />
-            <p className="mt-2 text-sm">Loading creations</p>
+            <p className="mt-2 text-sm">Loading creations...</p>
           </div>
         )}
         {error && (
