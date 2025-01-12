@@ -95,14 +95,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         <div className="mt-12 flex flex-col items-center justify-center w-full">
           <div className="flex flex-col items-center justify-center">
             <div className="flex flex-col items-center justify-center ">
-              <div>
-                {creation && (
-                  <Creation
-                    creation={creation}
-                    hasPraised={userPraises.has(creation.id) ? true : false}
-                  />
-                )}
-              </div>
+              <div>{creation && <Creation creation={creation} />}</div>
               {/*
               {creation?.stills && creation.stills.length > 0 && (
                 <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
