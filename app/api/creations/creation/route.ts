@@ -3,8 +3,7 @@ import type { NextRequest } from "next/server";
 import { SubgraphCreation, Metadata } from "@/types";
 
 // Environment variable for GraphQL endpoint
-const GRAPHQL_ENDPOINT =
-  "https://api.studio.thegraph.com/query/99814/abraham-ai/v0.0.2";
+const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "";
 
 // GraphQL query to fetch a single creation
 const GET_CREATION_QUERY = `
@@ -18,6 +17,10 @@ const GET_CREATION_QUERY = `
       conviction
       createdAt
       updatedAt
+      praises {
+        userAddress
+        noOfPraises
+      }
     }
   }
 `;
