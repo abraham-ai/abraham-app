@@ -4,8 +4,7 @@ import type { NextRequest } from "next/server";
 import { CreationItem, SubgraphCreation, Metadata } from "@/types";
 
 // Environment variable for GraphQL endpoint
-const GRAPHQL_ENDPOINT =
-  "https://api.studio.thegraph.com/query/99814/abraham-ai/v0.0.2";
+const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "";
 
 // GraphQL query to fetch creations
 const GET_CREATIONS_QUERY = `
@@ -19,6 +18,10 @@ const GET_CREATIONS_QUERY = `
       conviction
       createdAt
       updatedAt
+      praises {
+        userAddress
+        noOfPraises
+      }
     }
   }
 `;
@@ -67,7 +70,7 @@ export async function GET(request: NextRequest) {
               /^ipfs:\/\/|^https:\/\/[^/]+\/ipfs\//,
               ""
             );
-            console.log("CID:", cid);
+            //console.log("CID:", cid);
 
             // Fetch metadata from IPFS
             const metadataResponse = await fetch(`https://ipfs.io/ipfs/${cid}`);

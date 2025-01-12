@@ -7,6 +7,13 @@ export interface SubgraphCreation {
   conviction: string;
   createdAt: string; // Unix timestamp as a string
   updatedAt: string;
+  praises: [
+    {
+      userAddress: string;
+      noOfPraises: string;
+      mannaStaked: string;
+    }
+  ];
 }
 
 export interface Metadata {
