@@ -5,13 +5,14 @@ export interface SubgraphCreation {
   totalStaked: string; // Represented as a string because GraphQL's BigInt is returned as a string
   praisePool: string;
   conviction: string;
+  currentPriceToPraise: number;
   createdAt: string; // Unix timestamp as a string
   updatedAt: string;
   praises: [
     {
       userAddress: string;
-      noOfPraises: string;
-      mannaStaked: string;
+      noOfPraises: number;
+      mannaStaked: number;
     }
   ];
 }
