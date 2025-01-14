@@ -2,11 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { CreationItem } from "@/types";
-import { Loader2Icon } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import { Loader2Icon } from "lucide-react";
+import { ethers } from "ethers";
+
+import { CreationItem } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useManna } from "@/context/MannaContext";
+
 import {
   Dialog,
   DialogContent,
@@ -17,180 +21,162 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ethers } from "ethers";
 
 interface CreationProps {
   creation: CreationItem;
 }
 
+/** Convert a wei string to a normal decimal number. */
+function weiToNumber(weiString: string): number {
+  return parseFloat(ethers.formatUnits(weiString || "0", 18));
+}
+
 export default function Creation({ creation }: CreationProps) {
   const { loggedIn, login, loadingAuth, userAccounts } = useAuth();
-  const { praiseCreation, unpraiseCreation, getMannaBalance, balance } =
-    useMannaTransactions();
+  const { getMannaBalance } = useManna();
+  const { praiseCreation, unpraiseCreation, balance } = useMannaTransactions();
 
-  // Convert bigints from subgraph to user-friendly strings
-  const formattedMannaUsed = ethers.formatUnits(creation.praisePool, 18);
-  const formattedConviction = ethers.formatUnits(creation.conviction, 18);
-  const initialPraises = parseInt(creation.totalStaked, 10);
+  const initialTotalStaked: number = parseInt(creation.totalStaked, 10) || 0;
+  const initialPraisePool: number = weiToNumber(creation.praisePool);
+  const initialConviction = weiToNumber(creation.conviction);
+  const initialCostToPraise: number = weiToNumber(
+    creation.currentPriceToPraise.toString()
+  );
 
-  // -----------------------------
-  // Local states
-  // -----------------------------
-  const [mannaUsed, setMannaUsed] = useState<string>(formattedMannaUsed); // total Manna staked on this creation
-  const [conviction, setConviction] = useState<string>(formattedConviction);
-  const [numberOfPraises, setNumberOfPraises] =
-    useState<number>(initialPraises);
+  // Identify user’s praise data
+  const userAddress = userAccounts?.toLowerCase() || "";
+  const userPraiseData =
+    creation.praises?.find(
+      (p) => p.userAddress.toLowerCase() === userAddress
+    ) || null;
 
-  // Track if the user has praised (for enabling the Unpraise button).
-  const [currentHasPraised, setCurrentHasPraised] = useState<boolean>(false);
+  const initialUserMannaStaked: number = userPraiseData
+    ? weiToNumber(userPraiseData.mannaStaked.toString())
+    : 0;
 
-  // For storing the user's praise stats from subgraph
-  const [userNoOfPraises, setUserNoOfPraises] = useState<number>(0);
-  const [userMannaStaked, setUserMannaStaked] = useState<number>(0);
+  const initialNoOfPraises: number = parseInt(
+    userPraiseData?.noOfPraises?.toString() || "0",
+    10
+  );
 
-  // Loading states for praising/unpraising
+  // Local States
+  const [localTotalStaked, setLocalTotalStaked] =
+    useState<number>(initialTotalStaked);
+  const [localPraisePool, setLocalPraisePool] =
+    useState<number>(initialPraisePool);
+  const [localConviction, setLocalConviction] =
+    useState<number>(initialConviction);
+  const [costToPraise, setCostToPraise] = useState<number>(initialCostToPraise);
+
+  const [userNoOfPraises, setUserNoOfPraises] =
+    useState<number>(initialNoOfPraises);
+  const [userMannaStaked, setUserMannaStaked] = useState<number>(
+    initialUserMannaStaked
+  );
+
+  // Loading states
   const [loadingPraise, setLoadingPraise] = useState(false);
   const [loadingUnpraise, setLoadingUnpraise] = useState(false);
 
-  // For login prompt
-  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
-
-  // -----------------------------
-  // Setup user data from subgraph
-  // -----------------------------
   useEffect(() => {
-    if (!loggedIn || !userAccounts || userAccounts.length === 0) {
-      setCurrentHasPraised(false);
-      setUserNoOfPraises(0);
-      setUserMannaStaked(0);
-      return;
-    }
+    setLocalTotalStaked(parseInt(creation.totalStaked, 10) || 0);
+    setLocalPraisePool(weiToNumber(creation.praisePool));
+    setLocalConviction(parseFloat(creation.conviction));
+    setCostToPraise(weiToNumber(creation.currentPriceToPraise.toString()));
 
-    const address = userAccounts[0].toLowerCase();
+    const updatedUserPraiseData =
+      creation?.praises?.find(
+        (p) => p.userAddress.toLowerCase() === userAddress
+      ) || null;
 
-    // Find the PraiseCount for this user
-    const found = creation.praises.find(
-      (p: any) => p.userAddress.toLowerCase() === address
+    const newNoOfPraises = parseInt(
+      updatedUserPraiseData?.noOfPraises?.toString() || "0",
+      10
     );
-    if (!found) {
-      // user has not praised
-      setCurrentHasPraised(false);
-      setUserNoOfPraises(0);
-      setUserMannaStaked(0);
+    setUserNoOfPraises(newNoOfPraises);
+
+    if (updatedUserPraiseData?.mannaStaked) {
+      setUserMannaStaked(
+        weiToNumber(updatedUserPraiseData.mannaStaked.toString())
+      );
     } else {
-      // user has some praises
-      const noOfP = parseInt(found.noOfPraises, 10);
-      setUserNoOfPraises(noOfP);
-      setUserMannaStaked(parseFloat(ethers.formatUnits(found.mannaStaked, 18)));
-      setCurrentHasPraised(noOfP > 0);
+      setUserMannaStaked(0);
     }
-  }, [loggedIn, userAccounts, creation.praises]);
+  }, [creation, userAddress]);
 
-  // -----------------------------
-  // Calculation: cost to praise
-  // For simplicity: cost = 1 + parseFloat(mannaUsed)
-  // You can adjust if your contract logic differs.
-  // -----------------------------
-  const costToPraise = (1 + parseFloat(mannaUsed)).toFixed(2);
-
-  // -----------------------------
-  // Praise creation
-  // -----------------------------
   const handlePraiseClick = async () => {
-    const costInWei = ethers.parseUnits(costToPraise, 18);
-
-    if (!balance || ethers.parseUnits(balance.toString(), 18) < costInWei) {
-      alert("Insufficient Manna balance to praise this creation.");
-      return;
-    }
-    setLoadingPraise(true);
-
     if (!loggedIn) {
-      setIsLoginDialogOpen(true);
-      setLoadingPraise(false);
+      alert("Please log in first.");
       return;
     }
 
+    const userMannaBalance = parseFloat(balance?.toString() || "0");
+
+    if (userMannaBalance < costToPraise) {
+      alert("Insufficient Manna to praise this creation.");
+      return;
+    }
+
+    setLoadingPraise(true);
     try {
-      // Call the contract
       await praiseCreation(parseInt(creation.creationId, 10));
 
-      // Update local UI
-      // 1) Manna used for the creation goes up by cost
-      setMannaUsed((prev) => {
-        const prevWei = ethers.parseUnits(prev, 18);
-        const newWei = prevWei + costInWei;
-        return ethers.formatUnits(newWei, 18);
-      });
-
-      // 2) The total # of praises for the creation
-      setNumberOfPraises((prev) => prev + 1);
-
-      // 3) The user has praised at least once
-      setCurrentHasPraised(true);
-
-      // 4) The user’s # of praises + mannaStaked
-      setUserNoOfPraises((prev) => prev + 1);
-      setUserMannaStaked((prev) => prev + parseFloat(costToPraise));
+      // Update local states (pessimistic: only after success)
+      setLocalTotalStaked((prev) => prev + 1);
+      setLocalPraisePool((prev) => prev + costToPraise);
+      setUserNoOfPraises((prev) => prev + 1); // e.g. 2 + 1 = 3
+      setUserMannaStaked((prev) => prev + costToPraise);
 
       await getMannaBalance();
     } catch (error) {
-      console.error("Error praising the creation:", error);
-      alert("Failed to praise the creation. Please try again.");
+      console.error("Error praising:", error);
+      alert("Failed to praise or user canceled transaction.");
     } finally {
       setLoadingPraise(false);
     }
   };
 
-  // -----------------------------
-  // Unpraise creation
-  // We do a simpler assumption: minus 1 Manna from local UI
-  // Adjust if your real contract logic differs.
-  // -----------------------------
   const handleUnpraiseClick = async () => {
-    const amount = ethers.parseUnits("1", 18); // unpraise cost is 1 Manna
-
-    setLoadingUnpraise(true);
     if (!loggedIn) {
-      setIsLoginDialogOpen(true);
-      setLoadingUnpraise(false);
+      alert("Please log in first.");
       return;
     }
 
+    setLoadingUnpraise(true);
     try {
       await unpraiseCreation(parseInt(creation.creationId, 10));
 
-      // Update local UI
-      // 1) Manna used for creation: subtract 1
-      setMannaUsed((prev) => {
-        const prevWei = ethers.parseUnits(prev, 18);
-        const newWei = prevWei - amount;
-        return newWei > BigInt(0) ? ethers.formatUnits(newWei, 18) : "0.0";
-      });
+      // We approximate cost if we don't have exact last praise cost
+      const approxLastPraiseCost = costToPraise;
+      const unpraiseCost = 0.1; // from contract
 
-      // 2) total # of praises
-      setNumberOfPraises((prev) => (prev > 0 ? prev - 1 : 0));
-
-      // 3) userNoOfPraises
+      setLocalTotalStaked((prev) => (prev > 0 ? prev - 1 : 0));
+      setLocalPraisePool((prev) =>
+        prev > approxLastPraiseCost ? prev - approxLastPraiseCost : 0
+      );
       setUserNoOfPraises((prev) => (prev > 0 ? prev - 1 : 0));
-
-      // 4) userMannaStaked
-      setUserMannaStaked((prev) => (prev > 1 ? prev - 1 : 0));
-
-      setCurrentHasPraised(false);
+      setUserMannaStaked((prev) =>
+        prev > unpraiseCost ? prev - unpraiseCost : 0
+      );
 
       await getMannaBalance();
     } catch (error) {
-      console.error("Error unpraising the creation:", error);
-      alert("Failed to unpraise the creation. Please try again.");
+      console.error("Error unpraising:", error);
+      alert("Failed to unpraise or user canceled transaction.");
     } finally {
       setLoadingUnpraise(false);
     }
   };
+
+  const displayCostToPraise = costToPraise.toFixed(1);
+  const displayLocalPraisePool = localPraisePool.toFixed(1);
+  const displayLocalConviction = localConviction.toFixed(1);
+  const displayUserMannaStaked = userMannaStaked.toFixed(1);
 
   return (
     <>
       <div className="grid grid-cols-12 border-b border-x p-4 lg:w-[43vw] w-full">
+        {/* Creation Thumbnail / Avatar */}
         <Link href={`/creation/${creation.creationId}`}>
           <div className="col-span-1 flex flex-col mr-3">
             <Image
@@ -202,6 +188,8 @@ export default function Creation({ creation }: CreationProps) {
             />
           </div>
         </Link>
+
+        {/* Main Content */}
         <div className="col-span-11 flex flex-col">
           {/* Content / Description */}
           <div className="flex flex-col items-center pr-8">
@@ -221,9 +209,8 @@ export default function Creation({ creation }: CreationProps) {
             </Link>
           </div>
 
-          {/* Action row */}
+          {/* Action Row */}
           <div className="flex items-center mt-6 mb-4">
-            {/* Dialogue Trigger: "🙌" button */}
             <Dialog>
               <DialogTrigger asChild>
                 <button
@@ -234,104 +221,102 @@ export default function Creation({ creation }: CreationProps) {
                 </button>
               </DialogTrigger>
 
-              <DialogContent className="sm:max-w-[425px] bg-white">
-                <DialogHeader>
-                  <DialogTitle>Praise Creation</DialogTitle>
-                  <DialogDescription>
-                    Here you can see how many praises you already have, how much
-                    Manna you staked, and the current cost to praise.
-                  </DialogDescription>
-                </DialogHeader>
+              {loggedIn ? (
+                <DialogContent className="sm:max-w-[425px] bg-white">
+                  <DialogHeader>
+                    <DialogTitle>Praise Creation</DialogTitle>
+                  </DialogHeader>
 
-                {/* Dialog Body */}
-                <div className="grid gap-4 py-4">
-                  <div className="flex flex-col gap-2">
-                    <p className="text-gray-600">
-                      Your praises on this creation: {userNoOfPraises}
-                    </p>
-                    <p className="text-gray-600">
-                      Your Manna Staked: {userMannaStaked.toFixed(2)}
-                    </p>
-                    <p className="text-gray-600">
-                      Current cost to praise: {costToPraise} Manna
-                    </p>
+                  <div className="grid gap-4 py-4">
+                    <div className="flex flex-col gap-2">
+                      <p className="text-gray-600">
+                        Your praises on this creation: {userNoOfPraises}
+                      </p>
+                      <p className="text-gray-600">
+                        Your Manna Staked: {displayUserMannaStaked}
+                      </p>
+                      <p className="text-gray-600">
+                        Current cost to praise: {displayCostToPraise} Manna
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <DialogFooter>
-                  {/* Praise Button */}
-                  <Button
-                    onClick={handlePraiseClick}
-                    disabled={loadingPraise}
-                    className={`cursor-pointer ${
-                      loadingPraise
-                        ? "text-white cursor-not-allowed"
-                        : "hover:text-white"
-                    } transition-colors duration-200`}
-                  >
-                    {!loadingPraise ? (
-                      <>Praise 🙌</>
-                    ) : (
-                      <>
-                        Praising{" "}
-                        <Loader2Icon className="w-5 h-5 animate-spin ml-1" />
-                      </>
-                    )}
-                  </Button>
-
-                  {/* Unpraise Button (only if user has > 0 praises) */}
-                  {currentHasPraised && userNoOfPraises > 0 && (
+                  <DialogFooter>
+                    {/* Praise Button */}
                     <Button
-                      variant="secondary"
-                      onClick={handleUnpraiseClick}
-                      disabled={loadingUnpraise}
-                      className={`cursor-pointer ml-4 ${
-                        loadingUnpraise
-                          ? "cursor-not-allowed"
-                          : "hover:text-red-500"
+                      onClick={handlePraiseClick}
+                      disabled={loadingPraise}
+                      className={`cursor-pointer ${
+                        loadingPraise
+                          ? "text-white cursor-not-allowed"
+                          : "hover:text-white"
                       } transition-colors duration-200`}
                     >
-                      {!loadingUnpraise ? (
-                        <p>Unpraise</p>
+                      {loadingPraise ? (
+                        <>
+                          Praising
+                          <Loader2Icon className="w-5 h-5 animate-spin ml-1" />
+                        </>
                       ) : (
-                        <Loader2Icon className="w-5 h-5 animate-spin" />
+                        <>Praise 🙌</>
                       )}
                     </Button>
-                  )}
-                </DialogFooter>
-              </DialogContent>
+
+                    {/* Unpraise Button (only if user has > 0 praises) */}
+                    {userNoOfPraises > 0 && (
+                      <Button
+                        variant="secondary"
+                        onClick={handleUnpraiseClick}
+                        disabled={loadingUnpraise}
+                        className={`cursor-pointer ml-4 ${
+                          loadingUnpraise
+                            ? "cursor-not-allowed"
+                            : "hover:text-red-500"
+                        } transition-colors duration-200`}
+                      >
+                        {loadingUnpraise ? (
+                          <Loader2Icon className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <>Unpraise</>
+                        )}
+                      </Button>
+                    )}
+                  </DialogFooter>
+                </DialogContent>
+              ) : (
+                <DialogContent className="bg-white">
+                  <DialogHeader>
+                    <DialogTitle>Authentication Required</DialogTitle>
+                    <DialogDescription>
+                      You need to log in to perform this action.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button onClick={login} disabled={loadingAuth}>
+                      {loadingAuth ? "Logging in..." : "Log In"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              )}
             </Dialog>
 
-            {/* Display total # of praises */}
+            {/* Total # of praises (for entire creation) */}
             <span className="ml-1 text-sm font-semibold text-gray-500">
-              {numberOfPraises}
+              {localTotalStaked}
             </span>
 
-            {/* Additional info: MannaUsed + Conviction */}
+            {/* Additional info: Manna Pool + Conviction */}
             <div className="ml-10 flex flex-col">
-              <p className="text-sm text-gray-500">Manna Staked: {mannaUsed}</p>
-              <p className="text-sm text-gray-500">Conviction: {conviction}</p>
+              <p className="text-sm text-gray-500">
+                Manna Staked: {displayLocalPraisePool}
+              </p>
+              <p className="text-sm text-gray-500">
+                Conviction: {displayLocalConviction}
+              </p>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Login Dialog (if user tries to praise while not logged in) */}
-      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle>Authentication Required</DialogTitle>
-            <DialogDescription>
-              You need to log in to perform this action.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={login} disabled={loadingAuth}>
-              {loadingAuth ? "Logging in..." : "Log In"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

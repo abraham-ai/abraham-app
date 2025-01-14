@@ -16,11 +16,13 @@ const GET_CREATIONS_QUERY = `
       totalStaked
       praisePool
       conviction
+      currentPriceToPraise
       createdAt
       updatedAt
       praises {
         userAddress
         noOfPraises
+        mannaStaked
       }
     }
   }
