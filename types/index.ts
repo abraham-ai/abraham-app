@@ -2,9 +2,10 @@ export interface SubgraphCreation {
   id: string;
   creationId: string;
   metadataUri: string;
-  totalStaked: string; // Represented as a string because GraphQL's BigInt is returned as a string
-  praisePool: string;
-  conviction: string;
+  totalMannaUsed: string; // Represented as a string because GraphQL's BigInt is returned as a string
+  blessCount: string;
+  praiseCount: string;
+  burnCount: string;
   currentPriceToPraise: number;
   createdAt: string; // Unix timestamp as a string
   updatedAt: string;
@@ -12,7 +13,21 @@ export interface SubgraphCreation {
     {
       userAddress: string;
       noOfPraises: number;
-      mannaStaked: number;
+      mannaUsed: number;
+    }
+  ];
+  burns: [
+    {
+      userAddress: string;
+      noOfBurns: number;
+      mannaUsed: number;
+    }
+  ];
+  blessings: [
+    {
+      userAddress: string;
+      message: string;
+      mannaUsed: number;
     }
   ];
 }
@@ -29,4 +44,5 @@ export interface CreationItem extends SubgraphCreation, Metadata {}
 export interface Blessing {
   user: string;
   blessing: string;
+  mannaUsed: number;
 }

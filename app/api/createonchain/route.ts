@@ -74,98 +74,26 @@ async function uploadMetadataToPinata(
 
 // GET handler to process and create on-chain creations
 export async function GET() {
-  const externalApiUrl =
-    "https://edenartlab--abraham2-fastapi-app.modal.run/get_creations";
-
-  const results: any[] = [];
-
   try {
-    // Step 1: Fetch creations from the external API
-    // const response = await fetch(externalApiUrl);
-    // if (!response.ok) {
-    //   throw new Error(`Error fetching creations: ${response.statusText}`);
-    // }
+    const metadataIpfsUri =
+      "https://gateway.pinata.cloud/ipfs/QmciK6aFR1D58hhhJQCYbczgTvU18Xx7T4U5aSJSdSCesZ";
 
-    // const creationsData: any[] = (await response.json()) as any[];
+    //Step 3: Call the Abraham contract's newCreation function
+    const tx = await abrahamContract.newCreation(metadataIpfsUri);
+    const receipt = await tx.wait();
+    const _id = receipt.events[0].args.creationId.toString();
 
-    // if (!Array.isArray(creationsData)) {
-    //   throw new Error("Invalid data format received from external API.");
-    // }
+    const result = {
+      transactionHash: receipt.transactionHash,
+      creationId: receipt.events[0].args.creationId.toString(),
+      metadataUri: metadataIpfsUri,
+    };
 
-    // const results: any[] = [];
+    console.log(`Successfully created on-chain creation ID ${_id}`);
 
-    // // Step 2: Process each creation
-    // for (const creation of creationsData) {
-    //   const { _id, creation: creationDetails, result } = creation;
-
-    //   try {
-    //     const { title, description, visual_aesthetic } = creationDetails;
-
-    //     // Extract image URL
-    //     const imageUrl = result?.output?.[0]?.url;
-    //     if (!imageUrl) {
-    //       throw new Error(`No image URL found for creation ID ${_id}`);
-    //     }
-
-    //     // Fetch image data
-    //     const imageData = await fetchImageData(imageUrl);
-
-    //     // Determine MIME type from the image URL extension
-    //     const mimeMatch = imageUrl.match(/\.(png|jpg|jpeg|gif|svg)$/i);
-    //     const mimeType = mimeMatch
-    //       ? `image/${mimeMatch[1].toLowerCase()}`
-    //       : "application/octet-stream";
-
-    //     // Upload image to Pinata
-    //     const imageIpfsUri = await uploadFileToPinata(
-    //       imageData,
-    //       `${_id}-image.${mimeMatch ? mimeMatch[1].toLowerCase() : "bin"}`,
-    //       mimeType
-    //     );
-
-    //     // Create metadata
-    //     const metadata: any = {
-    //       name: title,
-    //       description,
-    //       visual_aesthetic,
-    //       image: imageIpfsUri,
-    //       attributes: [], // Add any additional attributes here
-    //     };
-
-    //     // Upload metadata to Pinata
-    //     const metadataIpfsUri = await uploadMetadataToPinata(
-    //       metadata.description,
-    //       metadata.image
-    //     );
-
-    //     // Step 3: Call the Abraham contract's newCreation function
-    //     const tx = await abrahamContract.newCreation(metadataIpfsUri);
-    //     const receipt = await tx.wait();
-
-    //     // Step 4: Collect on-chain details
-    //     results.push({
-    //       creationId: _id,
-    //       metadataIpfsUri,
-    //       txHash: receipt.transactionHash,
-    //       onchainDetails: receipt.events,
-    //     });
-
-    //     console.log(`Successfully created on-chain creation ID ${_id}`);
-    //   } catch (creationError: any) {
-    //     console.error(
-    //       `Error processing creation ID ${creation._id}:`,
-    //       creationError.message
-    //     );
-    //     results.push({
-    //       creationId: creation._id,
-    //       error: creationError.message,
-    //     });
-    //     continue; // Proceed with the next creation
-    //   }
-    // }
-
-    // Step 5: Return the results
-    return NextResponse.json({ results }, { status: 200 });
+    //Step 5: Return the results
+    return NextResponse.json({ result }, { status: 200 });
+    //return NextResponse.json("You need to uncomment the code", { status: 200 });
   } catch (error: any) {
     console.error("Error processing GET request:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
