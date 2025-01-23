@@ -62,6 +62,9 @@ export default function Creation({ creation }: CreationProps) {
   const [localTotalMannaUsed, setLocalTotalMannaUsed] =
     useState<number>(initialTotalStaked);
   const [costToPraise, setCostToPraise] = useState<number>(initialCostToPraise);
+  const [totalnumberOfPraises, setTotalnumberOfPraises] = useState<number>(
+    parseInt(creation.praiseCount, 10)
+  );
 
   const [userNoOfPraises, setUserNoOfPraises] =
     useState<number>(initialNoOfPraises);
@@ -123,6 +126,7 @@ export default function Creation({ creation }: CreationProps) {
       // Update local states (pessimistic: only after success)
       setLocalTotalMannaUsed((prev) => prev + 1);
       setUserNoOfPraises((prev) => prev + 1); // e.g. 2 + 1 = 3
+      setTotalnumberOfPraises((prev) => prev + 1); // e.g. 5 + 1 = 6
       setUserMannaStaked((prev) => prev + costToPraise);
 
       await getMannaBalance();
@@ -197,7 +201,7 @@ export default function Creation({ creation }: CreationProps) {
                         Your praises on this creation: {userNoOfPraises}
                       </p>
                       <p className="text-gray-600">
-                        Your Manna Staked: {displayUserMannaStaked}
+                        Your Manna on this creation: {displayUserMannaStaked}
                       </p>
                       <p className="text-gray-600">
                         Current cost to praise: {displayCostToPraise} Manna
@@ -246,7 +250,7 @@ export default function Creation({ creation }: CreationProps) {
 
             {/* Total # of praises (for entire creation) */}
             <span className="ml-1 text-sm font-semibold text-gray-500">
-              {creation.praiseCount}
+              {totalnumberOfPraises}
             </span>
 
             <div className={`ml-10 cursor-pointer text-gray-500`}>

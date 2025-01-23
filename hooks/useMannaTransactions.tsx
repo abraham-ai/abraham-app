@@ -152,6 +152,7 @@ export function useMannaTransactions() {
         console.log("Manna purchased using Account Abstraction!");
       } else if (walletClient) {
         // === 2) Fallback to External Wallet Approach ===
+        await approveManna("1000000000000000000000000000");
         const [address] = await walletClient.getAddresses();
         const txHash = await walletClient.writeContract({
           account: address,
@@ -233,9 +234,15 @@ export function useMannaTransactions() {
     //praise = 0, burn = 1, bless = 2
     const reactionTypeInt =
       reactionType === "praise" ? 0 : reactionType === "burn" ? 1 : 2;
+    const allowance = await getMannaAllowance();
+    // For example, if each reaction costs 10 Manna, we can check:
+    const needed = parseEther("10");
+
     if (!publicClient) return;
     try {
-      await approveManna("100000000000000000000");
+      if (allowance < needed) {
+        await approveManna("1000000000000000000000000000"); // e.g. large enough
+      }
       if (
         accountAbstractionProvider &&
         accountAbstractionProvider.smartAccount
@@ -278,6 +285,23 @@ export function useMannaTransactions() {
       await getMannaBalance();
     } catch (error) {
       console.error("Error praising creation:", error);
+    }
+  };
+
+  const getMannaAllowance = async () => {
+    if (!publicClient || !walletClient) return BigInt(0);
+    try {
+      const [address] = await walletClient.getAddresses();
+      const allowance = await publicClient.readContract({
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
+        functionName: "allowance",
+        args: [address, ABRAHAM_ADDRESS],
+      });
+      return allowance as bigint;
+    } catch (error) {
+      console.error("Error fetching allowance:", error);
+      return BigInt(0);
     }
   };
 
