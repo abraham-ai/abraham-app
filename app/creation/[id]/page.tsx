@@ -94,7 +94,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         <AppBar />
         <div className="mt-12 flex flex-col items-center justify-center w-full">
           <div className="flex flex-col items-center justify-center">
-            <div className="flex flex-col items-center justify-center ">
+            <div className="flex flex-col items-center justify-center border-x ">
               <div>{creation && <Creation creation={creation} />}</div>
               {/*
               {creation?.stills && creation.stills.length > 0 && (
@@ -131,10 +131,19 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                 </div>
               )}
               
-              <div>
-                <Blessings blessings={creation?.blessings || []} />
-              </div>
+             
               */}
+              <div>
+                <Blessings
+                  blessings={
+                    creation?.blessings.map((b) => ({
+                      ...b,
+                      user: b.userAddress,
+                      blessing: b.message,
+                    })) || []
+                  }
+                />
+              </div>
             </div>
           </div>
         </div>

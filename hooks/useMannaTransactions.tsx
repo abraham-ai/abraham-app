@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { AbrahamAbi } from "@/lib/abis/Abraham"; // Ensure this ABI includes all necessary functions
+import { MannaAbi } from "@/lib/abis/Manna";
 import {
   createPublicClient,
   createWalletClient,
@@ -31,7 +32,8 @@ const baseSepolia = {
 } as const satisfies Chain;
 
 // **Updated Abraham Contract Address**
-const ABRAHAM_ADDRESS = "0x3017258EB67f816F9504c7e0d41665022166d66E";
+const ABRAHAM_ADDRESS = process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS || "";
+const MANNA_ADDRESS = process.env.NEXT_PUBLIC_MANNA_ADDRESS || "";
 
 export function useMannaTransactions() {
   const { provider, accountAbstractionProvider } = useAuth();
@@ -77,8 +79,8 @@ export function useMannaTransactions() {
     try {
       const [address] = await walletClient.getAddresses();
       const balance = await publicClient.readContract({
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
         functionName: "balanceOf",
         args: [address],
       });
@@ -98,8 +100,8 @@ export function useMannaTransactions() {
     if (!publicClient) return;
     try {
       const [manna, eth] = (await publicClient.readContract({
-        address: ABRAHAM_ADDRESS as `0x${string}`,
-        abi: AbrahamAbi,
+        address: MANNA_ADDRESS as `0x${string}`,
+        abi: MannaAbi,
         functionName: "getContractBalances",
       })) as [bigint, bigint];
 
@@ -137,8 +139,8 @@ export function useMannaTransactions() {
           account: smartAccount,
           calls: [
             {
-              to: ABRAHAM_ADDRESS,
-              abi: AbrahamAbi,
+              to: MANNA_ADDRESS as `0x${string}`,
+              abi: MannaAbi,
               functionName: "buyManna",
               // parseEther(etherAmount) will convert a string like "0.1" to the correct wei BigInt
               value: parseEther(etherAmount),
@@ -153,8 +155,8 @@ export function useMannaTransactions() {
         const [address] = await walletClient.getAddresses();
         const txHash = await walletClient.writeContract({
           account: address,
-          address: ABRAHAM_ADDRESS as `0x${string}`,
-          abi: AbrahamAbi,
+          address: MANNA_ADDRESS as `0x${string}`,
+          abi: MannaAbi,
           functionName: "buyManna",
           value: parseEther(etherAmount),
         });
@@ -188,8 +190,8 @@ export function useMannaTransactions() {
           account: smartAccount,
           calls: [
             {
-              to: ABRAHAM_ADDRESS,
-              abi: AbrahamAbi,
+              to: MANNA_ADDRESS as `0x${string}`,
+              abi: MannaAbi,
               functionName: "sellManna",
               args: [BigInt(mannaAmount)],
             },
@@ -202,8 +204,8 @@ export function useMannaTransactions() {
         const [address] = await walletClient.getAddresses();
         const txHash = await walletClient.writeContract({
           account: address,
-          address: ABRAHAM_ADDRESS as `0x${string}`,
-          abi: AbrahamAbi,
+          address: MANNA_ADDRESS as `0x${string}`,
+          abi: MannaAbi,
           functionName: "sellManna",
           args: [BigInt(mannaAmount)],
         });
@@ -220,12 +222,20 @@ export function useMannaTransactions() {
   };
 
   /**
-   * Praises a creation.
+   * Make a reaction a creation.
    * Uses Account Abstraction if available; otherwise, normal contract write.
    */
-  const praiseCreation = async (creationId: number) => {
+  const makeReaction = async (
+    creationId: number,
+    reactionType: string,
+    message: string
+  ) => {
+    //praise = 0, burn = 1, bless = 2
+    const reactionTypeInt =
+      reactionType === "praise" ? 0 : reactionType === "burn" ? 1 : 2;
     if (!publicClient) return;
     try {
+      await approveManna("100000000000000000000");
       if (
         accountAbstractionProvider &&
         accountAbstractionProvider.smartAccount
@@ -237,10 +247,10 @@ export function useMannaTransactions() {
           account: smartAccount,
           calls: [
             {
-              to: ABRAHAM_ADDRESS,
+              to: ABRAHAM_ADDRESS as `0x${string}`,
               abi: AbrahamAbi,
-              functionName: "praise",
-              args: [creationId],
+              functionName: "react",
+              args: [creationId, reactionTypeInt, message],
             },
           ],
         });
@@ -255,8 +265,8 @@ export function useMannaTransactions() {
           account: address,
           address: ABRAHAM_ADDRESS as `0x${string}`,
           abi: AbrahamAbi,
-          functionName: "praise",
-          args: [creationId],
+          functionName: "react",
+          args: [creationId, reactionTypeInt, message],
         });
         console.log("Praise transaction hash:", txHash);
         await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -271,64 +281,112 @@ export function useMannaTransactions() {
     }
   };
 
-  /**
-   * Unpraises a creation to receive a Manna refund.
-   * Uses Account Abstraction if available; otherwise, normal contract write.
-   */
-  const unpraiseCreation = async (creationId: number) => {
-    if (!publicClient) return;
+  const approveManna = async (approveAmount: string) => {
+    if (!publicClient || !walletClient) return;
+
     try {
+      // You can do this with normal wallet or account abstraction as well.
+      // For simplicity, let's do the fallback external wallet approach.
+      // (Feel free to replicate AA logic if desired.)
       if (
         accountAbstractionProvider &&
         accountAbstractionProvider.smartAccount
       ) {
-        // === 1) Account Abstraction Approach ===
+        // (1) If using account abstraction:
         const bundlerClient = accountAbstractionProvider.bundlerClient!;
         const smartAccount = accountAbstractionProvider.smartAccount!;
         const userOpHash = await bundlerClient.sendUserOperation({
           account: smartAccount,
           calls: [
             {
-              to: ABRAHAM_ADDRESS,
-              abi: AbrahamAbi,
-              functionName: "unpraise",
-              args: [creationId],
+              to: MANNA_ADDRESS as `0x${string}`,
+              abi: MannaAbi,
+              functionName: "approve",
+              args: [ABRAHAM_ADDRESS, BigInt(approveAmount)],
             },
           ],
         });
+        // Wait for confirmation
         await bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-        console.log(
-          `Unpraised creationId ${creationId} using Account Abstraction!`
-        );
-      } else if (walletClient) {
-        // === 2) Fallback to External Wallet Approach ===
+        console.log(`Approved Manna (via AA) for ${ABRAHAM_ADDRESS}`);
+      } else {
+        // (2) Fallback: External wallet
         const [address] = await walletClient.getAddresses();
         const txHash = await walletClient.writeContract({
           account: address,
-          address: ABRAHAM_ADDRESS as `0x${string}`,
-          abi: AbrahamAbi,
-          functionName: "unpraise",
-          args: [creationId],
+          address: MANNA_ADDRESS as `0x${string}`,
+          abi: MannaAbi,
+          functionName: "approve",
+          args: [ABRAHAM_ADDRESS, BigInt(approveAmount)],
         });
+        // Wait for confirmation
         await publicClient.waitForTransactionReceipt({ hash: txHash });
-        console.log(`Unpraised creationId ${creationId} with external wallet!`);
-      } else {
-        throw new Error("No wallet or account abstraction provider available.");
+        console.log(
+          `Approved Manna (via external wallet) for ${ABRAHAM_ADDRESS}`
+        );
       }
-      // Update Manna balance after unpraising
-      await getMannaBalance();
     } catch (error) {
-      console.error("Error unpraising creation:", error);
+      console.error("Error approving Manna:", error);
     }
   };
+
+  /**
+   * Unpraises a creation to receive a Manna refund.
+   * Uses Account Abstraction if available; otherwise, normal contract write.
+   */
+  // const unpraiseCreation = async (creationId: number) => {
+  //   if (!publicClient) return;
+  //   try {
+  //     if (
+  //       accountAbstractionProvider &&
+  //       accountAbstractionProvider.smartAccount
+  //     ) {
+  //       // === 1) Account Abstraction Approach ===
+  //       const bundlerClient = accountAbstractionProvider.bundlerClient!;
+  //       const smartAccount = accountAbstractionProvider.smartAccount!;
+  //       const userOpHash = await bundlerClient.sendUserOperation({
+  //         account: smartAccount,
+  //         calls: [
+  //           {
+  //             to: ABRAHAM_ADDRESS,
+  //             abi: AbrahamAbi,
+  //             functionName: "unpraise",
+  //             args: [creationId],
+  //           },
+  //         ],
+  //       });
+  //       await bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+  //       console.log(
+  //         `Unpraised creationId ${creationId} using Account Abstraction!`
+  //       );
+  //     } else if (walletClient) {
+  //       // === 2) Fallback to External Wallet Approach ===
+  //       const [address] = await walletClient.getAddresses();
+  //       const txHash = await walletClient.writeContract({
+  //         account: address,
+  //         address: ABRAHAM_ADDRESS as `0x${string}`,
+  //         abi: AbrahamAbi,
+  //         functionName: "unpraise",
+  //         args: [creationId],
+  //       });
+  //       await publicClient.waitForTransactionReceipt({ hash: txHash });
+  //       console.log(`Unpraised creationId ${creationId} with external wallet!`);
+  //     } else {
+  //       throw new Error("No wallet or account abstraction provider available.");
+  //     }
+  //     // Update Manna balance after unpraising
+  //     await getMannaBalance();
+  //   } catch (error) {
+  //     console.error("Error unpraising creation:", error);
+  //   }
+  // };
 
   return {
     balance,
     contractBalances,
     buyManna,
     sellManna,
-    praiseCreation,
-    unpraiseCreation,
+    makeReaction,
     getMannaBalance,
     getContractBalances,
   };

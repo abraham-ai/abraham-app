@@ -10,6 +10,7 @@ import { CreationItem } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
 import { useManna } from "@/context/MannaContext";
+import BlessDialog from "./BlessDialog";
 
 import {
   Dialog,
@@ -34,11 +35,9 @@ function weiToNumber(weiString: string): number {
 export default function Creation({ creation }: CreationProps) {
   const { loggedIn, login, loadingAuth, userAccounts } = useAuth();
   const { getMannaBalance } = useManna();
-  const { praiseCreation, unpraiseCreation, balance } = useMannaTransactions();
+  const { makeReaction, balance } = useMannaTransactions();
 
-  const initialTotalStaked: number = parseInt(creation.totalStaked, 10) || 0;
-  const initialPraisePool: number = weiToNumber(creation.praisePool);
-  const initialConviction = weiToNumber(creation.conviction);
+  const initialTotalStaked: number = parseInt(creation.totalMannaUsed, 10) || 0;
   const initialCostToPraise: number = weiToNumber(
     creation.currentPriceToPraise.toString()
   );
@@ -51,7 +50,7 @@ export default function Creation({ creation }: CreationProps) {
     ) || null;
 
   const initialUserMannaStaked: number = userPraiseData
-    ? weiToNumber(userPraiseData.mannaStaked.toString())
+    ? weiToNumber(userPraiseData.mannaUsed.toString())
     : 0;
 
   const initialNoOfPraises: number = parseInt(
@@ -60,12 +59,8 @@ export default function Creation({ creation }: CreationProps) {
   );
 
   // Local States
-  const [localTotalStaked, setLocalTotalStaked] =
+  const [localTotalMannaUsed, setLocalTotalMannaUsed] =
     useState<number>(initialTotalStaked);
-  const [localPraisePool, setLocalPraisePool] =
-    useState<number>(initialPraisePool);
-  const [localConviction, setLocalConviction] =
-    useState<number>(initialConviction);
   const [costToPraise, setCostToPraise] = useState<number>(initialCostToPraise);
 
   const [userNoOfPraises, setUserNoOfPraises] =
@@ -76,12 +71,16 @@ export default function Creation({ creation }: CreationProps) {
 
   // Loading states
   const [loadingPraise, setLoadingPraise] = useState(false);
-  const [loadingUnpraise, setLoadingUnpraise] = useState(false);
+
+  const [blessingsCount, setBlessingsCount] = useState<number>(
+    parseInt(creation.blessCount, 10)
+  );
+  const [burnsCount, setBurnsCount] = useState<number>(
+    parseInt(creation.burnCount, 10)
+  );
 
   useEffect(() => {
-    setLocalTotalStaked(parseInt(creation.totalStaked, 10) || 0);
-    setLocalPraisePool(weiToNumber(creation.praisePool));
-    setLocalConviction(parseFloat(creation.conviction));
+    setLocalTotalMannaUsed(parseInt(creation.totalMannaUsed, 10) || 0);
     setCostToPraise(weiToNumber(creation.currentPriceToPraise.toString()));
 
     const updatedUserPraiseData =
@@ -95,9 +94,9 @@ export default function Creation({ creation }: CreationProps) {
     );
     setUserNoOfPraises(newNoOfPraises);
 
-    if (updatedUserPraiseData?.mannaStaked) {
+    if (updatedUserPraiseData?.mannaUsed) {
       setUserMannaStaked(
-        weiToNumber(updatedUserPraiseData.mannaStaked.toString())
+        weiToNumber(updatedUserPraiseData.mannaUsed.toString())
       );
     } else {
       setUserMannaStaked(0);
@@ -119,11 +118,10 @@ export default function Creation({ creation }: CreationProps) {
 
     setLoadingPraise(true);
     try {
-      await praiseCreation(parseInt(creation.creationId, 10));
+      await makeReaction(parseInt(creation.creationId, 10), "praise", "");
 
       // Update local states (pessimistic: only after success)
-      setLocalTotalStaked((prev) => prev + 1);
-      setLocalPraisePool((prev) => prev + costToPraise);
+      setLocalTotalMannaUsed((prev) => prev + 1);
       setUserNoOfPraises((prev) => prev + 1); // e.g. 2 + 1 = 3
       setUserMannaStaked((prev) => prev + costToPraise);
 
@@ -136,46 +134,12 @@ export default function Creation({ creation }: CreationProps) {
     }
   };
 
-  const handleUnpraiseClick = async () => {
-    if (!loggedIn) {
-      alert("Please log in first.");
-      return;
-    }
-
-    setLoadingUnpraise(true);
-    try {
-      await unpraiseCreation(parseInt(creation.creationId, 10));
-
-      // We approximate cost if we don't have exact last praise cost
-      const approxLastPraiseCost = costToPraise;
-      const unpraiseCost = 0.1; // from contract
-
-      setLocalTotalStaked((prev) => (prev > 0 ? prev - 1 : 0));
-      setLocalPraisePool((prev) =>
-        prev > approxLastPraiseCost ? prev - approxLastPraiseCost : 0
-      );
-      setUserNoOfPraises((prev) => (prev > 0 ? prev - 1 : 0));
-      setUserMannaStaked((prev) =>
-        prev > unpraiseCost ? prev - unpraiseCost : 0
-      );
-
-      await getMannaBalance();
-    } catch (error) {
-      console.error("Error unpraising:", error);
-      alert("Failed to unpraise or user canceled transaction.");
-    } finally {
-      setLoadingUnpraise(false);
-    }
-  };
-
   const displayCostToPraise = costToPraise.toFixed(1);
-  const displayLocalPraisePool = localPraisePool.toFixed(1);
-  const displayLocalConviction = localConviction.toFixed(1);
   const displayUserMannaStaked = userMannaStaked.toFixed(1);
 
   return (
     <>
-      <div className="grid grid-cols-12 border-b border-x p-4 lg:w-[43vw] w-full">
+      <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw] w-full">
         {/* Creation Thumbnail / Avatar */}
         <Link href={`/creation/${creation.creationId}`}>
           <div className="col-span-1 flex flex-col mr-3">
@@ -261,26 +225,6 @@ export default function Creation({ creation }: CreationProps) {
                         <>Praise 🙌</>
                       )}
                     </Button>
-
-                    {/* Unpraise Button (only if user has > 0 praises) */}
-                    {userNoOfPraises > 0 && (
-                      <Button
-                        variant="secondary"
-                        onClick={handleUnpraiseClick}
-                        disabled={loadingUnpraise}
-                        className={`cursor-pointer ml-4 ${
-                          loadingUnpraise
-                            ? "cursor-not-allowed"
-                            : "hover:text-red-500"
-                        } transition-colors duration-200`}
-                      >
-                        {loadingUnpraise ? (
-                          <Loader2Icon className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <>Unpraise</>
-                        )}
-                      </Button>
-                    )}
                   </DialogFooter>
                 </DialogContent>
               ) : (
@@ -302,16 +246,44 @@ export default function Creation({ creation }: CreationProps) {
 
             {/* Total # of praises (for entire creation) */}
             <span className="ml-1 text-sm font-semibold text-gray-500">
-              {localTotalStaked}
+              {creation.praiseCount}
             </span>
 
+            <div className={`ml-10 cursor-pointer text-gray-500`}>
+              {loggedIn ? (
+                <BlessDialog
+                  creation={creation}
+                  blessingsCount={blessingsCount}
+                  setBlessingsCount={setBlessingsCount}
+                />
+              ) : (
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <p>🙏</p>
+                  </DialogTrigger>
+                  <DialogContent className="bg-white">
+                    <DialogHeader>
+                      <DialogTitle>Authentication Required</DialogTitle>
+                      <DialogDescription>
+                        You need to log in to perform this action.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button onClick={login} disabled={loadingAuth}>
+                        {loadingAuth ? "Logging in..." : "Log In"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+            <span className="ml-1 text-sm font-semibold text-gray-500">
+              {blessingsCount}
+            </span>
             {/* Additional info: Manna Pool + Conviction */}
             <div className="ml-10 flex flex-col">
               <p className="text-sm text-gray-500">
-                Manna Staked: {displayLocalPraisePool}
-              </p>
-              <p className="text-sm text-gray-500">
-                Conviction: {displayLocalConviction}
+                Manna Used: {localTotalMannaUsed}
               </p>
             </div>
           </div>

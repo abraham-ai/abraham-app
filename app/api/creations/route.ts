@@ -13,16 +13,27 @@ const GET_CREATIONS_QUERY = `
       id
       creationId
       metadataUri
-      totalStaked
-      praisePool
-      conviction
+      totalMannaUsed
+      blessCount
+      praiseCount
+      burnCount
       currentPriceToPraise
       createdAt
       updatedAt
       praises {
         userAddress
         noOfPraises
-        mannaStaked
+        mannaUsed
+      }
+      burns {
+        userAddress
+        noOfBurns
+        mannaUsed
+      }
+      blessings {
+        userAddress
+        message
+        mannaUsed
       }
     }
   }

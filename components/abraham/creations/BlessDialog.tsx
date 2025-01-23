@@ -12,70 +12,62 @@ import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { CreationItem } from "@/types";
+import { ethers } from "ethers";
 
 export default function BlessDialog({
   creation,
   blessingsCount,
   setBlessingsCount,
 }: {
-  creation: { _id: string; creation: { title: string; description: string } };
+  creation: CreationItem;
   blessingsCount: number;
   setBlessingsCount: (count: number) => void;
 }) {
   const { loggedIn, userInfo, idToken, userAccounts } = useAuth();
   const [blessingText, setBlessingText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { balance, getMannaBalance } = useMannaTransactions();
+  const { makeReaction, balance, getMannaBalance } = useMannaTransactions();
 
   useEffect(() => {
     getMannaBalance();
   }, [getMannaBalance]);
 
+  /** Convert a wei string to a normal decimal number. */
+  function weiToNumber(weiString: string): number {
+    return parseFloat(ethers.formatUnits(weiString || "0", 18));
+  }
+
   const handleBlessSubmit = async () => {
-    if (!idToken) {
-      throw new Error("User not authenticated");
+    setIsSubmitting(true);
+    if (!loggedIn) {
+      alert("Please log in first.");
+      return;
     }
 
-    setIsSubmitting(true);
+    const userMannaBalance = parseFloat(balance?.toString() || "0");
+    const costToBless =
+      weiToNumber(creation.currentPriceToPraise.toString()) * 5 || 0;
+    if (userMannaBalance < costToBless) {
+      alert("Insufficient Manna to praise this creation.");
+      return;
+    }
 
     try {
-      const amount = BigInt("1000000000000000000"); // 1 Manna in wei
+      await makeReaction(
+        parseInt(creation.creationId, 10),
+        "bless",
+        blessingText
+      );
+      setBlessingsCount(blessingsCount + 1);
 
-      if (!balance || BigInt(balance) < 1) {
-        alert("Insufficient Manna balance to bless this creation.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Perform blockchain bless transaction
-      //await blessTransaction(1, blessingText);
-
-      // Handle server-side reaction
-      const response = await fetch("/api/artlabproxy/stories/bless", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          creation_id: creation._id,
-          blessing: blessingText,
-          address: userAccounts,
-        }),
-      });
-
-      if (response.ok) {
-        setBlessingsCount(blessingsCount + 1);
-        await getMannaBalance(); // Update balance after blessing
-        setBlessingText(""); // Reset blessing text
-      } else {
-        throw new Error("Error submitting blessing");
-      }
+      await getMannaBalance();
     } catch (error) {
       console.error("Error submitting blessing:", error);
       alert("Failed to bless the creation. Please try again.");
     } finally {
       setIsSubmitting(false);
+      setBlessingText("");
     }
   };
 
@@ -107,7 +99,7 @@ export default function BlessDialog({
           <div className="col-span-1 flex flex-col mr-3">
             <Image
               src={"/abrahamlogo.png"}
-              alt={creation.creation.title}
+              alt={creation.title || "Creation"}
               width={100}
               height={100}
               className="rounded-full aspect-[1] object-cover border"
@@ -115,7 +107,7 @@ export default function BlessDialog({
             <div className="py-4 ml-4 border-l h-full"></div>
           </div>
           <div className="col-span-11 flex flex-col">
-            <p className="text-gray-700 ">{creation.creation.description}</p>
+            <p className="text-gray-700 ">{creation.description}</p>
             <div className="py-3"></div>
           </div>
         </div>
@@ -164,4 +156,7 @@ export default function BlessDialog({
       </DialogContent>
     </Dialog>
   );
+}
+function weiToNumber(arg0: string) {
+  throw new Error("Function not implemented.");
 }
