@@ -17,7 +17,7 @@ function PraisePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const { praiseCreation, getMannaBalance } = useMannaTransactions();
+  const { makeReaction, getMannaBalance } = useMannaTransactions();
   const creationId = searchParams.get("creationId") || "";
 
   useEffect(() => {
@@ -46,7 +46,7 @@ function PraisePage() {
         }
 
         // 2) On-chain praise
-        await praiseCreation(1);
+        await makeReaction(parseInt(creationId, 10), "praise", "");
         alert("Praise transaction completed!");
 
         // 3) Redirect
