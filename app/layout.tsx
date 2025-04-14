@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { MannaProvider } from "@/context/MannaContext";
+import { MiniKitProvider } from "@coinbase/onchainkit/minikit";
+import { base } from "viem/chains";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -45,15 +47,43 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <AuthProvider>
-        <MannaProvider>
-          <body
-            className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-          >
-            {children}
-          </body>
-        </MannaProvider>
-      </AuthProvider>
+      <MiniKitProvider
+        apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+        chain={{
+          id: base.id,
+          name: base.name,
+          nativeCurrency: {
+            name: "ETH",
+            symbol: "ETH",
+            decimals: 18,
+          },
+          rpcUrls: {
+            default: {
+              http: [base.rpcUrls.default.http[0]],
+            },
+            public: {
+              http: [base.rpcUrls.default.http[0]],
+            },
+          },
+        }}
+        config={{
+          appearance: {
+            mode: "auto",
+            name: "Abraham",
+            logo: "/abrahamlogo.png",
+          },
+        }}
+      >
+        <AuthProvider>
+          <MannaProvider>
+            <body
+              className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+            >
+              {children}
+            </body>
+          </MannaProvider>
+        </AuthProvider>
+      </MiniKitProvider>
     </html>
   );
 }

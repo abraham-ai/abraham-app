@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@apollo/client": "^3.12.4",
-    "@coinbase/onchainkit": "github:coinbase/onchainkit",
+    "@coinbase/onchainkit": "latest",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-avatar": "^1.1.0",
     "@radix-ui/react-collapsible": "^1.1.0",
