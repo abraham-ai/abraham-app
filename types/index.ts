@@ -2,7 +2,7 @@ export interface SubgraphCreation {
   id: string;
   creationId: string;
   metadataUri: string;
-  totalMannaUsed: string; // Represented as a string because GraphQL's BigInt is returned as a string
+  totalEthUsed: string; // Represented as a string because GraphQL's BigInt is returned as a string
   blessCount: string;
   praiseCount: string;
   burnCount: string;
@@ -13,21 +13,21 @@ export interface SubgraphCreation {
     {
       userAddress: string;
       noOfPraises: number;
-      mannaUsed: number;
+      ethUsed: number;
     }
   ];
   burns: [
     {
       userAddress: string;
       noOfBurns: number;
-      mannaUsed: number;
+      ethUsed: number;
     }
   ];
   blessings: [
     {
       userAddress: string;
       message: string;
-      mannaUsed: number;
+      ethUsed: number;
     }
   ];
 }
@@ -44,5 +44,5 @@ export interface CreationItem extends SubgraphCreation, Metadata {}
 export interface Blessing {
   user: string;
   blessing: string;
-  mannaUsed: number;
+  ethUsed: number;
 }

@@ -9,6 +9,7 @@ import { ethers } from "ethers";
 import { CreationItem } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useAbrahamTransactions } from "@/hooks/useAbrahamTransactions";
 import { useManna } from "@/context/MannaContext";
 import BlessDialog from "./BlessDialog";
 
@@ -35,9 +36,10 @@ function weiToNumber(weiString: string): number {
 export default function Creation({ creation }: CreationProps) {
   const { loggedIn, login, loadingAuth, userAccounts } = useAuth();
   const { getMannaBalance } = useManna();
-  const { makeReaction, balance } = useMannaTransactions();
+  const { balance } = useMannaTransactions();
+  const { makeReaction } = useAbrahamTransactions();
 
-  const initialTotalStaked: number = parseInt(creation.totalMannaUsed, 10) || 0;
+  const initialTotalStaked: number = parseInt(creation.totalEthUsed, 10) || 0;
   const initialCostToPraise: number = weiToNumber(
     creation.currentPriceToPraise.toString()
   );
@@ -50,7 +52,7 @@ export default function Creation({ creation }: CreationProps) {
     ) || null;
 
   const initialUserMannaStaked: number = userPraiseData
-    ? weiToNumber(userPraiseData.mannaUsed.toString())
+    ? weiToNumber(userPraiseData.ethUsed.toString())
     : 0;
 
   const initialNoOfPraises: number = parseInt(
@@ -83,7 +85,7 @@ export default function Creation({ creation }: CreationProps) {
   );
 
   useEffect(() => {
-    setLocalTotalMannaUsed(parseInt(creation.totalMannaUsed, 10) || 0);
+    setLocalTotalMannaUsed(parseInt(creation.totalEthUsed, 10) || 0);
     setCostToPraise(weiToNumber(creation.currentPriceToPraise.toString()));
 
     const updatedUserPraiseData =
@@ -97,10 +99,8 @@ export default function Creation({ creation }: CreationProps) {
     );
     setUserNoOfPraises(newNoOfPraises);
 
-    if (updatedUserPraiseData?.mannaUsed) {
-      setUserMannaStaked(
-        weiToNumber(updatedUserPraiseData.mannaUsed.toString())
-      );
+    if (updatedUserPraiseData?.ethUsed) {
+      setUserMannaStaked(weiToNumber(updatedUserPraiseData.ethUsed.toString()));
     } else {
       setUserMannaStaked(0);
     }
@@ -112,12 +112,12 @@ export default function Creation({ creation }: CreationProps) {
       return;
     }
 
-    const userMannaBalance = parseFloat(balance?.toString() || "0");
+    //const userMannaBalance = parseFloat(balance?.toString() || "0");
 
-    if (userMannaBalance < costToPraise) {
-      alert("Insufficient Manna to praise this creation.");
-      return;
-    }
+    // if (userMannaBalance < costToPraise) {
+    //   alert("Insufficient Manna to praise this creation.");
+    //   return;
+    // }
 
     setLoadingPraise(true);
     try {
@@ -204,7 +204,7 @@ export default function Creation({ creation }: CreationProps) {
                         Your Manna on this creation: {displayUserMannaStaked}
                       </p>
                       <p className="text-gray-600">
-                        Current cost to praise: {displayCostToPraise} Manna
+                        Current cost to praise: {displayCostToPraise} Eth
                       </p>
                     </div>
                   </div>
@@ -287,7 +287,7 @@ export default function Creation({ creation }: CreationProps) {
             {/* Additional info: Manna Pool + Conviction */}
             <div className="ml-10 flex flex-col">
               <p className="text-sm text-gray-500">
-                Manna Used: {localTotalMannaUsed}
+                Eth Used: {localTotalMannaUsed}
               </p>
             </div>
           </div>

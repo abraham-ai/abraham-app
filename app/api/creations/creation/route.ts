@@ -12,7 +12,7 @@ const GET_CREATION_QUERY = `
       id
       creationId
       metadataUri
-      totalMannaUsed
+      totalEthUsed
       blessCount
       praiseCount
       burnCount
@@ -22,17 +22,17 @@ const GET_CREATION_QUERY = `
       praises {
         userAddress
         noOfPraises
-        mannaUsed
+        ethUsed
       }
       burns {
         userAddress
         noOfBurns
-        mannaUsed
+        ethUsed
       }
       blessings {
         userAddress
         message
-        mannaUsed
+        ethUsed
       }
     }
   }

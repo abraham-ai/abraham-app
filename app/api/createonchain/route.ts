@@ -6,7 +6,7 @@ import { PinataSDK } from "pinata-web3";
 import fetch from "node-fetch";
 
 // Environment variables
-const RPC_URL = process.env.RPC_URL || "https://rpc.ankr.com/base_sepolia";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const ABRAHAM_CONTRACT = process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS;
 const PINATA_JWT = process.env.PINATA_JWT;

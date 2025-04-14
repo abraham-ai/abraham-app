@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useAbrahamTransactions } from "@/hooks/useAbrahamTransactions";
 import { CreationItem } from "@/types";
 import { ethers } from "ethers";
 
@@ -27,7 +28,8 @@ export default function BlessDialog({
   const { loggedIn, userInfo, idToken, userAccounts } = useAuth();
   const [blessingText, setBlessingText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { makeReaction, balance, getMannaBalance } = useMannaTransactions();
+  const { balance, getMannaBalance } = useMannaTransactions();
+  const { makeReaction } = useAbrahamTransactions();
 
   useEffect(() => {
     getMannaBalance();
@@ -48,10 +50,10 @@ export default function BlessDialog({
     const userMannaBalance = parseFloat(balance?.toString() || "0");
     const costToBless =
       weiToNumber(creation.currentPriceToPraise.toString()) * 5 || 0;
-    if (userMannaBalance < costToBless) {
-      alert("Insufficient Manna to praise this creation.");
-      return;
-    }
+    // if (userMannaBalance < costToBless) {
+    //   alert("Insufficient Manna to praise this creation.");
+    //   return;
+    // }
 
     try {
       await makeReaction(
