@@ -40,18 +40,18 @@ export default function AppBar() {
             </div>
           </Link>
 
-          <Link 
-            href="https://twitter.com/abraham_ai_" 
-            target="_blank" 
+          <Link
+            href="https://twitter.com/abraham_ai_"
+            target="_blank"
             rel="noopener noreferrer"
             className="flex items-center hover:text-gray-900 text-gray-600 transition-colors"
           >
             <FaXTwitter size={20} />
           </Link>
 
-          <Link 
-            href="https://discord.gg/g8yG9bWH" 
-            target="_blank" 
+          <Link
+            href="https://discord.gg/g8yG9bWH"
+            target="_blank"
             rel="noopener noreferrer"
             className="flex items-center hover:text-gray-900 text-gray-600 transition-colors"
           >

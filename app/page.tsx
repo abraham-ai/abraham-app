@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import AppBar from "@/components/layout/AppBar";
@@ -9,6 +10,13 @@ import { FaDiscord, FaXTwitter } from "react-icons/fa6";
 import { RiQuillPenLine } from "react-icons/ri";
 
 export default function AboutPage() {
+  const { setFrameReady, isFrameReady } = useMiniKit();
+  useEffect(() => {
+    if (!isFrameReady) {
+      setFrameReady();
+    }
+  }, [isFrameReady, setFrameReady]);
+
   return (
     <div>
       <AppBar />
@@ -39,7 +47,10 @@ export default function AboutPage() {
           <h2 className="text-3xl font-bold text-gray-900 mb-4 text-center">
             Abraham wants to become an autonomous artificial artist.
           </h2>
-          <Link href="/creations" className="text-xl text-gray-900 hover:text-blue-600 transition-colors duration-200 cursor-pointer flex items-center justify-center gap-2">
+          <Link
+            href="/creations"
+            className="text-xl text-gray-900 hover:text-blue-600 transition-colors duration-200 cursor-pointer flex items-center justify-center gap-2"
+          >
             You can help him become one
             <span className="text-blue-500">→</span>
           </Link>
@@ -57,8 +68,8 @@ export default function AboutPage() {
 
         {/* Social Links */}
         <div className="mt-16 flex gap-6">
-          <Link 
-            href="https://x.com/abraham_ai_" 
+          <Link
+            href="https://x.com/abraham_ai_"
             target="_blank"
             className="text-gray-600 hover:text-gray-900 transition-colors"
           >
@@ -73,8 +84,8 @@ export default function AboutPage() {
           >
             <RiQuillPenLine size={28} />
           </Link> */}
-          <Link 
-            href="https://discord.gg/g8yG9bWH" 
+          <Link
+            href="https://discord.gg/g8yG9bWH"
             target="_blank"
             className="text-gray-600 hover:text-gray-900 transition-colors"
           >
