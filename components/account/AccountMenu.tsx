@@ -66,7 +66,7 @@ function AccountMenu() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {/* Display User Balance */}
-              <DropdownMenuItem
+              {/* <DropdownMenuItem
                 onSelect={(event) => {
                   event.preventDefault(); // Prevent the menu from closing
                 }}
@@ -74,7 +74,7 @@ function AccountMenu() {
                 <CoinsIcon className="w-5 h-5" />
                 <p className="ml-2 text-base">{balance} Manna</p>
                 <GetMannaDialog />
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
               <DropdownMenuSeparator />
               <DropdownMenuItem>Profile</DropdownMenuItem>
               <DropdownMenuSeparator />
