@@ -2,34 +2,32 @@ export interface SubgraphCreation {
   id: string;
   creationId: string;
   metadataUri: string;
-  totalMannaUsed: string; // Represented as a string because GraphQL's BigInt is returned as a string
+
+  // Represent these as strings of Wei
+  totalEthUsed: string;
+  currentPriceToPraise: string;
+
   blessCount: string;
   praiseCount: string;
   burnCount: string;
-  currentPriceToPraise: number;
-  createdAt: string; // Unix timestamp as a string
+  createdAt: string;
   updatedAt: string;
-  praises: [
-    {
-      userAddress: string;
-      noOfPraises: number;
-      mannaUsed: number;
-    }
-  ];
-  burns: [
-    {
-      userAddress: string;
-      noOfBurns: number;
-      mannaUsed: number;
-    }
-  ];
-  blessings: [
-    {
-      userAddress: string;
-      message: string;
-      mannaUsed: number;
-    }
-  ];
+  praises: Array<{
+    userAddress: string;
+    noOfPraises: number;
+    ethUsed: string; // Also Wei in string form
+  }>;
+  burns: Array<{
+    userAddress: string;
+    noOfBurns: number;
+    ethUsed: string;
+  }>;
+  blessings: Array<{
+    blockTimestamp: string;
+    userAddress: string;
+    message: string;
+    ethUsed: string;
+  }>;
 }
 
 export interface Metadata {
@@ -38,11 +36,12 @@ export interface Metadata {
   visual_aesthetic: string;
   image: string; // URL to the image
 }
+export interface Blessing {
+  user?: string;
+  userAddress?: string;
+  blessing?: string;
+  message?: string;
+  blockTimestamp?: string;
+}
 
 export interface CreationItem extends SubgraphCreation, Metadata {}
-
-export interface Blessing {
-  user: string;
-  blessing: string;
-  mannaUsed: number;
-}

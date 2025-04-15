@@ -6,7 +6,7 @@ import { PinataSDK } from "pinata-web3";
 import fetch from "node-fetch";
 
 // Environment variables
-const RPC_URL = process.env.RPC_URL || "https://rpc.ankr.com/base_sepolia";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const ABRAHAM_CONTRACT = process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS;
 const PINATA_JWT = process.env.PINATA_JWT;
@@ -79,21 +79,21 @@ export async function GET() {
       "https://gateway.pinata.cloud/ipfs/QmciK6aFR1D58hhhJQCYbczgTvU18Xx7T4U5aSJSdSCesZ";
 
     //Step 3: Call the Abraham contract's newCreation function
-    const tx = await abrahamContract.newCreation(metadataIpfsUri);
-    const receipt = await tx.wait();
-    const _id = receipt.events[0].args.creationId.toString();
+    // const tx = await abrahamContract.newCreation(metadataIpfsUri);
+    // const receipt = await tx.wait();
+    // const _id = receipt.events[0].args.creationId.toString();
 
-    const result = {
-      transactionHash: receipt.transactionHash,
-      creationId: receipt.events[0].args.creationId.toString(),
-      metadataUri: metadataIpfsUri,
-    };
+    // const result = {
+    //   transactionHash: receipt.transactionHash,
+    //   creationId: receipt.events[0].args.creationId.toString(),
+    //   metadataUri: metadataIpfsUri,
+    // };
 
-    console.log(`Successfully created on-chain creation ID ${_id}`);
+    // console.log(`Successfully created on-chain creation ID ${_id}`);
 
     //Step 5: Return the results
-    return NextResponse.json({ result }, { status: 200 });
-    //return NextResponse.json("You need to uncomment the code", { status: 200 });
+    //return NextResponse.json({ result }, { status: 200 });
+    return NextResponse.json("You need to uncomment the code", { status: 200 });
   } catch (error: any) {
     console.error("Error processing GET request:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
