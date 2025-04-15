@@ -16,57 +16,95 @@ import { useAbrahamTransactions } from "@/hooks/useAbrahamTransactions";
 import { CreationItem } from "@/types";
 import { ethers } from "ethers";
 
+interface BlessDialogProps {
+  creation: CreationItem;
+  blessingsCount: number;
+  setBlessingsCount: (count: number) => void;
+  setLocalTotalEthUsed: React.Dispatch<React.SetStateAction<number>>;
+
+  // Pass in so we can reflect the new cost after reaction
+  setCostToPraise: React.Dispatch<React.SetStateAction<number>>;
+
+  // The new callback from parent to insert a new blessing into local state
+  onNewBlessing?: (newBless: {
+    userAddress: string;
+    message: string;
+    ethUsed: string;
+    blockTimestamp?: string;
+  }) => void;
+}
+
+function weiToEtherNumber(weiString: string) {
+  return parseFloat(ethers.formatEther(BigInt(weiString || "0")));
+}
+
+// If contract's initPraisePrice is 0.0001 ETH:
+const INIT_PRAISE_PRICE_ETHER = 0.0001;
+
 export default function BlessDialog({
   creation,
   blessingsCount,
   setBlessingsCount,
-}: {
-  creation: CreationItem;
-  blessingsCount: number;
-  setBlessingsCount: (count: number) => void;
-}) {
-  const { loggedIn, userInfo, idToken, userAccounts } = useAuth();
+  setLocalTotalEthUsed,
+  setCostToPraise,
+  onNewBlessing,
+}: BlessDialogProps) {
+  const { loggedIn, userInfo, userAccounts, login } = useAuth();
   const [blessingText, setBlessingText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const { balance, getMannaBalance } = useMannaTransactions();
   const { makeReaction } = useAbrahamTransactions();
+
+  // The base cost for praising, multiplied by 5 for blessing
+  const basePraiseCostInEther = weiToEtherNumber(creation.currentPriceToPraise);
+  const blessCostInEther = basePraiseCostInEther * 5;
 
   useEffect(() => {
     getMannaBalance();
   }, [getMannaBalance]);
 
-  /** Convert a wei string to a normal decimal number. */
-  function weiToNumber(weiString: string): number {
-    return parseFloat(ethers.formatUnits(weiString || "0", 18));
-  }
-
   const handleBlessSubmit = async () => {
-    setIsSubmitting(true);
     if (!loggedIn) {
       alert("Please log in first.");
       return;
     }
-
-    const userMannaBalance = parseFloat(balance?.toString() || "0");
-    const costToBless =
-      weiToNumber(creation.currentPriceToPraise.toString()) * 5 || 0;
-    // if (userMannaBalance < costToBless) {
-    //   alert("Insufficient Manna to praise this creation.");
-    //   return;
-    // }
+    setIsSubmitting(true);
 
     try {
+      // Reaction call
       await makeReaction(
         parseInt(creation.creationId, 10),
         "bless",
-        blessingText
+        blessingText,
+        basePraiseCostInEther // or pass blessCostInEther if makeReaction doesn't do the *5
       );
+
+      // Locally increment bless count & total ETH used
       setBlessingsCount(blessingsCount + 1);
+      setLocalTotalEthUsed((prev) => prev + blessCostInEther);
+
+      // The contract reactionCount increments → next cost = old cost + 0.0001
+      setCostToPraise((prev) => prev + INIT_PRAISE_PRICE_ETHER);
+
+      // Insert the new blessing into the parent's array so the user sees it immediately
+      // Typically, we won't know the actual on-chain blockTimestamp right now,
+      // but we can store a local timestamp for approximate ordering:
+      if (onNewBlessing) {
+        const newBless = {
+          userAddress: userAccounts || "",
+          message: blessingText,
+          // We'll store how much ETH was used (in Wei string) or in Ether. We'll do Wei for consistency:
+          ethUsed: ethers.parseEther(blessCostInEther.toString()).toString(), // e.g. "2000000000000000" for 0.002
+          blockTimestamp: Date.now().toString(), // approximate
+        };
+        onNewBlessing(newBless);
+      }
 
       await getMannaBalance();
     } catch (error) {
       console.error("Error submitting blessing:", error);
-      alert("Failed to bless the creation. Please try again.");
+      alert("Failed to bless. Please try again.");
     } finally {
       setIsSubmitting(false);
       setBlessingText("");
@@ -77,25 +115,12 @@ export default function BlessDialog({
     <Dialog>
       {loggedIn ? (
         <DialogTrigger asChild>
-          <p
-            className={`${
-              loggedIn ? "text-gray-500" : "text-gray-300 cursor-not-allowed"
-            }`}
-          >
-            {" "}
-            🙏{" "}
-          </p>
+          <p className="text-gray-500">🙏</p>
         </DialogTrigger>
       ) : (
-        <p
-          className={`${
-            loggedIn ? "text-gray-500" : "text-gray-300 cursor-not-allowed"
-          }`}
-        >
-          {" "}
-          🙏{" "}
-        </p>
+        <p className="text-gray-300 cursor-not-allowed">🙏</p>
       )}
+
       <DialogContent className="sm:max-w-xl bg-white">
         <div className="grid grid-cols-12 mt-1">
           <div className="col-span-1 flex flex-col mr-3">
@@ -113,38 +138,39 @@ export default function BlessDialog({
             <div className="py-3"></div>
           </div>
         </div>
+
         <div className="grid grid-cols-12">
           <div className="col-span-1 flex flex-col mr-3">
-            <div>
-              {userInfo?.profileImage ? (
-                <Image
-                  src={userInfo.profileImage}
-                  alt={"user image"}
-                  width={100}
-                  height={100}
-                  className="rounded-full aspect-[1] object-cover border"
+            {userInfo?.profileImage ? (
+              <Image
+                src={userInfo.profileImage}
+                alt="user image"
+                width={100}
+                height={100}
+                className="rounded-full aspect-[1] object-cover border"
+              />
+            ) : (
+              <div className="rounded-full overflow-hidden">
+                <RandomPixelAvatar
+                  username={userAccounts || "username"}
+                  size={32}
                 />
-              ) : (
-                <div className="rounded-full overflow-hidden">
-                  <RandomPixelAvatar
-                    username={userAccounts || "username"}
-                    size={32}
-                  />
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-          <div className="col-span-11 flex flex-col ">
+
+          <div className="col-span-11 flex flex-col">
             <Textarea
               value={blessingText}
               onChange={(e) => setBlessingText(e.target.value)}
               className="w-full border-0 text-lg -mt-2 -ml-3"
-              placeholder="Share a blessing or a kind thought..."
+              placeholder="Share a blessing or kind thought..."
             />
           </div>
         </div>
+
         <DialogFooter>
-          {loggedIn && (
+          {loggedIn ? (
             <Button
               type="submit"
               className="px-8"
@@ -153,12 +179,13 @@ export default function BlessDialog({
             >
               {isSubmitting ? "Blessing..." : "Bless"}
             </Button>
+          ) : (
+            <Button onClick={login} disabled={isSubmitting}>
+              Log In
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
-function weiToNumber(arg0: string) {
-  throw new Error("Function not implemented.");
 }

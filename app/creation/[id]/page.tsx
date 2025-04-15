@@ -5,14 +5,10 @@ import Creation from "@/components/abraham/creations/Creation";
 import AppBar from "@/components/layout/AppBar";
 import { CreationItem } from "@/types";
 import Blessings from "@/components/abraham/creations/Blessings";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { ScrollArea } from "@radix-ui/react-scroll-area";
-import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 
 export default function CreationPage({ params }: { params: { id: string } }) {
   const [creation, setCreation] = useState<CreationItem | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [userPraises, setUserPraises] = useState<Set<string>>(new Set());
   const { loggedIn, userAccounts } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
@@ -21,23 +17,26 @@ export default function CreationPage({ params }: { params: { id: string } }) {
     fetchData();
   }, [loggedIn, userAccounts]);
 
-  // Fetch all creations and find the one with the matching ID
+  /**
+   * Fetch a single creation from an API route such as `/api/creations/creation?creationId=...`
+   */
   const fetchCreation = async () => {
     try {
-      axios
-        .get(`/api/creations/creation?creationId=${params.id}`)
-        .then((res) => {
-          console.log("Creation:", res.data);
-          setCreation(res.data);
-        });
+      const res = await axios.get(
+        `/api/creations/creation?creationId=${params.id}`
+      );
+      console.log("Creation:", res.data);
+      setCreation(res.data);
     } catch (err: any) {
       console.error("Fetch Error:", err);
     }
   };
 
+  /**
+   * Example: fetch user praises from subgraph. (You can remove if not in use.)
+   */
   const fetchUserPraises = async () => {
-    if (!loggedIn || !userAccounts || userAccounts.length === 0) return;
-    console.log("User Accounts: ", userAccounts);
+    if (!loggedIn || !userAccounts) return;
     const userAddress = userAccounts.toLowerCase();
     console.log("User Address: ", userAddress);
 
@@ -59,8 +58,9 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         }
       );
 
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(`Network error: ${response.statusText}`);
+      }
 
       const { data, errors } = await response.json();
       console.log("User Praises Data:", data);
@@ -76,6 +76,9 @@ export default function CreationPage({ params }: { params: { id: string } }) {
     }
   };
 
+  /**
+   * Wrapper to fetch everything we need
+   */
   const fetchData = async () => {
     setLoading(true);
     await fetchCreation();
@@ -83,67 +86,68 @@ export default function CreationPage({ params }: { params: { id: string } }) {
     setLoading(false);
   };
 
-  // Function to handle clicking on a thumbnail
-  const handleThumbnailClick = (index: number) => {
-    setCurrentIndex(index);
+  /**
+   * Callback that gets triggered after a successful Bless action
+   * to immediately add a new blessing to local state.
+   *
+   * We'll assume your subgraph's "Blessing" objects look like:
+   *   { userAddress: string; message: string; ethUsed: string; blockTimestamp?: string; }
+   */
+  const handleNewBlessing = (newBless: {
+    userAddress: string;
+    message: string;
+    ethUsed: string;
+    blockTimestamp?: string;
+  }) => {
+    if (!creation) return;
+
+    setCreation((prev) => {
+      if (!prev) return null;
+
+      // Insert the new blessing at the front for "latest first" ordering:
+      const updatedBlessings = [
+        { ...newBless, blockTimestamp: newBless.blockTimestamp || "" },
+        ...(prev.blessings || []),
+      ];
+      return {
+        ...prev,
+        blessings: updatedBlessings,
+      };
+    });
   };
 
   return (
     <>
-      <div>
-        <AppBar />
-        <div className="mt-12 flex flex-col items-center justify-center w-full">
-          <div className="flex flex-col items-center justify-center">
-            <div className="flex flex-col items-center justify-center border-x ">
-              <div>{creation && <Creation creation={creation} />}</div>
-              {/*
-              {creation?.stills && creation.stills.length > 0 && (
-                <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw]">
-                  <div className="col-span-1 flex flex-col mr-3">
-                    <Image
-                      src={"/abrahamlogo.png"}
-                      alt={"Abraham"}
-                      width={100}
-                      height={100}
-                      className="rounded-full aspect-[1] object-cover border"
-                    />
-                  </div>
-                  <div className="col-span-11 flex flex-col pr-4">
-                    <div className="grid grid-cols-12 ">
-                      <div className="col-span-9 flex flex-col mr-0.5 mt-2">
-                     
-                        <div className="flex flex-col items-center">
-                          <div className="flex items-center justify-center">
-                            <div>
-                              <Image
-                                src={creation.stills[currentIndex]}
-                                alt="still"
-                                className="rounded-lg w-auto h-72 object-cover"
-                                width={500}
-                                height={500}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-             
-              */}
-              <div>
-                <Blessings
-                  blessings={
-                    creation?.blessings.map((b) => ({
-                      ...b,
-                      user: b.userAddress,
-                      blessing: b.message,
-                    })) || []
-                  }
-                />
-              </div>
+      <AppBar />
+
+      <div className="mt-12 flex flex-col items-center justify-center w-full">
+        <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center justify-center border-x ">
+            {/* The main creation component */}
+            {creation && (
+              <Creation creation={creation} onNewBlessing={handleNewBlessing} />
+            )}
+
+            {/* 
+              Render the blessings in "latest first" order.
+              If your subgraph includes blockTimestamp, we can sort by it.
+              For example:
+            */}
+            <div>
+              <Blessings
+                blessings={
+                  creation?.blessings
+                    ?.slice() // shallow copy
+                    .sort(
+                      (a, b) =>
+                        // parseInt(b.blockTimestamp) - parseInt(a.blockTimestamp)
+                        // If you have blockTimestamp as a string
+                        // or if blockTimestamp is missing, remove the parse
+                        parseInt(b.blockTimestamp || "0", 10) -
+                        parseInt(a.blockTimestamp || "0", 10)
+                    ) || []
+                }
+              />
             </div>
           </div>
         </div>

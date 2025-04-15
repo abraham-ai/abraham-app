@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { AbrahamEthAbi } from "@/lib/abis/AbrahamEth"; // Ensure this ABI includes all necessary functions
+import { AbrahamEthAbi } from "@/lib/abis/AbrahamEth";
 import { MannaAbi } from "@/lib/abis/Manna";
 import {
   createPublicClient,
@@ -13,7 +13,7 @@ import {
 } from "viem";
 import { Chain } from "viem/chains";
 
-// Define the blockchain network configuration (Base Sepolia)
+// Your chain config for Base Sepolia
 const baseSepolia = {
   id: 84532,
   name: "Base Sepolia",
@@ -31,7 +31,7 @@ const baseSepolia = {
   },
 } as const satisfies Chain;
 
-// **Updated Abraham Contract Address**
+// Addresses
 const ABRAHAM_ADDRESS = process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS || "";
 const MANNA_ADDRESS = process.env.NEXT_PUBLIC_MANNA_ADDRESS || "";
 
@@ -62,7 +62,7 @@ export function useAbrahamTransactions() {
     }
   }, [provider]);
 
-  // Fetch Balances when Provider and Wallet Client are ready
+  // Fetch Manna + Contract Balances
   useEffect(() => {
     if (provider && walletClient) {
       getMannaBalance();
@@ -72,19 +72,19 @@ export function useAbrahamTransactions() {
   }, [provider, walletClient]);
 
   /**
-   * Fetches the Manna balance of the connected user.
+   * Fetch the user’s Manna balance.
    */
   const getMannaBalance = async () => {
     if (!publicClient || !walletClient) return;
     try {
       const [address] = await walletClient.getAddresses();
-      const balance = await publicClient.readContract({
+      const balanceData = await publicClient.readContract({
         address: MANNA_ADDRESS as `0x${string}`,
         abi: MannaAbi,
         functionName: "balanceOf",
         args: [address],
       });
-      const balanceValue = balance as bigint;
+      const balanceValue = balanceData as bigint;
       const formattedBalance = formatUnits(balanceValue, 18);
       setMannaBalance(formattedBalance);
       return formattedBalance;
@@ -94,7 +94,7 @@ export function useAbrahamTransactions() {
   };
 
   /**
-   * Fetches the contract's Manna and Ether balances.
+   * Fetch the Manna & ETH in the contract. Just for reference.
    */
   const getContractBalances = async () => {
     if (!publicClient) return;
@@ -119,28 +119,30 @@ export function useAbrahamTransactions() {
   };
 
   /**
-   * Make a reaction a creation.
-   * Uses Account Abstraction if available; otherwise, normal contract write.
+   * Sends a reaction (praise, burn, bless) to the Abraham contract.
+   *
+   * @param creationId ID of the creation
+   * @param reactionType "praise" | "burn" | "bless"
+   * @param message Optional text (used for blessings)
+   * @param costInEth The base cost in Ether for a praise. If bless, we multiply by 5.
    */
   const makeReaction = async (
     creationId: number,
     reactionType: string,
-    message: string
+    message: string,
+    costInEth: number
   ) => {
-    //praise = 0, burn = 1, bless = 2
-    const reactionTypeInt =
-      reactionType === "praise" ? 0 : reactionType === "burn" ? 1 : 2;
-    //const allowance = await getMannaAllowance();
-    // For example, if each reaction costs 10 Manna, we can check:
-    //const needed = parseEther("10");
-
     if (!publicClient) return;
     try {
-      if (
-        accountAbstractionProvider &&
-        accountAbstractionProvider.smartAccount
-      ) {
-        // === 1) Account Abstraction Approach ===
+      const reactionTypeInt =
+        reactionType === "praise" ? 0 : reactionType === "burn" ? 1 : 2;
+
+      // If bless => cost is costInEth * 5; if burn, it’s the same as praise in your contract?
+      // (Your contract logic: burn uses same price as praise. Bless is 5X.)
+      const finalCost = reactionType === "bless" ? costInEth * 5 : costInEth;
+
+      if (accountAbstractionProvider?.smartAccount) {
+        // 1) Account Abstraction
         const bundlerClient = accountAbstractionProvider.bundlerClient!;
         const smartAccount = accountAbstractionProvider.smartAccount!;
         const userOpHash = await bundlerClient.sendUserOperation({
@@ -151,16 +153,13 @@ export function useAbrahamTransactions() {
               abi: AbrahamEthAbi,
               functionName: "react",
               args: [creationId, reactionTypeInt, message],
-              value: parseEther("0.002"),
+              value: parseEther(finalCost.toString()),
             },
           ],
         });
         await bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-        console.log(
-          `Praised creationId ${creationId} using Account Abstraction!`
-        );
       } else if (walletClient) {
-        // === 2) Fallback to External Wallet Approach ===
+        // 2) External Wallet
         const [address] = await walletClient.getAddresses();
         const txHash = await walletClient.writeContract({
           account: address,
@@ -168,37 +167,20 @@ export function useAbrahamTransactions() {
           abi: AbrahamEthAbi,
           functionName: "react",
           args: [creationId, reactionTypeInt, message],
-          value: parseEther("0.002"),
+          value: parseEther(finalCost.toString()),
         });
-        console.log("Praise transaction hash:", txHash);
         await publicClient.waitForTransactionReceipt({ hash: txHash });
-        console.log(`Praised creationId ${creationId} with external wallet!`);
       } else {
         throw new Error("No wallet or account abstraction provider available.");
       }
-      // Update Manna balance after praising
+
+      // Refresh Manna or do any post-transaction logic...
       await getMannaBalance();
     } catch (error) {
-      console.error("Error praising creation:", error);
+      console.error("Error reacting to creation:", error);
+      throw error;
     }
   };
-
-  // const getMannaAllowance = async () => {
-  //   if (!publicClient || !walletClient) return BigInt(0);
-  //   try {
-  //     const [address] = await walletClient.getAddresses();
-  //     const allowance = await publicClient.readContract({
-  //       address: MANNA_ADDRESS as `0x${string}`,
-  //       abi: MannaAbi,
-  //       functionName: "allowance",
-  //       args: [address, ABRAHAM_ADDRESS],
-  //     });
-  //     return allowance as bigint;
-  //   } catch (error) {
-  //     console.error("Error fetching allowance:", error);
-  //     return BigInt(0);
-  //   }
-  // };
 
   return {
     balance,
