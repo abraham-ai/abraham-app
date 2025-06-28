@@ -6,6 +6,7 @@ import AppBar from "@/components/layout/AppBar";
 import { CreationItem } from "@/types";
 import Blessings from "@/components/abraham/creations/Blessings";
 import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
 
 export default function CreationPage({ params }: { params: { id: string } }) {
   const [creation, setCreation] = useState<CreationItem | null>(null);
@@ -127,7 +128,38 @@ export default function CreationPage({ params }: { params: { id: string } }) {
             {creation && (
               <Creation creation={creation} onNewBlessing={handleNewBlessing} />
             )}
-
+            <div>
+              <div className="flex items-center justify-center mt-6">
+                <Image
+                  src="https://github.com/shadcn.png"
+                  alt="variation"
+                  width={120}
+                  height={140}
+                  className="m-1 rounded-lg"
+                />
+                <Image
+                  src="https://github.com/shadcn.png"
+                  alt="variation"
+                  width={120}
+                  height={140}
+                  className="m-1 rounded-lg"
+                />
+                <Image
+                  src="https://github.com/shadcn.png"
+                  alt="variation"
+                  width={120}
+                  height={140}
+                  className="m-1 rounded-lg"
+                />
+                <Image
+                  src="https://github.com/shadcn.png"
+                  alt="variation"
+                  width={120}
+                  height={140}
+                  className="m-1 rounded-lg"
+                />
+              </div>
+            </div>
             {/* 
               Render the blessings in "latest first" order.
               If your subgraph includes blockTimestamp, we can sort by it.
