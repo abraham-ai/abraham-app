@@ -23,8 +23,8 @@ const baseSepolia = {
     symbol: "ETH",
   },
   rpcUrls: {
-    default: { http: ["https://rpc.ankr.com/base_sepolia"] },
-    public: { http: ["https://rpc.ankr.com/base_sepolia"] },
+    default: { http: [process.env.NEXT_PUBLIC_RPC_URL || ""] },
+    public: { http: [process.env.NEXT_PUBLIC_RPC_URL || ""] },
   },
   blockExplorers: {
     default: { name: "BaseScan", url: "https://sepolia.basescan.org" },
