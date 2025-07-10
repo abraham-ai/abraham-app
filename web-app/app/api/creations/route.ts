@@ -1,7 +1,7 @@
 // app/api/creations/route.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { CreationItem, SubgraphCreation, Metadata } from "@/web-app/types";
+import { CreationItem, SubgraphCreation, Metadata } from "@/types";
 
 // Environment variable for GraphQL endpoint
 const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "";

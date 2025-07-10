@@ -11,8 +11,8 @@ import {
   web3auth,
   configureWeb3AuthAdapters,
   accountAbstractionProvider,
-} from "@/web-app/lib/web3AuthConfig";
-import RPC from "@/web-app/lib/ethersRPC";
+} from "@/lib/web3AuthConfig";
+import RPC from "@/lib/ethersRPC";
 import { AccountAbstractionProvider } from "@web3auth/account-abstraction-provider";
 
 // Define the AuthContext type

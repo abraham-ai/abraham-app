@@ -3,9 +3,9 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Creation from "@/components/abraham/creations/Creation";
 import AppBar from "@/components/layout/AppBar";
-import { CreationItem } from "@/web-app/types";
+import { CreationItem } from "@/types";
 import Blessings from "@/components/abraham/creations/Blessings";
-import { useAuth } from "@/web-app/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 
 export default function CreationPage({ params }: { params: { id: string } }) {

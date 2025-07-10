@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useAuth } from "@/web-app/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ import {
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { Button } from "@/components/ui/button";
 import { Loader2Icon, CoinsIcon } from "lucide-react";
-import { useManna } from "@/web-app/context/MannaContext";
+import { useManna } from "@/context/MannaContext";
 import { GetMannaDialog } from "@/components/account/GetMannaDialog";
 
 function AccountMenu() {

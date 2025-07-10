@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { AuthProvider } from "@/web-app/context/AuthContext";
-import { MannaProvider } from "@/web-app/context/MannaContext";
+import { AuthProvider } from "@/context/AuthContext";
+import { MannaProvider } from "@/context/MannaContext";
 import { MiniKitProvider } from "@coinbase/onchainkit/minikit";
 import { base } from "viem/chains";
 

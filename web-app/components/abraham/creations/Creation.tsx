@@ -6,11 +6,11 @@ import Link from "next/link";
 import { Loader2Icon } from "lucide-react";
 import { ethers } from "ethers";
 
-import { CreationItem } from "@/web-app/types";
-import { useAuth } from "@/web-app/context/AuthContext";
-import { useMannaTransactions } from "@/web-app/hooks/useMannaTransactions";
-import { useAbrahamTransactions } from "@/web-app/hooks/useAbrahamTransactions";
-import { useManna } from "@/web-app/context/MannaContext";
+import { CreationItem } from "@/types";
+import { useAuth } from "@/context/AuthContext";
+import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useAbrahamTransactions } from "@/hooks/useAbrahamTransactions";
+import { useManna } from "@/context/MannaContext";
 import BlessDialog from "./BlessDialog";
 
 import {

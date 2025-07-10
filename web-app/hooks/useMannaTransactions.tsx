@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useAuth } from "@/web-app/context/AuthContext";
-import { AbrahamAbi } from "@/web-app/lib/abis/Abraham"; // Ensure this ABI includes all necessary functions
-import { MannaAbi } from "@/web-app/lib/abis/Manna";
+import { useAuth } from "@/context/AuthContext";
+import { AbrahamAbi } from "@/lib/abis/Abraham"; // Ensure this ABI includes all necessary functions
+import { MannaAbi } from "@/lib/abis/Manna";
 import {
   createPublicClient,
   createWalletClient,

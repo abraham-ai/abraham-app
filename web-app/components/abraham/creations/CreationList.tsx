@@ -1,6 +1,6 @@
 // components/abraham/creations/CreationList.tsx
 import React from "react";
-import { CreationItem } from "@/web-app/types";
+import { CreationItem } from "@/types";
 import Creation from "./Creation";
 
 interface CreationListProps {

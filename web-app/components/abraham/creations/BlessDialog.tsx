@@ -8,12 +8,12 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useAuth } from "@/web-app/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
-import { useMannaTransactions } from "@/web-app/hooks/useMannaTransactions";
-import { useAbrahamTransactions } from "@/web-app/hooks/useAbrahamTransactions";
-import { CreationItem } from "@/web-app/types";
+import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useAbrahamTransactions } from "@/hooks/useAbrahamTransactions";
+import { CreationItem } from "@/types";
 import { ethers } from "ethers";
 
 interface BlessDialogProps {

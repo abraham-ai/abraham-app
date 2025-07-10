@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react";
 import CreationList from "@/components/abraham/creations/CreationList";
 import AppBar from "@/components/layout/AppBar";
-import { CreationItem } from "@/web-app/types";
-import { useAuth } from "@/web-app/context/AuthContext";
+import { CreationItem } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 import { Loader2Icon, CircleXIcon } from "lucide-react";
 
 export default function Home() {

@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
-import { Blessing } from "@/web-app/types";
+import { Blessing } from "@/types";
 
 /** Utility to shorten addresses like 0x1234...ABCD. Adjust length as needed. */
 function shortAddress(addr: string, frontLen: number = 6, endLen: number = 4) {
