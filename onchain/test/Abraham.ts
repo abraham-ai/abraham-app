@@ -48,9 +48,9 @@ describe("Abraham contract", () => {
 
     it("reverts if non-owner tries", async () => {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await expect(
-        contract.connect(user1).createSession("hack", "ipfs://bad")
-      ).to.be.revertedWith("Ownable: caller is not the owner");
+      await expect(contract.connect(user1).createSession("hack", "ipfs://bad"))
+        .to.be.revertedWithCustomError(contract, "OwnableUnauthorizedAccount")
+        .withArgs(user1.address);
     });
 
     it("reverts if media is empty", async () => {
@@ -88,9 +88,9 @@ describe("Abraham contract", () => {
     it("reverts if non-owner calls", async () => {
       const { contract, user1 } = await loadFixture(deployFixture);
       await contract.createSession("v1", "ipfs://a");
-      await expect(
-        contract.connect(user1).abrahamUpdate(1, "evil", "ipfs://b")
-      ).to.be.revertedWith("Ownable: caller is not the owner");
+      await expect(contract.connect(user1).createSession("hack", "ipfs://bad"))
+        .to.be.revertedWithCustomError(contract, "OwnableUnauthorizedAccount")
+        .withArgs(user1.address);
     });
   });
 
@@ -207,9 +207,9 @@ describe("Abraham contract", () => {
 
     it("reverts if non-owner calls", async () => {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await expect(contract.connect(user1).withdraw()).to.be.revertedWith(
-        "Ownable: caller is not the owner"
-      );
+      await expect(contract.connect(user1).createSession("hack", "ipfs://bad"))
+        .to.be.revertedWithCustomError(contract, "OwnableUnauthorizedAccount")
+        .withArgs(user1.address);
     });
   });
 
@@ -225,7 +225,8 @@ describe("Abraham contract", () => {
       await contract.connect(user2).praise(1, 0, { value: PRAISE_PRICE });
 
       const praisers = await contract.getPraisers(1, 0);
-      expect(praisers).to.have.members([user1.address, user2.address]);
+      const praisersArr = [...praisers]; // unwrap the read-only Result
+      expect(praisersArr).to.have.members([user1.address, user2.address]);
     });
   });
 });

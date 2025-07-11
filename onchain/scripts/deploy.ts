@@ -1,36 +1,34 @@
+// scripts/deploy.ts  (TypeScript / CommonJS mix keeps your original style)
 const hre = require("hardhat");
 import * as dotenv from "dotenv";
-
 dotenv.config();
 
-const contractOwner = process.env.CONTRACT_OWNER;
+const contractOwner = process.env.CONTRACT_OWNER; // desired final owner
 
 async function main() {
-  if (!contractOwner) {
-    throw new Error("CONTRACT_OWNER not set in .env");
-  }
+  if (!contractOwner) throw new Error("CONTRACT_OWNER not set in .env");
 
-  // Deploy Abraham contract
-  const abraham = await deployAbraham(contractOwner);
+  const [deployer] = await hre.ethers.getSigners();
+  console.log(`🚀 Deploying from: ${deployer.address}`);
 
-  console.log("Deployment complete.");
-  console.log(`Abraham deployed at: ${await abraham.getAddress()}`);
-}
-
-async function deployAbraham(initialOwner: string) {
+  // 1️⃣ deploy (deployer is temporary owner)
   const Abraham = await hre.ethers.getContractFactory("Abraham");
-  // Abraham's constructor takes (string uri, address initialOwner)
-  const metadataURI = "https://example.com/metadata";
-  const abraham = await Abraham.deploy(metadataURI, initialOwner);
-
+  const abraham = await Abraham.deploy();
   await abraham.waitForDeployment();
+  console.log(`✅ Abraham deployed at: ${await abraham.getAddress()}`);
 
-  console.log(`Abraham deployed at: ${await abraham.getAddress()}`);
-  return abraham;
+  // 2️⃣ hand over ownership if needed
+  if (deployer.address.toLowerCase() !== contractOwner.toLowerCase()) {
+    console.log(`🔄 Transferring ownership to ${contractOwner} …`);
+    const tx = await abraham.transferOwnership(contractOwner);
+    await tx.wait();
+    console.log("🎉 Ownership transferred.");
+  } else {
+    console.log("ℹ️ Deployer is already the desired owner.");
+  }
 }
 
-// Execute the deployment script
-main().catch((error) => {
-  console.error("Error deploying contracts:", error);
+main().catch((err) => {
+  console.error("Error deploying contracts:", err);
   process.exitCode = 1;
 });
