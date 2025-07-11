@@ -1,143 +1,61 @@
 // app/api/creations/route.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { CreationItem, SubgraphCreation, Metadata } from "@/types";
+import { NextRequest, NextResponse } from "next/server";
+import { CreationItem, SubgraphCreation } from "@/types/abraham";
 
-// Environment variable for GraphQL endpoint
-const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "";
+const ENDPOINT =
+  "https://api.studio.thegraph.com/query/102152/abraham/version/latest";
 
-// GraphQL query to fetch creations
-const GET_CREATIONS_QUERY = `
-  query GetCreations($first: Int!) {
-    creations(first: $first, orderBy: creationId, orderDirection: desc) {
+const LIST_QUERY = `
+  query AllCreations($first:Int!) {
+    creations(first:$first,orderBy:id,orderDirection:desc) {
       id
-      creationId
-      metadataUri
-      totalEthUsed
-      blessCount
-      praiseCount
-      burnCount
-      currentPriceToPraise
-      createdAt
-      updatedAt
-      praises {
-        userAddress
-        noOfPraises
-        ethUsed
+      abrahamMessageCount
+      blessingCount
+      ethSpentTotal
+      abrahamMessages(orderBy:index,orderDirection:desc,first:1){
+        index content media praiseCount
       }
-      burns {
-        userAddress
-        noOfBurns
-        ethUsed
-      }
-      blessings {
-        userAddress
-        message
-        ethUsed
-      }
+      blessings{ author content praiseCount timestamp }
     }
-  }
-`;
+  }`;
 
-// Revalidation setting (optional)
-export const revalidate = 0;
+export const revalidate = 0; // always fresh
 
-// Define the GET handler
-export async function GET(request: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    // Fetch creations from the GraphQL endpoint
-    const response = await fetch(GRAPHQL_ENDPOINT, {
+    const res = await fetch(ENDPOINT, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        query: GET_CREATIONS_QUERY,
-        variables: {
-          first: 100, // Adjust based on expected number of creations
-        },
+        query: LIST_QUERY,
+        variables: { first: 100 },
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Network response was not ok: ${response.statusText}`);
-    }
+    const { data, errors } = await res.json();
+    if (errors) throw new Error(errors.map((e: any) => e.message).join(","));
 
-    const { data, errors } = await response.json();
+    const creations: CreationItem[] = (
+      data.creations as SubgraphCreation[]
+    ).map((c) => {
+      const msg = c.abrahamMessages[0]; // last AbrahamMessage
+      const http = msg.media.replace(/^ipfs:\/\//, "https://ipfs.io/ipfs/");
+      return {
+        id: c.id,
+        image: http,
+        description: msg.content,
+        ethTotal:
+          Number((BigInt(c.ethSpentTotal) / BigInt(1e14)).toString()) / 1e4, // wei→ETH float, keep 4dec
+        praiseCount: msg.praiseCount,
+        blessingCnt: c.blessingCount,
+        blessings: c.blessings,
+      };
+    });
 
-    if (errors) {
-      console.error("GraphQL Errors:", errors);
-      return NextResponse.json(
-        { error: errors.map((err: any) => err.message).join(", ") },
-        { status: 500 }
-      );
-    }
-
-    if (data && data.creations) {
-      // Fetch metadata for each creation
-      const creationsWithMetadata: CreationItem[] = await Promise.all(
-        data.creations.map(async (creation: SubgraphCreation) => {
-          try {
-            // Extract CID from metadataUri
-            const cid = creation.metadataUri.replace(
-              /^ipfs:\/\/|^https:\/\/[^/]+\/ipfs\//,
-              ""
-            );
-            //console.log("CID:", cid);
-
-            // Fetch metadata from IPFS
-            const metadataResponse = await fetch(`https://ipfs.io/ipfs/${cid}`);
-            if (!metadataResponse.ok) {
-              throw new Error(
-                `Failed to fetch metadata: ${metadataResponse.statusText}`
-              );
-            }
-
-            const metadata: Metadata = await metadataResponse.json();
-            const imageCid = metadata.image.replace(
-              /^ipfs:\/\/|^https:\/\/[^/]+\/ipfs\//,
-              ""
-            );
-
-            return {
-              ...creation,
-              title: metadata.title,
-              description: metadata.description,
-              visual_aesthetic: metadata.visual_aesthetic,
-              image: `https://ipfs.io/ipfs/${imageCid}`,
-            };
-          } catch (metaError: any) {
-            console.error(
-              `Error fetching metadata for creationId ${creation.creationId}:`,
-              metaError
-            );
-            // Provide default values if metadata fetch fails
-            return {
-              ...creation,
-              title: "Unknown Title",
-              description: "No description available.",
-              visual_aesthetic: "Unknown",
-              image:
-                "https://ipfs.io/ipfs/bafybeifrq3n5h4onservz3jlcwaeodiy5izwodbxs3ce4z6x5k4i2z4qwy", // Ensure this image exists or replace with a valid URL
-            };
-          }
-        })
-      );
-
-      return NextResponse.json(
-        { creations: creationsWithMetadata },
-        { status: 200 }
-      );
-    } else {
-      return NextResponse.json(
-        { error: "No data returned from GraphQL query." },
-        { status: 500 }
-      );
-    }
-  } catch (err: any) {
-    console.error("Fetch Error:", err);
+    return NextResponse.json({ creations }, { status: 200 });
+  } catch (e: any) {
     return NextResponse.json(
-      { error: err.message || "An unknown error occurred." },
+      { error: e.message ?? "fetch failed" },
       { status: 500 }
     );
   }

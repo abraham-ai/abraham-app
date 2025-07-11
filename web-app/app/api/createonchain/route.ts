@@ -1,7 +1,7 @@
 // pages/api/create_creations.ts
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
-import { AbrahamAbi } from "@/lib/abis/Abraham"; // Ensure this ABI is correctly defined
+import { AbrahamAbi } from "@/lib/abis/legacy/Abraham"; // Ensure this ABI is correctly defined
 import { PinataSDK } from "pinata-web3";
 import fetch from "node-fetch";
 

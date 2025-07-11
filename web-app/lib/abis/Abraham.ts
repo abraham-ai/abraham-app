@@ -1,126 +1,8 @@
 export const AbrahamAbi = [
   {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_manna",
-        type: "address",
-      },
-      {
-        internalType: "string",
-        name: "uri_",
-        type: "string",
-      },
-      {
-        internalType: "address",
-        name: "initialOwner",
-        type: "address",
-      },
-    ],
+    inputs: [],
     stateMutability: "nonpayable",
     type: "constructor",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "sender",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "balance",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "needed",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
-      },
-    ],
-    name: "ERC1155InsufficientBalance",
-    type: "error",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "approver",
-        type: "address",
-      },
-    ],
-    name: "ERC1155InvalidApprover",
-    type: "error",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "idsLength",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "valuesLength",
-        type: "uint256",
-      },
-    ],
-    name: "ERC1155InvalidArrayLength",
-    type: "error",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "operator",
-        type: "address",
-      },
-    ],
-    name: "ERC1155InvalidOperator",
-    type: "error",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "receiver",
-        type: "address",
-      },
-    ],
-    name: "ERC1155InvalidReceiver",
-    type: "error",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "sender",
-        type: "address",
-      },
-    ],
-    name: "ERC1155InvalidSender",
-    type: "error",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "operator",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "owner",
-        type: "address",
-      },
-    ],
-    name: "ERC1155MissingApprovalForAll",
-    type: "error",
   },
   {
     inputs: [
@@ -145,29 +27,9 @@ export const AbrahamAbi = [
     type: "error",
   },
   {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
-        name: "account",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "operator",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "bool",
-        name: "approved",
-        type: "bool",
-      },
-    ],
-    name: "ApprovalForAll",
-    type: "event",
+    inputs: [],
+    name: "ReentrancyGuardReentrantCall",
+    type: "error",
   },
   {
     anonymous: false,
@@ -175,17 +37,35 @@ export const AbrahamAbi = [
       {
         indexed: true,
         internalType: "uint256",
-        name: "creationId",
+        name: "sessionId",
         type: "uint256",
+      },
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "messageIndex",
+        type: "uint256",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "author",
+        type: "address",
       },
       {
         indexed: false,
         internalType: "string",
-        name: "metadataUri",
+        name: "content",
+        type: "string",
+      },
+      {
+        indexed: false,
+        internalType: "string",
+        name: "media",
         type: "string",
       },
     ],
-    name: "CreationAdded",
+    name: "MessageAdded",
     type: "event",
   },
   {
@@ -213,35 +93,23 @@ export const AbrahamAbi = [
       {
         indexed: true,
         internalType: "uint256",
-        name: "creationId",
+        name: "sessionId",
+        type: "uint256",
+      },
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "messageIndex",
         type: "uint256",
       },
       {
         indexed: true,
         internalType: "address",
-        name: "user",
+        name: "praiser",
         type: "address",
       },
-      {
-        indexed: true,
-        internalType: "enum Abraham.ReactionType",
-        name: "action",
-        type: "uint8",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "pricePaid",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "string",
-        name: "message",
-        type: "string",
-      },
     ],
-    name: "Reacted",
+    name: "Praised",
     type: "event",
   },
   {
@@ -249,137 +117,26 @@ export const AbrahamAbi = [
     inputs: [
       {
         indexed: true,
-        internalType: "address",
-        name: "operator",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "from",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "to",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256[]",
-        name: "ids",
-        type: "uint256[]",
-      },
-      {
-        indexed: false,
-        internalType: "uint256[]",
-        name: "values",
-        type: "uint256[]",
+        internalType: "uint256",
+        name: "sessionId",
+        type: "uint256",
       },
     ],
-    name: "TransferBatch",
+    name: "SessionCreated",
     type: "event",
   },
   {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
-        name: "operator",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "from",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "to",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "id",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "value",
-        type: "uint256",
-      },
-    ],
-    name: "TransferSingle",
-    type: "event",
+    stateMutability: "payable",
+    type: "fallback",
   },
   {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "string",
-        name: "value",
-        type: "string",
-      },
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "id",
-        type: "uint256",
-      },
-    ],
-    name: "URI",
-    type: "event",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "account",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "id",
-        type: "uint256",
-      },
-    ],
-    name: "balanceOf",
+    inputs: [],
+    name: "BLESS_PRICE",
     outputs: [
       {
         internalType: "uint256",
         name: "",
         type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address[]",
-        name: "accounts",
-        type: "address[]",
-      },
-      {
-        internalType: "uint256[]",
-        name: "ids",
-        type: "uint256[]",
-      },
-    ],
-    name: "balanceOfBatch",
-    outputs: [
-      {
-        internalType: "uint256[]",
-        name: "",
-        type: "uint256[]",
       },
     ],
     stateMutability: "view",
@@ -387,7 +144,7 @@ export const AbrahamAbi = [
   },
   {
     inputs: [],
-    name: "creationCount",
+    name: "PRAISE_PRICE",
     outputs: [
       {
         internalType: "uint256",
@@ -402,200 +159,141 @@ export const AbrahamAbi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    name: "creations",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "id",
+        name: "sessionId",
         type: "uint256",
       },
       {
         internalType: "string",
-        name: "metadataUri",
+        name: "content",
         type: "string",
-      },
-      {
-        internalType: "uint256",
-        name: "praiseCount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "burnCount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "blessCount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "reactionCount",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-    ],
-    name: "getCreation",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "id",
-        type: "uint256",
       },
       {
         internalType: "string",
-        name: "creationUri",
-        type: "string",
-      },
-      {
-        internalType: "uint256",
-        name: "praiseCount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "burnCount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "blessCount",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-    ],
-    name: "getReactions",
-    outputs: [
-      {
-        components: [
-          {
-            internalType: "address",
-            name: "user",
-            type: "address",
-          },
-          {
-            internalType: "enum Abraham.ReactionType",
-            name: "action",
-            type: "uint8",
-          },
-          {
-            internalType: "string",
-            name: "message",
-            type: "string",
-          },
-          {
-            internalType: "uint256",
-            name: "pricePaid",
-            type: "uint256",
-          },
-        ],
-        internalType: "struct Abraham.Reaction[]",
-        name: "",
-        type: "tuple[]",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "initPraisePrice",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "account",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "operator",
-        type: "address",
-      },
-    ],
-    name: "isApprovedForAll",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "manna",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "name",
-    outputs: [
-      {
-        internalType: "string",
-        name: "",
+        name: "media",
         type: "string",
       },
     ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "string",
-        name: "metadataUri",
-        type: "string",
-      },
-    ],
-    name: "newCreation",
+    name: "abrahamUpdate",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "sessionId",
+        type: "uint256",
+      },
+      {
+        internalType: "string",
+        name: "content",
+        type: "string",
+      },
+    ],
+    name: "bless",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "content",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "media",
+        type: "string",
+      },
+    ],
+    name: "createSession",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "sessionId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "messageIndex",
+        type: "uint256",
+      },
+    ],
+    name: "getMessage",
+    outputs: [
+      {
+        internalType: "address",
+        name: "author",
+        type: "address",
+      },
+      {
+        internalType: "string",
+        name: "content",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "media",
+        type: "string",
+      },
+      {
+        internalType: "uint256",
+        name: "praiseCount",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "sessionId",
+        type: "uint256",
+      },
+    ],
+    name: "getMessageCount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "sessionId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "messageIndex",
+        type: "uint256",
+      },
+    ],
+    name: "getPraisers",
+    outputs: [
+      {
+        internalType: "address[]",
+        name: "",
+        type: "address[]",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -615,62 +313,18 @@ export const AbrahamAbi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "creationId",
+        name: "sessionId",
         type: "uint256",
       },
       {
-        internalType: "enum Abraham.ReactionType",
-        name: "reactionType",
-        type: "uint8",
-      },
-      {
-        internalType: "string",
-        name: "message",
-        type: "string",
+        internalType: "uint256",
+        name: "messageIndex",
+        type: "uint256",
       },
     ],
-    name: "react",
+    name: "praise",
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    name: "reactions",
-    outputs: [
-      {
-        internalType: "address",
-        name: "user",
-        type: "address",
-      },
-      {
-        internalType: "enum Abraham.ReactionType",
-        name: "action",
-        type: "uint8",
-      },
-      {
-        internalType: "string",
-        name: "message",
-        type: "string",
-      },
-      {
-        internalType: "uint256",
-        name: "pricePaid",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
+    stateMutability: "payable",
     type: "function",
   },
   {
@@ -681,50 +335,28 @@ export const AbrahamAbi = [
     type: "function",
   },
   {
-    inputs: [
+    inputs: [],
+    name: "sessionCount",
+    outputs: [
       {
-        internalType: "address",
-        name: "from",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "to",
-        type: "address",
-      },
-      {
-        internalType: "uint256[]",
-        name: "ids",
-        type: "uint256[]",
-      },
-      {
-        internalType: "uint256[]",
-        name: "values",
-        type: "uint256[]",
-      },
-      {
-        internalType: "bytes",
-        name: "data",
-        type: "bytes",
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
       },
     ],
-    name: "safeBatchTransferFrom",
-    outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
       {
-        internalType: "address",
-        name: "from",
-        type: "address",
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
       },
-      {
-        internalType: "address",
-        name: "to",
-        type: "address",
-      },
+    ],
+    name: "sessions",
+    outputs: [
       {
         internalType: "uint256",
         name: "id",
@@ -732,91 +364,8 @@ export const AbrahamAbi = [
       },
       {
         internalType: "uint256",
-        name: "value",
+        name: "messageCount",
         type: "uint256",
-      },
-      {
-        internalType: "bytes",
-        name: "data",
-        type: "bytes",
-      },
-    ],
-    name: "safeTransferFrom",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "operator",
-        type: "address",
-      },
-      {
-        internalType: "bool",
-        name: "approved",
-        type: "bool",
-      },
-    ],
-    name: "setApprovalForAll",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "newPrice",
-        type: "uint256",
-      },
-    ],
-    name: "setInitPraisePrice",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "string",
-        name: "newuri",
-        type: "string",
-      },
-    ],
-    name: "setURI",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "bytes4",
-        name: "interfaceId",
-        type: "bytes4",
-      },
-    ],
-    name: "supportsInterface",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "symbol",
-    outputs: [
-      {
-        internalType: "string",
-        name: "",
-        type: "string",
       },
     ],
     stateMutability: "view",
@@ -836,22 +385,14 @@ export const AbrahamAbi = [
     type: "function",
   },
   {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "creationId",
-        type: "uint256",
-      },
-    ],
-    name: "uri",
-    outputs: [
-      {
-        internalType: "string",
-        name: "",
-        type: "string",
-      },
-    ],
-    stateMutability: "view",
+    inputs: [],
+    name: "withdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
+  },
+  {
+    stateMutability: "payable",
+    type: "receive",
   },
 ];

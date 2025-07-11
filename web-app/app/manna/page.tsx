@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 

@@ -13,7 +13,7 @@ const clientId =
 const chainConfig = {
   chainNamespace: CHAIN_NAMESPACES.EIP155,
   chainId: "0x14a34", // Base Sepolia Testnet Chain ID
-  rpcTarget: process.env.NEXT_PUBLIC_RPC_URL || "",
+  rpcTarget: process.env.NEXT_PUBLIC_RPC_URL as string,
   displayName: "Base Sepolia Testnet",
   blockExplorerUrl: "https://sepolia.basescan.org",
   ticker: "ETH",

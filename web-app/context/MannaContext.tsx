@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState } from "react";
-import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
 
 interface MannaContextProps {
   balance: string;

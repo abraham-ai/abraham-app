@@ -11,7 +11,7 @@ export default function PraiseWrapper() {
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
 
 function PraisePage() {
   const router = useRouter();

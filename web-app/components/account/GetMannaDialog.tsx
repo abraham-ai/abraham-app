@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useMannaTransactions } from "@/hooks/useMannaTransactions";
+import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
 import { useManna } from "@/context/MannaContext";
 import { Loader2Icon } from "lucide-react";
 
