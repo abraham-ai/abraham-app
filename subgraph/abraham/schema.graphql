@@ -1,0 +1,38 @@
+type MessageAdded @entity(immutable: true) {
+  id: Bytes!
+  sessionId: BigInt! # uint256
+  messageIndex: BigInt! # uint256
+  author: Bytes! # address
+  content: String! # string
+  media: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OwnershipTransferred @entity(immutable: true) {
+  id: Bytes!
+  previousOwner: Bytes! # address
+  newOwner: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Praised @entity(immutable: true) {
+  id: Bytes!
+  sessionId: BigInt! # uint256
+  messageIndex: BigInt! # uint256
+  praiser: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type SessionCreated @entity(immutable: true) {
+  id: Bytes!
+  sessionId: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}

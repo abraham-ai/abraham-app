@@ -5,6 +5,7 @@ import "dotenv/config";
 import "@nomicfoundation/hardhat-verify";
 
 const privateKey = process.env.PRIVATE_KEY;
+const apiKey = process.env.ETHERSCAN_API_KEY;
 
 const config: HardhatUserConfig = {
   solidity: "0.8.28",
@@ -49,16 +50,14 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: {
-      "base-sepolia": "empty",
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY,
     customChains: [
       {
         network: "base-sepolia",
         chainId: 84532,
         urls: {
-          apiURL: "https://base-sepolia.blockscout.com/api",
-          browserURL: "https://base-sepolia.blockscout.com",
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org",
         },
       },
     ],
