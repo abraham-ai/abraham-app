@@ -1,19 +1,12 @@
+# ─── raw, immutable event mirrors ─────────────────────────
+
 type MessageAdded @entity(immutable: true) {
   id: Bytes!
-  sessionId: BigInt! # uint256
-  messageIndex: BigInt! # uint256
-  author: Bytes! # address
-  content: String! # string
-  media: String! # string
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type OwnershipTransferred @entity(immutable: true) {
-  id: Bytes!
-  previousOwner: Bytes! # address
-  newOwner: Bytes! # address
+  sessionId: BigInt!
+  messageIndex: BigInt!
+  author: Bytes!
+  content: String!
+  media: String!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -21,9 +14,9 @@ type OwnershipTransferred @entity(immutable: true) {
 
 type Praised @entity(immutable: true) {
   id: Bytes!
-  sessionId: BigInt! # uint256
-  messageIndex: BigInt! # uint256
-  praiser: Bytes! # address
+  sessionId: BigInt!
+  messageIndex: BigInt!
+  praiser: Bytes!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -31,8 +24,50 @@ type Praised @entity(immutable: true) {
 
 type SessionCreated @entity(immutable: true) {
   id: Bytes!
-  sessionId: BigInt! # uint256
+  sessionId: BigInt!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
+}
+
+# ─── domain model ─────────────────────────────────────────
+
+type Creation @entity(immutable: false) {
+  id: ID!
+  abrahamMessageCount: Int!
+  blessingCount: Int!
+  ethSpentPraise: BigInt!
+  ethSpentBless: BigInt!
+  ethSpentTotal: BigInt!
+
+  abrahamMessages: [AbrahamMessage!]! @derivedFrom(field: "creation")
+  blessings: [Blessing!]! @derivedFrom(field: "creation")
+}
+
+type AbrahamMessage @entity(immutable: false) {
+  id: ID!
+  creation: Creation!
+  index: Int!
+  content: String!
+  media: String!
+  praiseCount: Int!
+  praises: [Praise!] @derivedFrom(field: "abrahamMessage")
+}
+
+type Blessing @entity(immutable: false) {
+  id: ID!
+  creation: Creation!
+  index: Int!
+  author: Bytes!
+  content: String!
+  praiseCount: Int!
+  praises: [Praise!] @derivedFrom(field: "blessing")
+}
+
+type Praise @entity(immutable: true) {
+  id: ID!
+  abrahamMessage: AbrahamMessage
+  blessing: Blessing
+  praiser: Bytes!
+  timestamp: BigInt!
 }
