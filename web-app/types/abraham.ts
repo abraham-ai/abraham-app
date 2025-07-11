@@ -1,42 +1,44 @@
-/*──────────────────────────────*
- | Raw subgraph return types    |
- *──────────────────────────────*/
+/* ────────── Raw entity from subgraph ────────── */
 export interface SubgraphCreation {
-  id: string; // == sessionId
+  id: string;
+  createdAt: string;
   abrahamMessageCount: number;
   blessingCount: number;
-  ethSpentTotal: string; // wei
+  ethSpentTotal: string;
   abrahamMessages: {
     index: number;
     content: string;
-    media: string; // ipfs://… or https://…
+    media: string;
     praiseCount: number;
+    timestamp: string;
   }[];
   blessings: {
     author: string;
     content: string;
     praiseCount: number;
-    timestamp: string; // BigInt as string
-  }[];
-  praises: {
-    praiser: string;
     timestamp: string;
   }[];
 }
 
-/*──────────────────────────────*
- | Normalised for the UI        |
- *──────────────────────────────*/
+/* ────────── Normalised for the UI ────────── */
 export interface CreationItem {
   id: string;
-  // derived / formatted
-  image: string; // HTTP gateway URL for media
-  description: string; // AbrahamMessage.content
-  ethTotal: number; // ETH (not wei)
+  createdAt: string;
+  image: string;
+  description: string;
+  latestIndex: number;
+  msgTimestamp: string;
+
+  ethTotal: number;
   praiseCount: number;
   blessingCnt: number;
-  // raw
-  blessings: SubgraphCreation["blessings"];
+
+  blessings: {
+    author: string;
+    content: string;
+    praiseCount: number;
+    timestamp: string;
+  }[];
 }
-/* A single Blessing after mapping */
+
 export type Blessing = CreationItem["blessings"][number];

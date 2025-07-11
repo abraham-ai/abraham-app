@@ -34,12 +34,12 @@ type SessionCreated @entity(immutable: true) {
 
 type Creation @entity(immutable: false) {
   id: ID!
+  createdAt: BigInt!
   abrahamMessageCount: Int!
   blessingCount: Int!
   ethSpentPraise: BigInt!
   ethSpentBless: BigInt!
   ethSpentTotal: BigInt!
-
   abrahamMessages: [AbrahamMessage!]! @derivedFrom(field: "creation")
   blessings: [Blessing!]! @derivedFrom(field: "creation")
 }
@@ -50,6 +50,7 @@ type AbrahamMessage @entity(immutable: false) {
   index: Int!
   content: String!
   media: String!
+  timestamp: BigInt!
   praiseCount: Int!
   praises: [Praise!] @derivedFrom(field: "abrahamMessage")
 }
@@ -60,6 +61,7 @@ type Blessing @entity(immutable: false) {
   index: Int!
   author: Bytes!
   content: String!
+  timestamp: BigInt!
   praiseCount: Int!
   praises: [Praise!] @derivedFrom(field: "blessing")
 }

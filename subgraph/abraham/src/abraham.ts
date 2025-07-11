@@ -85,6 +85,7 @@ export function handleMessageAdded(e: MessageAddedEvent): void {
     am.content = e.params.content;
     am.media = e.params.media;
     am.praiseCount = 0;
+    am.timestamp = e.block.timestamp;
     am.save();
 
     creation.abrahamMessageCount = idx + 1;
@@ -95,10 +96,12 @@ export function handleMessageAdded(e: MessageAddedEvent): void {
     bl.author = e.params.author;
     bl.content = e.params.content;
     bl.praiseCount = 0;
+    bl.timestamp = e.block.timestamp;
     bl.save();
 
     creation.blessingCount += 1;
     creation.ethSpentBless = creation.ethSpentBless.plus(fee);
+    creation.createdAt = e.block.timestamp;
     creation.ethSpentTotal = creation.ethSpentTotal.plus(fee);
   }
 
