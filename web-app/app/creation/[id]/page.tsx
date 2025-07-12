@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { Loader2Icon, CircleXIcon } from "lucide-react";
 import axios from "axios";
 
@@ -14,16 +13,23 @@ import { useAuth } from "@/context/AuthContext";
 
 const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
+/* ───────────────────────────────────────────── types */
+interface MessageGroup {
+  abraham: SubgraphMessage;
+  blessings: SubgraphMessage[];
+}
+
+/* ───────────────────────────────────────────── page */
 export default function CreationPage({ params }: { params: { id: string } }) {
-  /* state */
   const { loggedIn, userAccounts } = useAuth();
+
   const [creation, setCreation] = useState<CreationItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* fetch */
+  /* fetch creation */
   useEffect(() => {
-    async function load() {
+    (async () => {
       setLoading(true);
       try {
         const { data } = await axios.get<CreationItem>(
@@ -31,41 +37,36 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         );
         setCreation(data);
         setError(null);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
         console.error(e);
-        setError(e.message ?? "Failed to load creation.");
+        setError(msg);
       } finally {
         setLoading(false);
       }
-    }
-    load();
+    })();
   }, [params.id, loggedIn, userAccounts]);
 
-  /* timeline grouping (latest Abraham first) */
-  const timeline = useMemo(() => {
+  /* build timeline */
+  const timeline: MessageGroup[] = useMemo(() => {
     if (!creation) return [];
-    const out: { abraham: SubgraphMessage; blessings: SubgraphMessage[] }[] =
-      [];
 
-    let current: {
-      abraham: SubgraphMessage;
-      blessings: SubgraphMessage[];
-    } | null = null;
+    const groups: MessageGroup[] = [];
+    let current: MessageGroup | null = null;
 
     creation.messages.forEach((m) => {
       if (m.author.toLowerCase() === OWNER) {
-        // start a new group
         current = { abraham: m, blessings: [] };
-        out.push(current);
+        groups.push(current);
       } else if (current) {
         current.blessings.push(m);
       }
     });
 
-    return out.reverse(); // latest Abraham group first
+    return groups.reverse(); // newest Abraham first
   }, [creation]);
 
-  /* live blessing insert */
+  /* optimistic live bless insert */
   const handleNewBlessing = (b: {
     userAddress: string;
     message: string;
@@ -111,16 +112,18 @@ export default function CreationPage({ params }: { params: { id: string } }) {
 
         {!loading && !error && creation && (
           <div className="flex flex-col items-center border-x">
-            {timeline.map((group, i) => (
-              <div key={i} className="w-full">
+            {timeline.map((group) => (
+              <div key={group.abraham.index} className="w-full">
                 {/* Abraham post */}
                 <CreationCard
                   creation={{
                     ...creation,
-                    image: group.abraham.media?.replace(
-                      /^ipfs:\/\//,
-                      "https://ipfs.io/ipfs/"
-                    )!,
+                    image: group.abraham.media
+                      ? group.abraham.media.replace(
+                          /^ipfs:\/\//,
+                          "https://ipfs.io/ipfs/"
+                        )
+                      : "",
                     description: group.abraham.content,
                     praiseCount: group.abraham.praiseCount,
                     messageIndex: group.abraham.index,
@@ -128,7 +131,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                   onNewBlessing={handleNewBlessing}
                 />
 
-                {/* blessings tied to that post */}
+                {/* Blessings for that post */}
                 <Blessings
                   blessings={[...group.blessings].sort(
                     (a, b) =>
