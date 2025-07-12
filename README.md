@@ -2,24 +2,22 @@
 
 _(only two things to remember)_
 
----
-
 ### 1. Start a brand-new Creation (session)
 
 1. Upload the **first image** to IPFS.
-   _Example result:_ `ipfs://bafybeih4…abc`
+   _Example result:_ `https://gateway.pinata.cloud/ipfs/bafybeih4…abc`
 
 2. Call **`createSession`** on the contract, passing:
 
 | Argument    | What to pass                                                                            |
 | ----------- | --------------------------------------------------------------------------------------- |
 | **content** | the text prompt / caption you want to store, e.g. `"Here is my first image about love"` |
-| **media**   | the IPFS URL from step 1, e.g. `"ipfs://bafybeih4…abc"`                                 |
+| **media**   | the IPFS URL from step 1, e.g. `"https://gateway.pinata.cloud/ipfs/bafybeih4…abc"`      |
 
 ```js
 await contract.createSession(
   "Here is my first image about love",
-  "ipfs://bafybeih4…abc"
+  "https://gateway.pinata.cloud/ipfs/bafybeih4…abc"
 );
 ```
 
@@ -33,23 +31,23 @@ That single call automatically:
 
 ### 2. Append a new Abraham message to an existing Creation
 
-1. Upload the **new version** (edited image) to IPFS → get `ipfs://…xyz`
+1. Upload the **new version** (edited image) to IPFS → get `https://gateway.pinata.cloud/ipfs/…xyz`
 
-2. Look up the session you want to extend (e.g. ID = `7`).
+2. Look up the session you want to extend (e.g. ID = `2`).
 
 3. Call **`abrahamUpdate`** with:
 
-| Argument      | Example                                     |
-| ------------- | ------------------------------------------- |
-| **sessionId** | `1`                                         |
-| **content**   | `"Updated the image: added a purple heart"` |
-| **media**     | `"ipfs://bafybeia6…xyz"`                    |
+| Argument      | Example                                             |
+| ------------- | --------------------------------------------------- |
+| **sessionId** | `2`                                                 |
+| **content**   | `"Updated the image: added a purple heart"`         |
+| **media**     | `"https://gateway.pinata.cloud/ipfs/bafybeia6…xyz"` |
 
 ```js
 await contract.abrahamUpdate(
-  1,
+  2,
   "Updated the image: added a purple heart",
-  "ipfs://bafybeia6…xyz"
+  "https://gateway.pinata.cloud/ipfs/bafybeia6…xyz"
 );
 ```
 
@@ -75,14 +73,14 @@ const contract = new ethers.Contract(ADDR, abi, signer);
 // ----- start a new Creation -----
 await contract.createSession(
   "Here is my first image about love",
-  "ipfs://bafybeih4…abc"
+  "https://gateway.pinata.cloud/ipfs/bafybeih4…abc"
 );
 
 // ----- update an existing Creation (id = 7) -----
 await contract.abrahamUpdate(
-  7,
+  2,
   "Updated the image: added a purple heart",
-  "ipfs://bafybeia6…xyz"
+  "https://gateway.pinata.cloud/ipfs/bafybeia6…xyz"
 );
 ```
 
@@ -100,7 +98,7 @@ query Timeline($owner: Bytes!, $firstCreations: Int!, $firstMsgs: Int!) {
       index # sequential position in this session
       author # 0x…
       content
-      media # ipfs://…  (null for user blessings)
+      media # https://gateway.pinata.cloud/ipfs/…  (null for user blessings)
       praiseCount # length of on-chain praiser array
       timestamp # block time, seconds
     }
@@ -139,7 +137,7 @@ POST https://api.studio.thegraph.com/query/102152/abraham/version/latest
             "index": 0,
             "author": "0x641f5f…", // Abraham
             "content": "here is my second creation, it’s about sports",
-            "media": "ipfs://bafy…def",
+            "media": "https://gateway.pinata.cloud/ipfs/bafy…def",
             "praiseCount": 1,
             "timestamp": "1720472405"
           },
