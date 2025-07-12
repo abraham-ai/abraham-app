@@ -1,0 +1,27 @@
+type Creation @entity(immutable: false) {
+  id: ID!
+  messageCount: Int!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  ethSpent: BigInt! # total wei (praises + blessings)
+  messages: [Message!]! @derivedFrom(field: "creation")
+}
+
+type Message @entity(immutable: false) {
+  id: ID!
+  creation: Creation!
+  index: Int!
+  author: Bytes!
+  content: String!
+  media: String
+  timestamp: BigInt! # when MessageAdded was emitted
+  praiseCount: Int!
+  praises: [Praise!]! @derivedFrom(field: "message")
+}
+
+type Praise @entity(immutable: true) {
+  id: ID!
+  message: Message!
+  praiser: Bytes!
+  timestamp: BigInt!
+}
