@@ -10,7 +10,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useAuth } from "@/context/AuthContext";
 import {
   useAbrahamContract,
@@ -39,29 +38,30 @@ export default function BlessDialog({
   setLocalTotalEthUsed,
   onNewBlessing,
 }: Props) {
-  const { loggedIn, login, loadingAuth, userAccounts, userInfo } = useAuth();
+  const { loggedIn, login, loadingAuth, userAccounts } = useAuth();
   const { bless } = useAbrahamContract();
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /* ------------------------------------------------ submit */
+  /* ---------------- submit ---------------- */
   const submit = async () => {
-    if (!loggedIn) return alert("Log in first.");
-    if (!text) return;
+    if (!loggedIn) return alert("Please log in first.");
+    if (!text.trim()) return;
 
     setLoading(true);
     try {
-      await bless(Number(creation.id), BLESS_PRICE_ETHER, text);
+      await bless(Number(creation.id), text.trim());
 
+      // optimistic UI updates
       setBlessingsCount(blessingsCount + 1);
       setLocalTotalEthUsed((e) => e + BLESS_PRICE_ETHER);
 
       onNewBlessing?.({
         userAddress: userAccounts ?? "",
-        message: text,
+        message: text.trim(),
         ethUsed: ethers.parseEther(BLESS_PRICE_ETHER.toString()).toString(),
-        blockTimestamp: Date.now().toString(),
+        blockTimestamp: Math.floor(Date.now() / 1000).toString(),
       });
     } catch (e) {
       console.error(e);
@@ -72,7 +72,7 @@ export default function BlessDialog({
     }
   };
 
-  /* ------------------------------------------------ UI */
+  /* ---------------- UI ---------------- */
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -102,8 +102,8 @@ export default function BlessDialog({
         {/* footer */}
         <DialogFooter>
           {loggedIn ? (
-            <Button onClick={submit} disabled={loading || !text}>
-              {loading ? "Blessing…" : `Bless (0.00002 ETH)`}
+            <Button onClick={submit} disabled={loading || !text.trim()}>
+              {loading ? "Blessing…" : `Bless (${BLESS_PRICE_ETHER} ETH)`}
             </Button>
           ) : (
             <Button onClick={login} disabled={loadingAuth}>

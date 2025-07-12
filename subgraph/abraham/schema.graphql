@@ -1,75 +1,27 @@
-# ─── raw, immutable event mirrors ─────────────────────────
-
-type MessageAdded @entity(immutable: true) {
-  id: Bytes!
-  sessionId: BigInt!
-  messageIndex: BigInt!
-  author: Bytes!
-  content: String!
-  media: String!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type Praised @entity(immutable: true) {
-  id: Bytes!
-  sessionId: BigInt!
-  messageIndex: BigInt!
-  praiser: Bytes!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type SessionCreated @entity(immutable: true) {
-  id: Bytes!
-  sessionId: BigInt!
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-# ─── domain model ─────────────────────────────────────────
-
 type Creation @entity(immutable: false) {
   id: ID!
+  messageCount: Int!
   createdAt: BigInt!
-  abrahamMessageCount: Int!
-  blessingCount: Int!
-  ethSpentPraise: BigInt!
-  ethSpentBless: BigInt!
-  ethSpentTotal: BigInt!
-  abrahamMessages: [AbrahamMessage!]! @derivedFrom(field: "creation")
-  blessings: [Blessing!]! @derivedFrom(field: "creation")
+  updatedAt: BigInt!
+  ethSpent: BigInt! # total wei (praises + blessings)
+  messages: [Message!]! @derivedFrom(field: "creation")
 }
 
-type AbrahamMessage @entity(immutable: false) {
-  id: ID!
-  creation: Creation!
-  index: Int!
-  content: String!
-  media: String!
-  timestamp: BigInt!
-  praiseCount: Int!
-  praises: [Praise!] @derivedFrom(field: "abrahamMessage")
-}
-
-type Blessing @entity(immutable: false) {
+type Message @entity(immutable: false) {
   id: ID!
   creation: Creation!
   index: Int!
   author: Bytes!
   content: String!
-  timestamp: BigInt!
+  media: String
+  timestamp: BigInt! # when MessageAdded was emitted
   praiseCount: Int!
-  praises: [Praise!] @derivedFrom(field: "blessing")
+  praises: [Praise!]! @derivedFrom(field: "message")
 }
 
 type Praise @entity(immutable: true) {
   id: ID!
-  abrahamMessage: AbrahamMessage
-  blessing: Blessing
+  message: Message!
   praiser: Bytes!
   timestamp: BigInt!
 }

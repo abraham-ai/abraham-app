@@ -1,32 +1,33 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Loader2Icon, CircleXIcon } from "lucide-react";
 import axios from "axios";
 
 import AppBar from "@/components/layout/AppBar";
-import Creation from "@/components/abraham/creations/Creation";
+import CreationCard from "@/components/abraham/creations/Creation";
 import Blessings from "@/components/abraham/creations/Blessings";
 
-import { CreationItem } from "@/types/abraham";
+import { CreationItem, SubgraphMessage } from "@/types/abraham";
 import { useAuth } from "@/context/AuthContext";
 
-export default function CreationPage({ params }: { params: { id: string } }) {
-  /* ─────────────────────────────── state */
-  const { loggedIn, userAccounts } = useAuth();
+const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
+export default function CreationPage({ params }: { params: { id: string } }) {
+  /* state */
+  const { loggedIn, userAccounts } = useAuth();
   const [creation, setCreation] = useState<CreationItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* ─────────────────────────────── fetch */
+  /* fetch */
   useEffect(() => {
-    const load = async () => {
+    async function load() {
       setLoading(true);
       try {
         const { data } = await axios.get<CreationItem>(
-          `/api/creations/${params.id}`
+          `/api/creations/creation?creationId=${params.id}`
         );
         setCreation(data);
         setError(null);
@@ -36,11 +37,35 @@ export default function CreationPage({ params }: { params: { id: string } }) {
       } finally {
         setLoading(false);
       }
-    };
+    }
     load();
   }, [params.id, loggedIn, userAccounts]);
 
-  /* ────────────────────────── live bless insert */
+  /* timeline grouping (latest Abraham first) */
+  const timeline = useMemo(() => {
+    if (!creation) return [];
+    const out: { abraham: SubgraphMessage; blessings: SubgraphMessage[] }[] =
+      [];
+
+    let current: {
+      abraham: SubgraphMessage;
+      blessings: SubgraphMessage[];
+    } | null = null;
+
+    creation.messages.forEach((m) => {
+      if (m.author.toLowerCase() === OWNER) {
+        // start a new group
+        current = { abraham: m, blessings: [] };
+        out.push(current);
+      } else if (current) {
+        current.blessings.push(m);
+      }
+    });
+
+    return out.reverse(); // latest Abraham group first
+  }, [creation]);
+
+  /* live blessing insert */
   const handleNewBlessing = (b: {
     userAddress: string;
     message: string;
@@ -65,13 +90,12 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         : prev
     );
 
-  /* ─────────────────────────────── render */
+  /* render */
   return (
     <>
       <AppBar />
 
       <main className="mt-12 flex flex-col items-center">
-        {/* spinners & errors */}
         {loading && (
           <div className="flex flex-col items-center mt-10">
             <Loader2Icon className="w-6 h-6 animate-spin text-primary" />
@@ -85,34 +109,35 @@ export default function CreationPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* actual page */}
         {!loading && !error && creation && (
           <div className="flex flex-col items-center border-x">
-            {/* main card */}
-            <Creation creation={creation} onNewBlessing={handleNewBlessing} />
-
-            {/* optional variations / placeholders */}
-            <div className="flex items-center justify-center mt-6">
-              {[1, 2, 3, 4].map((i) => (
-                <Image
-                  key={i}
-                  src="https://github.com/shadcn.png"
-                  alt="variation"
-                  width={120}
-                  height={140}
-                  className="m-1 rounded-lg"
+            {timeline.map((group, i) => (
+              <div key={i} className="w-full">
+                {/* Abraham post */}
+                <CreationCard
+                  creation={{
+                    ...creation,
+                    image: group.abraham.media?.replace(
+                      /^ipfs:\/\//,
+                      "https://ipfs.io/ipfs/"
+                    )!,
+                    description: group.abraham.content,
+                    praiseCount: group.abraham.praiseCount,
+                    messageIndex: group.abraham.index,
+                  }}
+                  onNewBlessing={handleNewBlessing}
                 />
-              ))}
-            </div>
 
-            {/* blessings list */}
-            <Blessings
-              blessings={[...creation.blessings].sort(
-                (a, b) =>
-                  parseInt(b.timestamp ?? "0", 10) -
-                  parseInt(a.timestamp ?? "0", 10)
-              )}
-            />
+                {/* blessings tied to that post */}
+                <Blessings
+                  blessings={[...group.blessings].sort(
+                    (a, b) =>
+                      parseInt(b.timestamp ?? "0", 10) -
+                      parseInt(a.timestamp ?? "0", 10)
+                  )}
+                />
+              </div>
+            ))}
           </div>
         )}
       </main>

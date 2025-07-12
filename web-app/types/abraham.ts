@@ -1,44 +1,42 @@
-/* ────────── Raw entity from subgraph ────────── */
+/* ---------- raw subgraph shapes ---------- */
+export interface SubgraphMessage {
+  index: number;
+  author: string;
+  content: string;
+  media: string | null;
+  praiseCount: number;
+  timestamp: string; // seconds since epoch
+}
+
 export interface SubgraphCreation {
   id: string;
-  createdAt: string;
-  abrahamMessageCount: number;
-  blessingCount: number;
-  ethSpentTotal: string;
-  abrahamMessages: {
-    index: number;
-    content: string;
-    media: string;
-    praiseCount: number;
-    timestamp: string;
-  }[];
-  blessings: {
-    author: string;
-    content: string;
-    praiseCount: number;
-    timestamp: string;
-  }[];
+  messageCount: number;
+  ethSpent: string; // BigInt (wei)
+  messages: SubgraphMessage[];
 }
 
-/* ────────── Normalised for the UI ────────── */
+/* ---------- UI shapes ---------- */
+export interface Blessing {
+  author: string;
+  content: string;
+  praiseCount: number;
+  timestamp?: string;
+}
+
 export interface CreationItem {
   id: string;
-  createdAt: string;
+
+  /* thumbnail info (latest Abraham msg) */
   image: string;
   description: string;
-  latestIndex: number;
-  msgTimestamp: string;
-
-  ethTotal: number;
   praiseCount: number;
+  messageIndex: number; // index of latest Abraham msg (needed for praise)
+
+  /* stats */
+  ethTotal: number;
   blessingCnt: number;
+  blessings: Blessing[];
 
-  blessings: {
-    author: string;
-    content: string;
-    praiseCount: number;
-    timestamp: string;
-  }[];
+  /* full chronological list (Abraham + blessings) */
+  messages: SubgraphMessage[]; // ← NEW
 }
-
-export type Blessing = CreationItem["blessings"][number];

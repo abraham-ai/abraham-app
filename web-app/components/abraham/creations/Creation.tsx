@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-interface CreationProps {
+interface Props {
   creation: CreationItem;
   onNewBlessing?: (b: {
     userAddress: string;
@@ -36,42 +36,24 @@ interface CreationProps {
   }) => void;
 }
 
-/* helper */
-const weiToEth = (wei: string) =>
-  parseFloat(ethers.formatEther(BigInt(wei || "0")));
-
-export default function Creation({ creation, onNewBlessing }: CreationProps) {
-  /* ------------------------------------------------------------------ hooks */
+export default function Creation({ creation, onNewBlessing }: Props) {
   const { loggedIn, login, loadingAuth, userAccounts } = useAuth();
   const { getMannaBalance } = useManna();
   const { praise } = useAbrahamContract();
 
-  /* ---------------------------------------------------------------- counters */
-  const [totalEthUsed, setTotalEthUsed] = useState<number>(creation.ethTotal);
-  const [totalPraises, setTotalPraises] = useState<number>(
-    creation.praiseCount
-  );
-  const [blessingsCnt, setBlessingsCnt] = useState<number>(
-    creation.blessingCnt
-  );
+  const [totalEthUsed, setTotalEthUsed] = useState(creation.ethTotal);
+  const [totalPraises, setTotalPraises] = useState(creation.praiseCount);
+  const [blessingsCnt, setBlessingsCnt] = useState(creation.blessingCnt);
 
-  const userAddr = userAccounts?.toLowerCase() || "";
-  const hasPraised =
-    creation.blessings.findIndex((b) => b.author.toLowerCase() === userAddr) >
-    -1;
-
-  /* ---------------------------------------------------------------- praise */
   const [loadingPraise, setLoadingPraise] = useState(false);
 
   const handlePraise = async () => {
     if (!loggedIn) return alert("Please log in first.");
     setLoadingPraise(true);
     try {
-      await praise(parseInt(creation.id, 10), PRAISE_PRICE_ETHER);
-
+      await praise(Number(creation.id), creation.messageIndex);
       setTotalPraises((p) => p + 1);
       setTotalEthUsed((e) => e + PRAISE_PRICE_ETHER);
-
       await getMannaBalance();
     } catch (e) {
       console.error(e);
@@ -81,10 +63,9 @@ export default function Creation({ creation, onNewBlessing }: CreationProps) {
     }
   };
 
-  /* ---------------------------------------------------------------- render */
   return (
     <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw] w-full">
-      {/* avatar / thumbnail */}
+      {/* avatar */}
       <Link href={`/creation/${creation.id}`} className="col-span-1 mr-3">
         <Image
           src="/abrahamlogo.png"
@@ -95,9 +76,8 @@ export default function Creation({ creation, onNewBlessing }: CreationProps) {
         />
       </Link>
 
-      {/* main */}
+      {/* content */}
       <div className="col-span-11 flex flex-col">
-        {/* description + image */}
         <Link href={`/creation/${creation.id}`} className="flex flex-col pr-8">
           <p className="mb-1">{creation.description}</p>
           <Image
@@ -109,32 +89,23 @@ export default function Creation({ creation, onNewBlessing }: CreationProps) {
           />
         </Link>
 
-        {/* action row */}
+        {/* actions */}
         <div className="flex items-center mt-6 mb-4">
-          {/* praise button */}
           <Dialog>
             <DialogTrigger asChild>
-              <button
-                className="text-gray-500 hover:text-blue-500"
-                title="Praise"
-              >
-                🙌
-              </button>
+              <button className="text-gray-500 hover:text-blue-500">🙌</button>
             </DialogTrigger>
+
             {loggedIn ? (
               <DialogContent className="bg-white">
                 <DialogHeader>
                   <DialogTitle>Praise Creation</DialogTitle>
                 </DialogHeader>
-                <div className="py-4 space-y-2 text-gray-600">
-                  <p>Cost to praise: {PRAISE_PRICE_ETHER.toFixed(5)} ETH</p>
+                <div className="py-4 text-gray-600">
+                  Cost: {PRAISE_PRICE_ETHER.toFixed(5)} ETH
                 </div>
                 <DialogFooter>
-                  <Button
-                    onClick={handlePraise}
-                    disabled={loadingPraise}
-                    className="flex items-center"
-                  >
+                  <Button onClick={handlePraise} disabled={loadingPraise}>
                     {loadingPraise && (
                       <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
                     )}
@@ -147,7 +118,7 @@ export default function Creation({ creation, onNewBlessing }: CreationProps) {
                 <DialogHeader>
                   <DialogTitle>Authentication Required</DialogTitle>
                   <DialogDescription>
-                    You need to log in to perform this action.
+                    Log in to perform this action.
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>

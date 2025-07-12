@@ -1,4 +1,3 @@
-"use client";
 import { useEffect, useState } from "react";
 import {
   createPublicClient,
@@ -10,15 +9,11 @@ import { Chain } from "viem/chains";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { useAuth } from "@/context/AuthContext";
 
-/* ────────── Chain config (Base Sepolia) ────────── */
+/* ---------- Base Sepolia ---------- */
 const baseSepolia = {
   id: 84532,
   name: "Base Sepolia",
-  nativeCurrency: {
-    decimals: 18,
-    name: "Base Sepolia ETH",
-    symbol: "ETH",
-  },
+  nativeCurrency: { decimals: 18, name: "Base Sepolia ETH", symbol: "ETH" },
   rpcUrls: {
     default: { http: [process.env.NEXT_PUBLIC_RPC_URL as string] },
     public: { http: [process.env.NEXT_PUBLIC_RPC_URL as string] },
@@ -28,18 +23,17 @@ const baseSepolia = {
   },
 } as const satisfies Chain;
 
-/* ────────── Contract constants ────────── */
-export const CONTRACT_ADDRESS = "0x0d70c061e12666968AAF839e7e507a96db16D6e7";
+/* ---------- Constants ---------- */
+export const CONTRACT_ADDRESS = "0x3667BD9cb464f4492899384c6f73908d6681EC78";
 export const PRAISE_PRICE_ETHER = 0.00001;
 export const BLESS_PRICE_ETHER = 0.00002;
 
-/* ────────── Hook ────────── */
+/* ---------- Hook ---------- */
 export function useAbrahamContract() {
   const { provider } = useAuth();
-  const [publicClient, setPC] = useState<any>(null);
-  const [walletClient, setWC] = useState<any>(null);
+  const [publicClient, setPC] = useState<any>();
+  const [walletClient, setWC] = useState<any>();
 
-  /* create viem clients once we have a provider */
   useEffect(() => {
     if (!provider) return;
     setPC(
@@ -50,32 +44,35 @@ export function useAbrahamContract() {
     );
   }, [provider]);
 
-  /** internal helper for both praise & bless */
-  async function sendTx(
-    fn: "praise" | "bless",
-    sessionId: number,
-    messageIndex: number,
-    content: string = ""
-  ) {
-    if (!publicClient || !walletClient) throw new Error("wallet not ready");
+  async function praise(sessionId: number, messageIdx: number) {
+    if (!walletClient) throw new Error("wallet not ready");
     const [sender] = await walletClient.getAddresses();
-    const valueEther = fn === "praise" ? PRAISE_PRICE_ETHER : BLESS_PRICE_ETHER;
-
-    const txHash = await walletClient.writeContract({
+    const hash = await walletClient.writeContract({
       account: sender,
       address: CONTRACT_ADDRESS as `0x${string}`,
       abi: AbrahamAbi,
-      functionName: fn,
-      args: fn === "praise" ? [sessionId, messageIndex] : [sessionId, content],
-      value: parseEther(valueEther.toString()),
+      functionName: "praise",
+      args: [sessionId, messageIdx],
+      value: parseEther(PRAISE_PRICE_ETHER.toString()),
     });
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
-    return txHash;
+    await publicClient!.waitForTransactionReceipt({ hash });
+    return hash;
   }
 
-  return {
-    praise: (sid: number, mid: number) => sendTx("praise", sid, mid),
-    bless: (sid: number, mid: number, msg: string) =>
-      sendTx("bless", sid, mid, msg),
-  };
+  async function bless(sessionId: number, content: string) {
+    if (!walletClient) throw new Error("wallet not ready");
+    const [sender] = await walletClient.getAddresses();
+    const hash = await walletClient.writeContract({
+      account: sender,
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      abi: AbrahamAbi,
+      functionName: "bless",
+      args: [sessionId, content],
+      value: parseEther(BLESS_PRICE_ETHER.toString()),
+    });
+    await publicClient!.waitForTransactionReceipt({ hash });
+    return hash;
+  }
+
+  return { praise, bless };
 }

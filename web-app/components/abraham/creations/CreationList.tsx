@@ -9,10 +9,10 @@ interface CreationListProps {
 
 export default function CreationList({ creations }: CreationListProps) {
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-4xl">
-      {creations.map((creation) => {
-        return <Creation key={creation.id} creation={creation} />;
-      })}
+    <div className="flex flex-col items-center w-full max-w-4xl">
+      {creations.map((c) => (
+        <Creation key={c.id} creation={c} />
+      ))}
     </div>
   );
 }

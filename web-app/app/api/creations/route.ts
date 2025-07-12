@@ -1,25 +1,36 @@
-// app/api/creations/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { CreationItem, SubgraphCreation } from "@/types/abraham";
+import {
+  CreationItem,
+  Blessing,
+  SubgraphCreation,
+  SubgraphMessage,
+} from "@/types/abraham";
 
+/* Graph endpoint */
 const ENDPOINT =
   "https://api.studio.thegraph.com/query/102152/abraham/version/latest";
 
-const LIST_QUERY = `
-  query AllCreations($first:Int!) {
-    creations(first:$first,orderBy:id,orderDirection:desc) {
+/* Query all creations + all messages */
+const LIST_QUERY = /* GraphQL */ `
+  query AllCreations($first: Int!, $msgLimit: Int!) {
+    creations(first: $first, orderBy: id, orderDirection: desc) {
       id
-      abrahamMessageCount
-      blessingCount
-      ethSpentTotal
-      abrahamMessages(orderBy:index,orderDirection:desc,first:1){
-        index content media praiseCount
+      messageCount
+      ethSpent
+      messages(orderBy: index, orderDirection: asc, first: $msgLimit) {
+        index
+        author
+        content
+        media
+        praiseCount
+        timestamp
       }
-      blessings{ author content praiseCount timestamp }
     }
-  }`;
+  }
+`;
 
-export const revalidate = 0; // always fresh
+export const revalidate = 0;
+const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
 export async function GET(_req: NextRequest) {
   try {
@@ -28,35 +39,43 @@ export async function GET(_req: NextRequest) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query: LIST_QUERY,
-        variables: { first: 100 },
+        variables: { first: 100, msgLimit: 200 },
       }),
     });
-
     const { data, errors } = await res.json();
     if (errors) throw new Error(errors.map((e: any) => e.message).join(","));
 
     const creations: CreationItem[] = (
       data.creations as SubgraphCreation[]
     ).map((c) => {
-      const msg = c.abrahamMessages[0]; // last AbrahamMessage
-      const http = msg.media.replace(/^ipfs:\/\//, "https://ipfs.io/ipfs/");
+      /* split Abraham vs blessings */
+      const abrahamMsgs = c.messages.filter(
+        (m) => m.author.toLowerCase() === OWNER
+      );
+      const blessingsRaw = c.messages.filter(
+        (m) => m.author.toLowerCase() !== OWNER
+      );
+
+      const latest = abrahamMsgs[abrahamMsgs.length - 1] as
+        | SubgraphMessage
+        | undefined;
+
       return {
         id: c.id,
-        image: http,
-        description: msg.content,
-        ethTotal:
-          Number((BigInt(c.ethSpentTotal) / BigInt(1e14)).toString()) / 1e4, // wei→ETH float, keep 4dec
-        praiseCount: msg.praiseCount,
-        blessingCnt: c.blessingCount,
-        blessings: c.blessings,
+        image:
+          latest?.media?.replace(/^ipfs:\/\//, "https://ipfs.io/ipfs/") ?? "",
+        description: latest?.content ?? "(no description)",
+        praiseCount: latest?.praiseCount ?? 0,
+        messageIndex: latest?.index ?? 0,
+        ethTotal: Number((BigInt(c.ethSpent) / BigInt(1e14)).toString()) / 1e4,
+        blessingCnt: blessingsRaw.length,
+        blessings: blessingsRaw as Blessing[],
+        messages: c.messages,
       };
     });
 
     return NextResponse.json({ creations }, { status: 200 });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e.message ?? "fetch failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
