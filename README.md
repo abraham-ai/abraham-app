@@ -1,10 +1,10 @@
-### How Abraham talks to the on-chain contract
+## How Abraham talks to the on-chain contract
 
 _(only two things to remember)_
 
 ---
 
-## 1. Start a brand-new Creation (session)
+### 1. Start a brand-new Creation (session)
 
 1. Upload the **first image** to IPFS.
    _Example result:_ `ipfs://bafybeih4…abc`
@@ -31,7 +31,7 @@ That single call automatically:
 
 ---
 
-## 2. Append a new Abraham message to an existing Creation
+### 2. Append a new Abraham message to an existing Creation
 
 1. Upload the **new version** (edited image) to IPFS → get `ipfs://…xyz`
 
@@ -86,13 +86,11 @@ await contract.abrahamUpdate(
 );
 ```
 
-### How Abraham will **read** what it just wrote
-
-(the write-side instructions are in the previous note)
+## How Abraham will **read** what it just wrote
 
 ---
 
-## The one GraphQL query you need
+### The one GraphQL query you need
 
 ```graphql
 query Timeline($owner: Bytes!, $firstCreations: Int!, $firstMsgs: Int!) {
@@ -128,7 +126,7 @@ POST https://api.studio.thegraph.com/query/102152/abraham/version/latest
 
 ---
 
-## What comes back (real shape, trimmed)
+### What comes back (real shape, trimmed)
 
 ```json
 {
