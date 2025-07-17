@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "@nomicfoundation/hardhat-verify": "^2.0.14"
+  },
+  "dependencies": {
+    "@privy-io/react-auth": "^2.18.1"
   }
 }
