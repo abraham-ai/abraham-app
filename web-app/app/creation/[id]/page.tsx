@@ -9,7 +9,7 @@ import CreationCard from "@/components/abraham/creations/Creation";
 import Blessings from "@/components/abraham/creations/Blessings";
 
 import { CreationItem, SubgraphMessage } from "@/types/abraham";
-import { useAuth } from "@/context/legacy/AuthContext";
+import { useAuth } from "@/context/auth-context";
 
 const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
@@ -21,8 +21,9 @@ interface MessageGroup {
 
 /* ───────────────────────────────────────────── page */
 export default function CreationPage({ params }: { params: { id: string } }) {
-  const { loggedIn, userAccounts } = useAuth();
-
+  const { loggedIn, authState } = useAuth();
+  const { walletAddress } = authState;
+  const userAddress = walletAddress?.toLowerCase();
   const [creation, setCreation] = useState<CreationItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         setLoading(false);
       }
     })();
-  }, [params.id, loggedIn, userAccounts]);
+  }, [params.id, loggedIn, userAddress]);
 
   /* build timeline */
   const timeline: MessageGroup[] = useMemo(() => {
