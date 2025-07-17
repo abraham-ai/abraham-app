@@ -7,12 +7,11 @@ import { Loader2Icon } from "lucide-react";
 import { ethers } from "ethers";
 
 import { CreationItem } from "@/types/abraham";
-import { useAuth } from "@/context/AuthContext";
-import { useManna } from "@/context/MannaContext";
+import { useAuth } from "@/context/auth-context";
 import {
   useAbrahamContract,
   PRAISE_PRICE_ETHER,
-} from "@/hooks/useAbrahamContract";
+} from "@/hooks/use-abraham-contract";
 import BlessDialog from "./BlessDialog";
 
 import {
@@ -37,8 +36,8 @@ interface Props {
 }
 
 export default function Creation({ creation, onNewBlessing }: Props) {
-  const { loggedIn, login, loadingAuth, userAccounts } = useAuth();
-  const { getMannaBalance } = useManna();
+  const { loggedIn, login, loadingAuth } = useAuth();
+
   const { praise } = useAbrahamContract();
 
   const [totalEthUsed, setTotalEthUsed] = useState(creation.ethTotal);
@@ -54,7 +53,6 @@ export default function Creation({ creation, onNewBlessing }: Props) {
       await praise(Number(creation.id), creation.messageIndex);
       setTotalPraises((p) => p + 1);
       setTotalEthUsed((e) => e + PRAISE_PRICE_ETHER);
-      await getMannaBalance();
     } catch (e) {
       console.error(e);
       alert("Transaction failed or cancelled.");

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { AuthProvider } from "@/context/AuthContext";
-import { MannaProvider } from "@/context/MannaContext";
+import { AuthProvider } from "@/context/auth-context";
 import { MiniKitProvider } from "@coinbase/onchainkit/minikit";
 import { base } from "viem/chains";
+import Providers from "@/Providers";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -74,15 +74,15 @@ export default function RootLayout({
           },
         }}
       >
-        <AuthProvider>
-          <MannaProvider>
+        <Providers>
+          <AuthProvider>
             <body
               className={`${geistSans.variable} ${geistMono.variable} antialiased`}
             >
               {children}
             </body>
-          </MannaProvider>
-        </AuthProvider>
+          </AuthProvider>
+        </Providers>
       </MiniKitProvider>
     </html>
   );

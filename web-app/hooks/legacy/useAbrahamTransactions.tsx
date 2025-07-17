@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/legacy/AuthContext";
 import { AbrahamEthAbi } from "@/lib/abis/legacy/AbrahamEth";
 import { MannaAbi } from "@/lib/abis/legacy/Manna";
 import {
