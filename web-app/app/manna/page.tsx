@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/legacy/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 export default function Manna() {

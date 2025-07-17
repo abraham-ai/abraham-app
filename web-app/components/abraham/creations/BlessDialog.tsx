@@ -10,11 +10,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth-context";
 import {
   useAbrahamContract,
   BLESS_PRICE_ETHER,
-} from "@/hooks/useAbrahamContract";
+} from "@/hooks/use-abraham-contract";
 import { CreationItem } from "@/types/abraham";
 import { ethers } from "ethers";
 
@@ -38,9 +38,11 @@ export default function BlessDialog({
   setLocalTotalEthUsed,
   onNewBlessing,
 }: Props) {
-  const { loggedIn, login, loadingAuth, userAccounts } = useAuth();
+  const { loggedIn, login, loadingAuth, authState } = useAuth();
   const { bless } = useAbrahamContract();
+  const { walletAddress } = authState;
 
+  const userAddress = walletAddress?.toLowerCase();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -58,7 +60,7 @@ export default function BlessDialog({
       setLocalTotalEthUsed((e) => e + BLESS_PRICE_ETHER);
 
       onNewBlessing?.({
-        userAddress: userAccounts ?? "",
+        userAddress: userAddress || "",
         message: text.trim(),
         ethUsed: ethers.parseEther(BLESS_PRICE_ETHER.toString()).toString(),
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),

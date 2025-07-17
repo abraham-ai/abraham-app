@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import CreationList from "@/components/abraham/creations/CreationList";
 import AppBar from "@/components/layout/AppBar";
 import { CreationItem } from "@/types/abraham";
-import { useAuth } from "@/context/AuthContext";
 import { Loader2Icon, CircleXIcon } from "lucide-react";
 
 export default function Home() {

@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
-import { useManna } from "@/context/MannaContext";
+import { useManna } from "@/context/legacy/MannaContext";
 import { Loader2Icon } from "lucide-react";
 
 export function GetMannaDialog() {

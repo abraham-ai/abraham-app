@@ -9,7 +9,7 @@ import CreationCard from "@/components/abraham/creations/Creation";
 import Blessings from "@/components/abraham/creations/Blessings";
 
 import { CreationItem, SubgraphMessage } from "@/types/abraham";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/legacy/AuthContext";
 
 const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 

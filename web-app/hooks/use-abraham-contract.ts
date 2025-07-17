@@ -1,52 +1,57 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import {
   createPublicClient,
   createWalletClient,
   custom,
+  http,
   parseEther,
 } from "viem";
-import { Chain } from "viem/chains";
+import { baseSepolia } from "@/lib/base-sepolia";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth-context";
 
-/* ---------- Base Sepolia ---------- */
-const baseSepolia = {
-  id: 84532,
-  name: "Base Sepolia",
-  nativeCurrency: { decimals: 18, name: "Base Sepolia ETH", symbol: "ETH" },
-  rpcUrls: {
-    default: { http: [process.env.NEXT_PUBLIC_RPC_URL as string] },
-    public: { http: [process.env.NEXT_PUBLIC_RPC_URL as string] },
-  },
-  blockExplorers: {
-    default: { name: "BaseScan", url: "https://sepolia.basescan.org" },
-  },
-} as const satisfies Chain;
-
-/* ---------- Constants ---------- */
+/* ---------- constants ---------- */
 export const CONTRACT_ADDRESS = "0x3667BD9cb464f4492899384c6f73908d6681EC78";
 export const PRAISE_PRICE_ETHER = 0.00001;
 export const BLESS_PRICE_ETHER = 0.00002;
 
-/* ---------- Hook ---------- */
+/* ---------- hook ---------- */
 export function useAbrahamContract() {
-  const { provider } = useAuth();
-  const [publicClient, setPC] = useState<any>();
-  const [walletClient, setWC] = useState<any>();
+  const { eip1193Provider } = useAuth();
+
+  /* read‑only client */
+  const [publicClient] = useState(() =>
+    createPublicClient({
+      chain: baseSepolia,
+      transport: http(baseSepolia.rpcUrls.default.http[0]),
+    })
+  );
+
+  /* wallet client (writes) */
+  const [walletClient, setWalletClient] = useState<ReturnType<
+    typeof createWalletClient
+  > | null>(null);
 
   useEffect(() => {
-    if (!provider) return;
-    setPC(
-      createPublicClient({ chain: baseSepolia, transport: custom(provider) })
+    if (!eip1193Provider) {
+      setWalletClient(null);
+      return;
+    }
+    setWalletClient(
+      createWalletClient({
+        chain: baseSepolia,
+        transport: custom(eip1193Provider),
+      })
     );
-    setWC(
-      createWalletClient({ chain: baseSepolia, transport: custom(provider) })
-    );
-  }, [provider]);
+  }, [eip1193Provider]);
 
-  async function praise(sessionId: number, messageIdx: number) {
+  /* ---------- contract methods ---------- */
+  const praise = async (sessionId: number, messageIdx: number) => {
     if (!walletClient) throw new Error("wallet not ready");
     const [sender] = await walletClient.getAddresses();
+
     const hash = await walletClient.writeContract({
       account: sender,
       address: CONTRACT_ADDRESS as `0x${string}`,
@@ -54,12 +59,14 @@ export function useAbrahamContract() {
       functionName: "praise",
       args: [sessionId, messageIdx],
       value: parseEther(PRAISE_PRICE_ETHER.toString()),
+      chain: baseSepolia,
     });
-    await publicClient!.waitForTransactionReceipt({ hash });
-    return hash;
-  }
 
-  async function bless(sessionId: number, content: string) {
+    await publicClient.waitForTransactionReceipt({ hash });
+    return hash;
+  };
+
+  const bless = async (sessionId: number, content: string) => {
     if (!walletClient) throw new Error("wallet not ready");
     const [sender] = await walletClient.getAddresses();
     const hash = await walletClient.writeContract({
@@ -69,10 +76,12 @@ export function useAbrahamContract() {
       functionName: "bless",
       args: [sessionId, content],
       value: parseEther(BLESS_PRICE_ETHER.toString()),
+      chain: baseSepolia,
     });
-    await publicClient!.waitForTransactionReceipt({ hash });
+
+    await publicClient.waitForTransactionReceipt({ hash });
     return hash;
-  }
+  };
 
   return { praise, bless };
 }
