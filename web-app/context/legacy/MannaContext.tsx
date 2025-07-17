@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState } from "react";
-import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
+//import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
 
 interface MannaContextProps {
   balance: string;
@@ -16,17 +16,18 @@ interface MannaProviderProps {
 }
 
 export const MannaProvider = ({ children }: MannaProviderProps) => {
-  const { getMannaBalance: fetchBalance } = useMannaTransactions();
+  //const { getMannaBalance: fetchBalance } = useMannaTransactions();
   const [balance, setBalance] = useState<string>("0");
 
   const getMannaBalance = async () => {
-    const newBalance = await fetchBalance();
-    if (typeof newBalance === "string") {
-      setBalance(newBalance);
-      console;
-    } else {
-      console.error("fetchBalance did not return a string");
-    }
+    //const newBalance = await fetchBalance();
+    // if (typeof newBalance === "string") {
+    //   // setBalance(newBalance);
+    //   // console;
+    // } else {
+    //   console.error("fetchBalance did not return a string");
+    // }
+    console.error("fetchBalance did not return a string");
   };
 
   return (

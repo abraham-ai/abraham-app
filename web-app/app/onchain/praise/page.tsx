@@ -11,13 +11,12 @@ export default function PraiseWrapper() {
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMannaTransactions } from "@/hooks/legacy/useMannaTransactions";
 
 function PraisePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const { makeReaction, getMannaBalance } = useMannaTransactions();
+  //const { makeReaction, getMannaBalance } = useMannaTransactions();
   const creationId = searchParams.get("creationId") || "";
 
   useEffect(() => {
@@ -32,22 +31,22 @@ function PraisePage() {
         const cost = BigInt("1000000000000000000"); // 1 Manna
 
         // 1) Check user’s Manna balance
-        const userBalance = await getMannaBalance();
-        if (!userBalance) {
-          alert("Error fetching Manna balance. Please try again.");
-          router.push(`/frames/${creationId}`);
-          return;
-        }
+        //const userBalance = await getMannaBalance();
+        // if (!userBalance) {
+        //   alert("Error fetching Manna balance. Please try again.");
+        //   router.push(`/frames/${creationId}`);
+        //   return;
+        // }
 
-        if (BigInt(userBalance) < cost) {
-          alert("You don't have enough Manna to Praise!");
-          router.push(`/frames/${creationId}`);
-          return;
-        }
+        // if (BigInt(userBalance) < cost) {
+        //   alert("You don't have enough Manna to Praise!");
+        //   router.push(`/frames/${creationId}`);
+        //   return;
+        // }
 
         // 2) On-chain praise
-        await makeReaction(parseInt(creationId, 10), "praise", "");
-        alert("Praise transaction completed!");
+        // await makeReaction(parseInt(creationId, 10), "praise", "");
+        // alert("Praise transaction completed!");
 
         // 3) Redirect
         router.push(`/frames/${creationId}`);
@@ -59,7 +58,7 @@ function PraisePage() {
     };
 
     doPraise();
-  }, [creationId, router, makeReaction, getMannaBalance]);
+  }, [creationId, router]);
 
   return (
     <div style={{ padding: "20px" }}>
