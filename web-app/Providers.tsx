@@ -1,6 +1,8 @@
 "use client";
 import React from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
+//import { baseSepolia } from "@/lib/base-sepolia";
+import { baseSepolia } from "viem/chains";
 
 type Props = {
   children: React.ReactNode;
@@ -13,7 +15,8 @@ export default function Providers({ children }: Props) {
       config={{
         // (Optional) Customize the login methods displayed to users upfront:
         loginMethods: ["email", "wallet", "google"],
-
+        defaultChain: baseSepolia,
+        supportedChains: [baseSepolia],
         appearance: {
           theme: "light",
           // Additional appearance customizations, e.g. brand color:

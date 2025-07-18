@@ -4,6 +4,8 @@ import React, { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Loader2Icon, CoinsIcon } from "lucide-react";
+import { useWallets } from "@privy-io/react-auth"; // Import useWallets
+import { baseSepolia } from "viem/chains";
 
 import {
   DropdownMenu,
@@ -22,13 +24,15 @@ import { useAuth } from "@/context/auth-context";
 
 function AccountMenu() {
   const { login, logout, loggedIn, loadingAuth, authState } = useAuth();
+  const { wallets } = useWallets();
   //const { balance, getMannaBalance } = useManna();
 
-  // useEffect(() => {
-  //   getMannaBalance();
-  // }, [getMannaBalance]);
-
-  /* ---------------------------------------------------------------------- */
+  useEffect(() => {
+    const wallet = wallets[0];
+    if (wallet && wallet.chainId !== `eip155:${baseSepolia.id}`) {
+      wallet.switchChain(baseSepolia.id);
+    }
+  }, [wallets]);
 
   if (loadingAuth) {
     return (
