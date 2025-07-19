@@ -1,19 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Loader2Icon } from "lucide-react";
-import { ethers } from "ethers";
-
-import { CreationItem } from "@/types/abraham";
+import type { CreationItem } from "@/types/abraham";
 import { useAuth } from "@/context/auth-context";
 import {
   useAbrahamContract,
   PRAISE_PRICE_ETHER,
 } from "@/hooks/use-abraham-contract";
 import BlessDialog from "./BlessDialog";
-
 import {
   Dialog,
   DialogContent,
@@ -24,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 
 interface Props {
   creation: CreationItem;
@@ -37,27 +35,40 @@ interface Props {
 
 export default function Creation({ creation, onNewBlessing }: Props) {
   const { loggedIn, login, loadingAuth } = useAuth();
-
   const { praise } = useAbrahamContract();
-
   const [totalEthUsed, setTotalEthUsed] = useState(creation.ethTotal);
   const [totalPraises, setTotalPraises] = useState(creation.praiseCount);
   const [blessingsCnt, setBlessingsCnt] = useState(creation.blessingCnt);
-
   const [loadingPraise, setLoadingPraise] = useState(false);
 
   const handlePraise = async () => {
-    if (!loggedIn) return alert("Please log in first.");
+    if (!loggedIn) {
+      showWarningToast(
+        "Authentication Required",
+        "Please log in to praise this creation."
+      );
+      return;
+    }
+
     setLoadingPraise(true);
     try {
       await praise(Number(creation.id), creation.messageIndex);
       setTotalPraises((p) => p + 1);
       setTotalEthUsed((e) => e + PRAISE_PRICE_ETHER);
-    } catch (e) {
-      console.error(e);
-      alert("Transaction failed or cancelled.");
+    } catch (error: any) {
+      console.error("Praise error:", error);
+      // Error toast is handled in the hook
     } finally {
       setLoadingPraise(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      await login();
+    } catch (error: any) {
+      console.error("Login error:", error);
+      showErrorToast(error, "Login Failed");
     }
   };
 
@@ -79,11 +90,15 @@ export default function Creation({ creation, onNewBlessing }: Props) {
         <Link href={`/creation/${creation.id}`} className="flex flex-col pr-8">
           <p className="mb-1">{creation.description}</p>
           <Image
-            src={creation.image}
+            src={creation.image || "/placeholder.svg"}
             alt="creation"
             width={500}
             height={300}
             className="w-full rounded-lg aspect-[5/4] object-cover mt-2 border"
+            onError={(e) => {
+              console.error("Image failed to load:", creation.image);
+              showErrorToast(new Error("Failed to load image"), "Image Error");
+            }}
           />
         </Link>
 
@@ -91,23 +106,33 @@ export default function Creation({ creation, onNewBlessing }: Props) {
         <div className="flex items-center mt-6 mb-4">
           <Dialog>
             <DialogTrigger asChild>
-              <button className="text-gray-500 hover:text-blue-500">🙌</button>
+              <button
+                className="text-gray-500 hover:text-blue-500 disabled:opacity-50"
+                disabled={loadingPraise}
+              >
+                🙌
+              </button>
             </DialogTrigger>
-
             {loggedIn ? (
               <DialogContent className="bg-white">
                 <DialogHeader>
                   <DialogTitle>Praise Creation</DialogTitle>
+                  <DialogDescription>
+                    Show your appreciation for this creation
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 text-gray-600">
-                  Cost: {PRAISE_PRICE_ETHER.toFixed(5)} ETH
+                  <p>Cost: {PRAISE_PRICE_ETHER.toFixed(5)} ETH</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    This will be recorded permanently on the blockchain
+                  </p>
                 </div>
                 <DialogFooter>
                   <Button onClick={handlePraise} disabled={loadingPraise}>
                     {loadingPraise && (
                       <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
                     )}
-                    Praise
+                    {loadingPraise ? "Praising..." : "Praise"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -116,18 +141,24 @@ export default function Creation({ creation, onNewBlessing }: Props) {
                 <DialogHeader>
                   <DialogTitle>Authentication Required</DialogTitle>
                   <DialogDescription>
-                    Log in to perform this action.
+                    Connect your wallet to praise this creation.
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                  <Button onClick={login} disabled={loadingAuth}>
-                    {loadingAuth ? "Logging in…" : "Log in"}
+                  <Button onClick={handleLogin} disabled={loadingAuth}>
+                    {loadingAuth ? (
+                      <>
+                        <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                        Connecting...
+                      </>
+                    ) : (
+                      "Connect Wallet"
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             )}
           </Dialog>
-
           <span className="ml-1 text-sm font-semibold text-gray-500">
             {totalPraises}
           </span>
