@@ -178,9 +178,9 @@ export default function Creation({ creation, onNewBlessing }: Props) {
           </span>
 
           {/* totals */}
-          <div className="ml-10 text-sm text-gray-500">
+          {/* <div className="ml-10 text-sm text-gray-500">
             Total ETH: {totalEthUsed.toFixed(4)}
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
