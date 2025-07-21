@@ -74,23 +74,36 @@ export default function CreationPage({ params }: { params: { id: string } }) {
     ethUsed: string;
     blockTimestamp?: string;
   }) =>
-    setCreation((prev) =>
-      prev
-        ? {
-            ...prev,
-            blessings: [
-              {
-                author: b.userAddress,
-                content: b.message,
-                praiseCount: 0,
-                timestamp: b.blockTimestamp ?? "",
-              },
-              ...prev.blessings,
-            ],
-            blessingCnt: prev.blessingCnt + 1,
-          }
-        : prev
-    );
+    setCreation((prev) => {
+      if (!prev) return prev;
+
+      const messages = [...prev.messages];
+      const latestAbrahamIndex = messages
+        .map((m, i) => ({ ...m, i }))
+        .reverse()
+        .find((m) => m.author.toLowerCase() === OWNER)?.i;
+
+      if (latestAbrahamIndex === undefined) return prev;
+
+      const newBlessingMsg = {
+        author: b.userAddress,
+        content: b.message,
+        praiseCount: 0,
+        timestamp: b.blockTimestamp ?? Math.floor(Date.now() / 1000).toString(),
+        index: Date.now(), // Ensure uniqueness
+        media: "",
+      };
+
+      // Insert directly after the Abraham post
+      messages.splice(latestAbrahamIndex + 1, 0, newBlessingMsg);
+      //console.log("New blessing added:", newBlessingMsg);
+      return {
+        ...prev,
+        messages,
+        blessings: [newBlessingMsg, ...prev.blessings],
+        blessingCnt: prev.blessingCnt + 1,
+      };
+    });
 
   /* render */
   return (
