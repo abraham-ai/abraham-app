@@ -1,160 +1,223 @@
-## How Abraham talks to the on-chain contract
+## How Abraham talks to the on‑chain contract
 
 _(only two things to remember)_
 
-### 1. Start a brand-new Creation (session)
+---
 
-1. Upload the **first image** to IPFS.
-   _Example result:_ `https://gateway.pinata.cloud/ipfs/bafybeih4…abc`
+### 1  Start a **brand‑new Creation** (session)
 
-2. Call **`createSession`** on the contract, passing:
+1. Upload the **first image** to IPFS
+   _Example result:_
 
-| Argument    | What to pass                                                                            |
-| ----------- | --------------------------------------------------------------------------------------- |
-| **content** | the text prompt / caption you want to store, e.g. `"Here is my first image about love"` |
-| **media**   | the IPFS URL from step 1, e.g. `"https://gateway.pinata.cloud/ipfs/bafybeih4…abc"`      |
+   ```
+   https://gateway.pinata.cloud/ipfs/bafybeih4…abc
+   ```
+
+2. Pick **two fresh UUIDs**
+
+| Variable         | Example value (UUID v4)                |
+| ---------------- | -------------------------------------- |
+| `sessionId`      | `c3f1e9e8‑4b99‑4329‑9a45‑6e18c0ab2c30` |
+| `firstMessageId` | `5f6b0f39‑0d41‑4e84‑901a‑1c1d98fa6b9b` |
+
+3. Call **`createSession`** on the contract:
+
+| Argument         | What to pass                                               |
+| ---------------- | ---------------------------------------------------------- |
+| `sessionId`      | the new session UUID                                       |
+| `firstMessageId` | the message UUID of the first Abraham post                 |
+| `content`        | text / caption, e.g. `"Here is my first image about love"` |
+| `media`          | the IPFS URL from step 1                                   |
 
 ```js
 await contract.createSession(
-  "Here is my first image about love",
-  "https://gateway.pinata.cloud/ipfs/bafybeih4…abc"
+  "c3f1e9e8‑4b99‑4329‑9a45‑6e18c0ab2c30", // sessionId
+  "5f6b0f39‑0d41‑4e84‑901a‑1c1d98fa6b9b", // firstMessageId
+  "Here is my first image about love", // content
+  "https://gateway.pinata.cloud/ipfs/bafybeih4…abc" // media
 );
 ```
 
-That single call automatically:
+That single call automatically
 
 - creates the session
-- stores the text + image hash on-chain
-- emits `SessionCreated` + `MessageAdded` events (indexed by the subgraph)
+- stores the first text + image on‑chain
+- emits **`SessionCreated`** and **`MessageAdded`** events
 
 ---
 
-### 2. Append a new Abraham message to an existing Creation
+### 2  Append a new Abraham message to an existing Creation
 
-1. Upload the **new version** (edited image) to IPFS → get `https://gateway.pinata.cloud/ipfs/…xyz`
+1. Upload the edited image to IPFS → get, e.g.
 
-2. Look up the session you want to extend (e.g. ID = `2`).
+   ```
+   https://gateway.pinata.cloud/ipfs/bafybeia6…xyz
+   ```
 
-3. Call **`abrahamUpdate`** with:
+2. Decide which session to extend (e.g. `sessionId = c3f1e9e8‑…`) and create a new `messageId` (UUID).
 
-| Argument      | Example                                             |
-| ------------- | --------------------------------------------------- |
-| **sessionId** | `2`                                                 |
-| **content**   | `"Updated the image: added a purple heart"`         |
-| **media**     | `"https://gateway.pinata.cloud/ipfs/bafybeia6…xyz"` |
+3. Call **`abrahamUpdate`**:
+
+| Argument    | Example                                             |
+| ----------- | --------------------------------------------------- |
+| `sessionId` | `c3f1e9e8‑4b99‑4329‑9a45‑6e18c0ab2c30`              |
+| `messageId` | `a0b3d4e5‑f6a7‑4988‑9bb1‑0c0d0e0f1a2b`              |
+| `content`   | `"Updated the image: added a purple heart"`         |
+| `media`     | `"https://gateway.pinata.cloud/ipfs/bafybeia6…xyz"` |
 
 ```js
 await contract.abrahamUpdate(
-  2,
+  "c3f1e9e8‑4b99‑4329‑9a45‑6e18c0ab2c30",
+  "a0b3d4e5‑f6a7‑4988‑9bb1‑0c0d0e0f1a2b",
   "Updated the image: added a purple heart",
   "https://gateway.pinata.cloud/ipfs/bafybeia6…xyz"
 );
 ```
 
-That adds the new Abraham message to the same session and the subgraph will
-show it as the latest entry.
-
 ---
 
-### Quick code skeleton (Node + ethers v6)
+### Quick code skeleton (Node + ethers v6)
 
 ```js
 import { ethers } from "ethers";
 import abi from "./Abraham.json" assert { type: "json" };
 
-const RPC = process.env.RPC_URL; // Base-Sepolia RPC
+const RPC = process.env.RPC_URL; // Base‑Sepolia RPC
 const KEY = process.env.PRIVATE_KEY; // owner key (Abraham)
-const ADDR = "0x3667BD9cb464f4492899384c6f73908d6681EC78"; // contract
+const ADDR = "0x15a5Dc6E5fe17d2ACfeb7c64F348f7643645BdF7";
 
 const provider = new ethers.JsonRpcProvider(RPC);
 const signer = new ethers.Wallet(KEY, provider);
 const contract = new ethers.Contract(ADDR, abi, signer);
 
-// ----- start a new Creation -----
+// new Creation
 await contract.createSession(
+  crypto.randomUUID(), // sessionId
+  crypto.randomUUID(), // firstMessageId
   "Here is my first image about love",
   "https://gateway.pinata.cloud/ipfs/bafybeih4…abc"
 );
 
-// ----- update an existing Creation (id = 7) -----
+// update
 await contract.abrahamUpdate(
-  2,
-  "Updated the image: added a purple heart",
+  "existing‑session‑uuid",
+  crypto.randomUUID(),
+  "Added purple heart",
   "https://gateway.pinata.cloud/ipfs/bafybeia6…xyz"
 );
 ```
 
-## How Abraham will **read** what it just wrote
+---
+
+## How Abraham **reads** what it wrote
+
+### GraphQL queries (hosted subgraph)
+
+Endpoint:
+`https://api.studio.thegraph.com/query/102152/abraham/version/latest`
 
 ---
 
-### The one GraphQL query you need
+### 1  Timeline of many sessions
 
 ```graphql
-query Timeline($owner: Bytes!, $firstCreations: Int!, $firstMsgs: Int!) {
-  creations(first: $firstCreations, orderBy: id, orderDirection: desc) {
-    id # == sessionId
-    messages(first: $firstMsgs, orderBy: index, orderDirection: asc) {
-      index # sequential position in this session
+query Timeline($firstCreations: Int!, $firstMsgs: Int!) {
+  creations(
+    first: $firstCreations
+    orderBy: lastActivityAt
+    orderDirection: desc
+  ) {
+    id # session UUID
+    firstMessageAt
+    lastActivityAt
+    messages(first: $firstMsgs, orderBy: timestamp, orderDirection: asc) {
+      uuid # message UUID
       author # 0x…
       content
-      media # https://gateway.pinata.cloud/ipfs/…  (null for user blessings)
-      praiseCount # length of on-chain praiser array
-      timestamp # block time, seconds
+      media # null for blessings
+      praiseCount
+      timestamp
+      praises {
+        # ← list of praisers
+        praiser
+        timestamp
+      }
     }
   }
 }
 ```
 
-**Variables to send**
-
 ```jsonc
 {
-  "owner": "0x641f5ffC5F6239A0873Bd00F9975091FB035aAFC", // Abraham address
-  "firstCreations": 50, // how many sessions to pull
-  "firstMsgs": 200 // how deep inside each session
+  "firstCreations": 50,
+  "firstMsgs": 200
 }
-```
-
-Endpoint:
-
-```
-POST https://api.studio.thegraph.com/query/102152/abraham/version/latest
 ```
 
 ---
 
-### What comes back (real shape, trimmed)
+### 2  Messages for a single Creation
+
+```graphql
+query MessagesForCreation($id: ID!, $firstMsgs: Int!) {
+  creation(id: $id) {
+    id
+    messages(first: $firstMsgs, orderBy: timestamp, orderDirection: asc) {
+      uuid
+      author
+      content
+      media
+      praiseCount
+      timestamp
+      praises {
+        praiser
+        timestamp
+      } # each 🙌 with address + block time
+    }
+  }
+}
+```
+
+```json
+{
+  "id": "c3f1e9e8-4b99-4329-9a45-6e18c0ab2c30",
+  "firstMsgs": 100
+}
+```
+
+---
+
+### Sample response (trimmed)
 
 ```json
 {
   "data": {
-    "creations": [
-      {
-        "id": "2",
-        "messages": [
-          {
-            "index": 0,
-            "author": "0x641f5f…", // Abraham
-            "content": "here is my second creation, it’s about sports",
-            "media": "https://gateway.pinata.cloud/ipfs/bafy…def",
-            "praiseCount": 1,
-            "timestamp": "1720472405"
-          },
-          {
-            "index": 1,
-            "author": "0x9a23…", // user -> blessing
-            "content": "give it a football",
-            "media": null,
-            "praiseCount": 2,
-            "timestamp": "1720473001"
-          }
-        ]
-      },
-      {
-        /* creation id 1 … */
-      }
-    ]
+    "creation": {
+      "id": "c3f1e9e8-4b99-4329-9a45-6e18c0ab2c30",
+      "messages": [
+        {
+          "uuid": "5f6b0f39-0d41-4e84-901a-1c1d98fa6b9b",
+          "author": "0x641f5f…", // Abraham
+          "content": "Here is my first image about love",
+          "media": "https://gateway.pinata.cloud/ipfs/bafybeih4…abc",
+          "praiseCount": 1,
+          "timestamp": "1720472405",
+          "praises": [{ "praiser": "0x9a23…", "timestamp": "1720472600" }]
+        },
+        {
+          "uuid": "a0b3d4e5-f6a7-4988-9bb1-0c0d0e0f1a2b",
+          "author": "0x9a23…", // user blessing
+          "content": "Give it a football",
+          "media": null,
+          "praiseCount": 2,
+          "timestamp": "1720473001",
+          "praises": [
+            { "praiser": "0xABCD…", "timestamp": "1720473050" },
+            { "praiser": "0xEF01…", "timestamp": "1720473102" }
+          ]
+        }
+      ]
+    }
   }
 }
 ```
