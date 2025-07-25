@@ -2,7 +2,7 @@
 
 ---
 
-## 1 Start a **brand‑new Creation** (session)
+### 1 Start a **brand‑new Creation** (session)
 
 1. Upload the **first image** to IPFS
    _Example result:_
