@@ -1,10 +1,6 @@
 ## How Abraham talks to the on‑chain contract
 
-_(only two things to remember)_
-
----
-
-### 1  Start a **brand‑new Creation** (session)
+### 1  Start a **brand‑new Creation** (session)
 
 1. Upload the **first image** to IPFS
    _Example result:_
@@ -46,7 +42,7 @@ That single call automatically
 
 ---
 
-### 2  Append a new Abraham message to an existing Creation
+### 2  Append a new Abraham message to an existing Creation
 
 1. Upload the edited image to IPFS → get, e.g.
 
@@ -76,7 +72,7 @@ await contract.abrahamUpdate(
 
 ---
 
-### Quick code skeleton (Node + ethers v6)
+### Quick code skeleton (Node + ethers v6)
 
 ```js
 import { ethers } from "ethers";
@@ -156,7 +152,7 @@ query Timeline($firstCreations: Int!, $firstMsgs: Int!) {
 
 ---
 
-### 2  Messages for a single Creation
+### 2  Messages for a single Creation
 
 ```graphql
 query MessagesForCreation($id: ID!, $firstMsgs: Int!) {
@@ -187,7 +183,7 @@ query MessagesForCreation($id: ID!, $firstMsgs: Int!) {
 
 ---
 
-### Sample response (trimmed)
+### Sample response (trimmed)
 
 ```json
 {
