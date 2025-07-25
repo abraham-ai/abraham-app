@@ -1,44 +1,39 @@
-/* ---------- raw subgraph shapes ---------- */
 export interface SubgraphMessage {
-  index: number;
+  uuid: string;
   author: string;
   content: string;
   media: string | null;
   praiseCount: number;
-  timestamp: string; // seconds since epoch
+  timestamp: string;
 }
 
 export interface SubgraphCreation {
   id: string;
-  messageCount: number;
-  ethSpent: string; // BigInt (wei)
+  ethSpent: string;
+  firstMessageAt: string;
+  lastActivityAt: string;
   messages: SubgraphMessage[];
 }
 
-/* ---------- UI shapes ---------- */
 export interface Blessing {
   author: string;
   content: string;
   praiseCount: number;
-  timestamp?: string;
-  messageIdx: number; // index of the blessing message
-  creationId: string; // parent creation id
+  timestamp: string;
+  messageUuid: string;
+  creationId: string;
 }
 
 export interface CreationItem {
   id: string;
-
-  /* thumbnail info (latest Abraham msg) */
   image: string;
   description: string;
   praiseCount: number;
-  messageIndex: number; // index of latest Abraham msg (needed for praise)
-
-  /* stats */
+  messageUuid: string;
   ethTotal: number;
   blessingCnt: number;
+  firstMessageAt: string;
+  lastActivityAt: string;
   blessings: Blessing[];
-
-  /* full chronological list (Abraham + blessings) */
-  messages: SubgraphMessage[]; // ← NEW
+  messages: SubgraphMessage[];
 }

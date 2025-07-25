@@ -1,6 +1,5 @@
 "use client";
 
-import type React from "react";
 import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -19,8 +18,7 @@ import {
   useAbrahamContract,
   BLESS_PRICE_ETHER,
 } from "@/hooks/use-abraham-contract";
-import type { CreationItem } from "@/types/abraham";
-import { ethers } from "ethers";
+import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 
@@ -34,6 +32,7 @@ interface Props {
     message: string;
     ethUsed: string;
     blockTimestamp?: string;
+    messageUuid: string;
   }) => void;
 }
 
@@ -46,64 +45,51 @@ export default function BlessDialog({
 }: Props) {
   const { loggedIn, login, loadingAuth, authState } = useAuth();
   const { bless } = useAbrahamContract();
-  const { walletAddress } = authState;
-  const userAddress = walletAddress?.toLowerCase();
+  const userAddress = authState.walletAddress?.toLowerCase() ?? "";
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   /* ---------------- submit ---------------- */
   const submit = async () => {
     if (!loggedIn) {
-      showWarningToast(
-        "Authentication Required",
-        "Please connect your wallet to bless this creation."
-      );
+      showWarningToast("Authentication", "Please connect your wallet.");
       return;
     }
-
     if (!text.trim()) {
-      showWarningToast("Message Required", "Please enter a blessing message.");
+      showWarningToast("Message Required", "Enter a blessing.");
       return;
     }
 
     setLoading(true);
     try {
-      await bless(Number(creation.id), text.trim());
+      const { msgUuid } = await bless(creation.id, text.trim());
 
-      // optimistic UI updates
+      /* optimistic UI */
       setBlessingsCount(blessingsCount + 1);
       setLocalTotalEthUsed((e) => e + BLESS_PRICE_ETHER);
       onNewBlessing?.({
-        userAddress: userAddress || "",
+        userAddress,
         message: text.trim(),
-        ethUsed: ethers.parseEther(BLESS_PRICE_ETHER.toString()).toString(),
+        ethUsed: (BLESS_PRICE_ETHER * 10 ** 18).toString(),
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),
+        messageUuid: msgUuid,
       });
 
-      // Close dialog and reset form
-      setIsOpen(false);
+      setOpen(false);
       setText("");
-    } catch (error: any) {
-      console.error("Blessing error:", error);
-      // Error toast is handled in the hook
+    } catch (e) {
+      /* toast handled in hook */
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogin = async () => {
-    try {
-      await login();
-    } catch (error: any) {
-      console.error("Login error:", error);
-      showErrorToast(error, "Login Failed");
-    }
-  };
+  const handleLogin = () => login().catch((e) => showErrorToast(e, "Login"));
 
   /* ---------------- UI ---------------- */
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
           className="cursor-pointer hover:scale-110 transition-transform"
@@ -112,76 +98,59 @@ export default function BlessDialog({
           🙏
         </button>
       </DialogTrigger>
+
       <DialogContent className="bg-white">
         <DialogHeader>
           <div className="flex items-center mb-2">
             <Image
               src="/abrahamlogo.png"
-              alt="abraham"
+              alt="avatar"
               width={40}
               height={40}
               className="rounded-full border mr-3"
             />
             <div>
               <DialogTitle>Bless Creation</DialogTitle>
-              <DialogDescription>
-                Share a blessing or kind thought
-              </DialogDescription>
+              <DialogDescription>Share something kind</DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         {loggedIn ? (
           <>
-            <div className="space-y-4">
-              <Textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Share a blessing or kind thought…"
-                className="min-h-[100px]"
-                maxLength={500}
-              />
-              <div className="text-sm text-gray-500">
-                <p>Cost: {BLESS_PRICE_ETHER} ETH</p>
-                <p className="text-xs">
-                  Your blessing will be permanently recorded on the blockchain
-                </p>
-              </div>
-            </div>
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Your blessing…"
+              className="min-h-[100px]"
+              maxLength={500}
+            />
+            <p className="text-sm text-gray-500 mt-3">
+              Cost: {BLESS_PRICE_ETHER} ETH
+            </p>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsOpen(false)}
-                disabled={loading}
-              >
+              <Button variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
               <Button onClick={submit} disabled={loading || !text.trim()}>
-                {loading ? (
-                  <>
-                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
-                    Blessing...
-                  </>
-                ) : (
-                  `Bless (${BLESS_PRICE_ETHER} ETH)`
+                {loading && (
+                  <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
                 )}
+                {loading ? "Blessing…" : `Bless (${BLESS_PRICE_ETHER} ETH)`}
               </Button>
             </DialogFooter>
           </>
         ) : (
           <>
-            <div className="py-4">
-              <p className="text-gray-600">
-                Connect your wallet to bless this creation and support the
-                artist.
-              </p>
-            </div>
+            <p className="py-4 text-gray-600">
+              Connect your wallet to post a blessing.
+            </p>
             <DialogFooter>
               <Button onClick={handleLogin} disabled={loadingAuth}>
                 {loadingAuth ? (
                   <>
                     <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
-                    Connecting...
+                    Connecting…
                   </>
                 ) : (
                   "Connect Wallet"

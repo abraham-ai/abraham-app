@@ -1,27 +1,33 @@
 type Creation @entity(immutable: false) {
-  id: ID!
+  id: ID! # session UUID
   messageCount: Int!
-  createdAt: BigInt!
-  updatedAt: BigInt!
-  ethSpent: BigInt! # total wei (praises + blessings)
+  firstMessageAt: BigInt!
+  lastActivityAt: BigInt!
+  ethSpent: BigInt!
   messages: [Message!]! @derivedFrom(field: "creation")
 }
 
 type Message @entity(immutable: false) {
-  id: ID!
+  id: ID! # `${sessionId}-${messageId}`
   creation: Creation!
-  index: Int!
+  uuid: String! # message UUID
   author: Bytes!
   content: String!
   media: String
-  timestamp: BigInt! # when MessageAdded was emitted
+  timestamp: BigInt!
   praiseCount: Int!
   praises: [Praise!]! @derivedFrom(field: "message")
 }
 
 type Praise @entity(immutable: true) {
-  id: ID!
+  id: ID! # `${messageId}-${praiser}`
   message: Message!
   praiser: Bytes!
   timestamp: BigInt!
+}
+
+type User @entity(immutable: false) {
+  id: ID!
+  praisesGiven: Int!
+  praisesReceived: Int!
 }

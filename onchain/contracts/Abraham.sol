@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-
 contract Abraham is Ownable, ReentrancyGuard {
     constructor() Ownable(msg.sender) ReentrancyGuard() {}
 
@@ -12,107 +11,143 @@ contract Abraham is Ownable, ReentrancyGuard {
     uint256 public constant BLESS_PRICE  = 20_000_000_000_000; // 0.00002 ETH
 
     struct Message {
-        address   author;      // msg.sender
-        string    content;     // UTF-8 text
-        string    media;       // IPFS hash (empty unless author == owner)
-        address[] praisers;    // unique addresses that paid PRAISE_PRICE
+        string   id;          // uuid
+        address  author;
+        string   content;
+        string   media;       // empty for blessings
+        address[] praisers;
     }
 
     struct Session {
-        uint256 id;            // sessionId == index in [1, …]
-        uint256 messageCount;  // total Messages so far
+        string id;                    // uuid
+        string[] messageIds;          // ordering
+        uint256 messageCount;
     }
 
-    uint256 public sessionCount;                        // total Sessions
-    mapping(uint256 => Session) public sessions;        // sessionId → Session
-    mapping(uint256 => mapping(uint256 => Message)) private _messages; // sessionId → msgIdx → Message
-    mapping(uint256 => mapping(uint256 => mapping(address => bool))) private _hasPraised; // sessionId → msgIdx → user → true
+    /*──────────────────────── storage ──────────────────────────*/
+    mapping(string => Session) private sessions;              // sessionId → Session
+    mapping(string => mapping(string => Message)) private messages;         // sessionId → messageId → Message
+    mapping(string => mapping(string => mapping(address => bool))) private hasPraised; // sessionId → messageId → user
+
+    uint256 public sessionTotal; // purely analytics
 
    
-    event SessionCreated(uint256 indexed sessionId);
-    event MessageAdded(
-        uint256 indexed sessionId,
-        uint256 indexed messageIndex,
-        address indexed author,
-        string  content,
-        string  media
-    );
-    event Praised(
-        uint256 indexed sessionId,
-        uint256 indexed messageIndex,
-        address indexed praiser
-    );
-
-
-
-    /// @dev Abraham starts a new Creation / Session with an image & text.
-    function createSession(string calldata content, string calldata media)
-        external
-        onlyOwner
-    {
-        require(bytes(media).length > 0, "Media required for first message");
-
-        ++sessionCount;
-        sessions[sessionCount] = Session({ id: sessionCount, messageCount: 0 });
-
-        _addMessage(sessionCount, _msgSender(), content, media); // emits events
-        emit SessionCreated(sessionCount);
-    }
-
-    /// @dev Abraham appends another image + text to an existing Session.
-    function abrahamUpdate(
-        uint256 sessionId,
-        string calldata content,
-        string calldata media
-    ) external onlyOwner {
-        require(_sessionExists(sessionId), "Session not found");
-        require(bytes(media).length > 0, "Media required");
-        _addMessage(sessionId, _msgSender(), content, media);
-    }
-
-    /// @dev Any user leaves a text-only blessing (cost: BLESS_PRICE).
-    function bless(uint256 sessionId, string calldata content)
-        external
-        payable
-        nonReentrant
-    {
-        require(_sessionExists(sessionId), "Session not found");
-        require(bytes(content).length > 0, "Content required");
-        require(msg.value == BLESS_PRICE, "Incorrect ETH for blessing");
-
-        _addMessage(sessionId, _msgSender(), content, ""); // no media
-    }
-
-    /// @dev Praise (like) any Message once (cost: PRAISE_PRICE).
-    function praise(uint256 sessionId, uint256 messageIndex)
-        external
-        payable
-        nonReentrant
-    {
-        require(_sessionExists(sessionId),      "Session not found");
-        require(messageIndex < sessions[sessionId].messageCount, "Message not found");
-        require(msg.value == PRAISE_PRICE,      "Incorrect ETH for praise");
-        require(!_hasPraised[sessionId][messageIndex][_msgSender()], "Already praised");
-
-        Message storage m = _messages[sessionId][messageIndex];
-        _hasPraised[sessionId][messageIndex][_msgSender()] = true;
-        m.praisers.push(_msgSender());
-
-        emit Praised(sessionId, messageIndex, _msgSender());
-    }
-
-    /*──────────────────────────────────────────────────────────
-                              VIEW HELPERS
-    ──────────────────────────────────────────────────────────*/
-
-    /// @return total messages in a Session.
-    function getMessageCount(uint256 sessionId) external view returns (uint256) {
-        require(_sessionExists(sessionId), "Session not found");
-        return sessions[sessionId].messageCount;
-    }
+    event SessionCreated(string sessionId);
+    event MessageAdded(string sessionId, string messageId, address author, string content, string media);
+    event Praised(string sessionId, string messageId, address praiser);
 
   
-    function getMessage(uint256 sessionId, uint256 messageIndex)
+    modifier sessionExists(string memory sessionId) {
+        require(bytes(sessions[sessionId].id).length != 0, "Session not found");
+        _;
+    }
+
+    modifier uniqueSession(string memory sessionId) {
+        require(bytes(sessions[sessionId].id).length == 0, "Session exists");
+        _;
+    }
+
+    modifier uniqueMessage(string memory sessionId, string memory messageId) {
+        require(bytes(messages[sessionId][messageId].id).length == 0, "Message exists");
+        _;
+    }
+
+    /// @notice Create a new session with its first message.
+    function createSession(
+        string calldata sessionId,
+        string calldata firstMessageId,
+        string calldata content,
+        string calldata media
+    )
+        external
+        onlyOwner
+        uniqueSession(sessionId)
+        uniqueMessage(sessionId, firstMessageId)
+    {
+        require(bytes(media).length > 0, "Media required");
+
+        // init session
+        Session storage s  = sessions[sessionId];
+        s.id               = sessionId;
+        s.messageCount     = 0;
+
+        // first message from Abraham
+        _addMessageInternal(
+            s,
+            firstMessageId,
+            msg.sender,
+            content,
+            media
+        );
+
+        unchecked { ++sessionTotal; }
+        emit SessionCreated(sessionId);
+    }
+
+    /// @notice Abraham adds another image+text message to a session.
+    function abrahamUpdate(
+        string calldata sessionId,
+        string calldata messageId,
+        string calldata content,
+        string calldata media
+    )
+        external
+        onlyOwner
+        sessionExists(sessionId)
+        uniqueMessage(sessionId, messageId)
+    {
+        require(bytes(media).length > 0, "Media required");
+
+        Session storage s = sessions[sessionId];
+        _addMessageInternal(s, messageId, msg.sender, content, media);
+    }
+
+    /// @notice Any user adds a text‑only blessing (pays BLESS_PRICE).
+    function bless(
+        string calldata sessionId,
+        string calldata messageId,
+        string calldata content
+    )
+        external
+        payable
+        nonReentrant
+        sessionExists(sessionId)
+        uniqueMessage(sessionId, messageId)
+    {
+        require(msg.value == BLESS_PRICE, "Incorrect ETH");
+        require(bytes(content).length > 0, "Content required");
+
+        Session storage s = sessions[sessionId];
+        _addMessageInternal(s, messageId, msg.sender, content, "");
+    }
+
+    /// @notice Praise any message once (pays PRAISE_PRICE).
+    function praise(
+        string calldata sessionId,
+        string calldata messageId
+    )
+        external
+        payable
+        nonReentrant
+        sessionExists(sessionId)
+    {
+        require(msg.value == PRAISE_PRICE, "Incorrect ETH");
+
+        Message storage m = messages[sessionId][messageId];
+        require(bytes(m.id).length != 0, "Message not found");
+        require(!hasPraised[sessionId][messageId][msg.sender], "Already praised");
+
+        hasPraised[sessionId][messageId][msg.sender] = true;
+        m.praisers.push(msg.sender);
+
+        emit Praised(sessionId, messageId, msg.sender);
+    }
+
+    /*──────────────────────── view helpers ─────────────────────*/
+    function getMessage(
+        string calldata sessionId,
+        string calldata messageId
+    )
         external
         view
         returns (
@@ -122,52 +157,46 @@ contract Abraham is Ownable, ReentrancyGuard {
             uint256 praiseCount
         )
     {
-        require(_sessionExists(sessionId), "Session not found");
-        require(messageIndex < sessions[sessionId].messageCount, "Message not found");
-
-        Message storage m = _messages[sessionId][messageIndex];
+        Message storage m = messages[sessionId][messageId];
         return (m.author, m.content, m.media, m.praisers.length);
     }
 
-    /// @return all praiser addresses for a given Message.
-    function getPraisers(uint256 sessionId, uint256 messageIndex)
+    function getMessageIds(string calldata sessionId)
         external
         view
-        returns (address[] memory)
+        returns (string[] memory)
     {
-        require(_sessionExists(sessionId), "Session not found");
-        require(messageIndex < sessions[sessionId].messageCount, "Message not found");
-        return _messages[sessionId][messageIndex].praisers;
+        return sessions[sessionId].messageIds;
     }
 
-
-
-    /// @dev Withdraw accumulated ETH to owner.
+    /*──────────────────────── admin ────────────────────────────*/
     function withdraw() external onlyOwner {
         payable(owner()).transfer(address(this).balance);
     }
-    function _addMessage(
-        uint256 sessionId,
+
+    /*──────────────────────── internal ─────────────────────────*/
+    function _addMessageInternal(
+        Session storage s,
+        string memory messageId,
         address author,
-        string calldata content,
+        string memory content,
         string memory media
-    ) internal {
-        Session storage s = sessions[sessionId];
-        uint256 idx      = s.messageCount;
+    ) private {
+        messages[s.id][messageId] = Message({
+            id: messageId,
+            author: author,
+            content: content,
+            media: media,
+            praisers: new address[](0)
+        });
 
-        _messages[sessionId][idx].author  = author;
-        _messages[sessionId][idx].content = content;
-        _messages[sessionId][idx].media   = media;
-
+        s.messageIds.push(messageId);
         unchecked { ++s.messageCount; }
 
-        emit MessageAdded(sessionId, idx, author, content, media);
+        emit MessageAdded(s.id, messageId, author, content, media);
     }
 
-    function _sessionExists(uint256 sessionId) private view returns (bool) {
-        return sessionId != 0 && sessionId <= sessionCount;
-    }
-
+    /* fallback / receive */
     receive() external payable {}
     fallback() external payable {}
 }

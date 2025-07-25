@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  SubgraphCreation,
-  SubgraphMessage,
-  CreationItem,
-  Blessing,
-} from "@/types/abraham";
+import { SubgraphCreation, CreationItem } from "@/types/abraham";
 
 const ENDPOINT =
   "https://api.studio.thegraph.com/query/102152/abraham/version/latest";
@@ -13,10 +8,11 @@ const DETAIL_QUERY = /* GraphQL */ `
   query One($id: ID!, $msgLimit: Int!) {
     creation(id: $id) {
       id
-      messageCount
       ethSpent
-      messages(orderBy: index, orderDirection: asc, first: $msgLimit) {
-        index
+      firstMessageAt
+      lastActivityAt
+      messages(orderBy: timestamp, orderDirection: asc, first: $msgLimit) {
+        uuid
         author
         content
         media
@@ -35,22 +31,21 @@ export async function GET(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "missing id" }, { status: 400 });
 
   try {
-    const res = await fetch(ENDPOINT, {
+    const r = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query: DETAIL_QUERY,
         variables: { id, msgLimit: 1000 },
       }),
+      next: { revalidate: 0 },
     });
-    const { data, errors } = await res.json();
+    const { data, errors } = await r.json();
     if (errors) throw new Error(errors.map((e: any) => e.message).join(","));
     if (!data.creation)
       return NextResponse.json({ error: "not found" }, { status: 404 });
 
     const c: SubgraphCreation = data.creation;
-
-    /* Split + locate latest Abraham message */
     const abrahamMsgs = c.messages.filter(
       (m) => m.author.toLowerCase() === OWNER
     );
@@ -61,24 +56,25 @@ export async function GET(req: NextRequest) {
         content: m.content,
         praiseCount: m.praiseCount,
         timestamp: m.timestamp,
-        messageIdx: m.index,
+        messageUuid: m.uuid,
         creationId: c.id,
       }));
+
     const latest = abrahamMsgs[abrahamMsgs.length - 1];
 
-    /* Creation summary used by <Creation> card */
     const creation: CreationItem = {
       id: c.id,
       image:
         latest?.media?.replace(/^ipfs:\/\//, "https://ipfs.io/ipfs/") ?? "",
       description: latest?.content ?? "(no description)",
       praiseCount: latest?.praiseCount ?? 0,
-      messageIndex: latest?.index ?? 0,
+      messageUuid: latest?.uuid ?? "",
       ethTotal: Number((BigInt(c.ethSpent) / BigInt(1e14)).toString()) / 1e4,
       blessingCnt: blessingsRaw.length,
       blessings: blessingsRaw,
-      /* NEW → full chronological list */
       messages: c.messages,
+      firstMessageAt: c.firstMessageAt,
+      lastActivityAt: c.lastActivityAt,
     };
 
     return NextResponse.json(creation, { status: 200 });
