@@ -7,7 +7,7 @@ dataSources:
     name: Abraham
     network: base-sepolia
     source:
-      address: "0x3667BD9cb464f4492899384c6f73908d6681EC78"
+      address: "0x702596A9C2CBF923E3dd2B5A99e95AbE156F5Dd6"
       abi: Abraham
       startBlock: 28236769
 
@@ -16,17 +16,18 @@ dataSources:
       apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
-        - Session
+        - Creation
         - Message
         - Praise
+        - User
       abis:
         - name: Abraham
           file: ./abis/Abraham.json
       eventHandlers:
-        - event: MessageAdded(indexed uint256,indexed uint256,indexed address,string,string)
-          handler: handleMessageAdded
-        - event: Praised(indexed uint256,indexed uint256,indexed address)
-          handler: handlePraised
-        - event: SessionCreated(indexed uint256)
+        - event: SessionCreated(string)
           handler: handleSessionCreated
+        - event: MessageAdded(string,string,address,string,string)
+          handler: handleMessageAdded
+        - event: Praised(string,string,address)
+          handler: handlePraised
       file: ./src/abraham.ts

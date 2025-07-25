@@ -35,19 +35,19 @@ export const AbrahamAbi = [
     anonymous: false,
     inputs: [
       {
-        indexed: true,
-        internalType: "uint256",
+        indexed: false,
+        internalType: "string",
         name: "sessionId",
-        type: "uint256",
+        type: "string",
       },
       {
-        indexed: true,
-        internalType: "uint256",
-        name: "messageIndex",
-        type: "uint256",
+        indexed: false,
+        internalType: "string",
+        name: "messageId",
+        type: "string",
       },
       {
-        indexed: true,
+        indexed: false,
         internalType: "address",
         name: "author",
         type: "address",
@@ -91,19 +91,19 @@ export const AbrahamAbi = [
     anonymous: false,
     inputs: [
       {
-        indexed: true,
-        internalType: "uint256",
+        indexed: false,
+        internalType: "string",
         name: "sessionId",
-        type: "uint256",
+        type: "string",
       },
       {
-        indexed: true,
-        internalType: "uint256",
-        name: "messageIndex",
-        type: "uint256",
+        indexed: false,
+        internalType: "string",
+        name: "messageId",
+        type: "string",
       },
       {
-        indexed: true,
+        indexed: false,
         internalType: "address",
         name: "praiser",
         type: "address",
@@ -116,10 +116,10 @@ export const AbrahamAbi = [
     anonymous: false,
     inputs: [
       {
-        indexed: true,
-        internalType: "uint256",
+        indexed: false,
+        internalType: "string",
         name: "sessionId",
-        type: "uint256",
+        type: "string",
       },
     ],
     name: "SessionCreated",
@@ -158,9 +158,14 @@ export const AbrahamAbi = [
   {
     inputs: [
       {
-        internalType: "uint256",
+        internalType: "string",
         name: "sessionId",
-        type: "uint256",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "messageId",
+        type: "string",
       },
       {
         internalType: "string",
@@ -181,9 +186,14 @@ export const AbrahamAbi = [
   {
     inputs: [
       {
-        internalType: "uint256",
+        internalType: "string",
         name: "sessionId",
-        type: "uint256",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "messageId",
+        type: "string",
       },
       {
         internalType: "string",
@@ -198,6 +208,16 @@ export const AbrahamAbi = [
   },
   {
     inputs: [
+      {
+        internalType: "string",
+        name: "sessionId",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "firstMessageId",
+        type: "string",
+      },
       {
         internalType: "string",
         name: "content",
@@ -217,14 +237,14 @@ export const AbrahamAbi = [
   {
     inputs: [
       {
-        internalType: "uint256",
+        internalType: "string",
         name: "sessionId",
-        type: "uint256",
+        type: "string",
       },
       {
-        internalType: "uint256",
-        name: "messageIndex",
-        type: "uint256",
+        internalType: "string",
+        name: "messageId",
+        type: "string",
       },
     ],
     name: "getMessage",
@@ -256,41 +276,17 @@ export const AbrahamAbi = [
   {
     inputs: [
       {
-        internalType: "uint256",
+        internalType: "string",
         name: "sessionId",
-        type: "uint256",
+        type: "string",
       },
     ],
-    name: "getMessageCount",
+    name: "getMessageIds",
     outputs: [
       {
-        internalType: "uint256",
+        internalType: "string[]",
         name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "sessionId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "messageIndex",
-        type: "uint256",
-      },
-    ],
-    name: "getPraisers",
-    outputs: [
-      {
-        internalType: "address[]",
-        name: "",
-        type: "address[]",
+        type: "string[]",
       },
     ],
     stateMutability: "view",
@@ -312,14 +308,14 @@ export const AbrahamAbi = [
   {
     inputs: [
       {
-        internalType: "uint256",
+        internalType: "string",
         name: "sessionId",
-        type: "uint256",
+        type: "string",
       },
       {
-        internalType: "uint256",
-        name: "messageIndex",
-        type: "uint256",
+        internalType: "string",
+        name: "messageId",
+        type: "string",
       },
     ],
     name: "praise",
@@ -336,35 +332,11 @@ export const AbrahamAbi = [
   },
   {
     inputs: [],
-    name: "sessionCount",
+    name: "sessionTotal",
     outputs: [
       {
         internalType: "uint256",
         name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    name: "sessions",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "id",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "messageCount",
         type: "uint256",
       },
     ],

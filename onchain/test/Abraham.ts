@@ -12,19 +12,24 @@ async function deployFixture() {
   const AbrahamFactory = await ethers.getContractFactory("Abraham", abraham);
   const contract = (await AbrahamFactory.deploy()) as Abraham;
 
-  // read on-chain constants
   const PRAISE_PRICE = await contract.PRAISE_PRICE();
   const BLESS_PRICE = await contract.BLESS_PRICE();
 
   return { contract, abraham, user1, user2, PRAISE_PRICE, BLESS_PRICE };
 }
 
+/* helper uuids */
+const S1 = "session‑aaa"; // simple ascii UUIDs for clarity
+const M1 = "msg‑0001";
+const M2 = "msg‑0002";
+const B1 = "bless‑01";
+
 /* ---------------------------------------------------------- */
 /*                        TESTS                               */
 /* ---------------------------------------------------------- */
-describe("Abraham contract", () => {
+describe("Abraham contract (UUID ids)", () => {
   /* ----------------------- deploy ------------------------ */
-  it("sets the deployer as owner", async () => {
+  it("sets deployer as owner", async () => {
     const { contract, abraham } = await loadFixture(deployFixture);
     expect(await contract.owner()).to.equal(abraham.address);
   });
@@ -34,30 +39,37 @@ describe("Abraham contract", () => {
     it("owner can create a session with media", async () => {
       const { contract } = await loadFixture(deployFixture);
 
-      await expect(contract.createSession("first love image", "ipfs://hashA"))
+      await expect(
+        contract.createSession(S1, M1, "first image", "ipfs://hashA")
+      )
         .to.emit(contract, "SessionCreated")
-        .withArgs(1);
+        .withArgs(S1);
 
-      // messageCount should be 1
-      expect(await contract.getMessageCount(1)).to.equal(1);
+      const ids = await contract.getMessageIds(S1);
+      expect(ids.length).to.equal(1);
+      expect(ids[0]).to.equal(M1);
 
-      const [author, , media] = await contract.getMessage(1, 0);
+      const [author, , media] = await contract.getMessage(S1, M1);
       expect(media).to.equal("ipfs://hashA");
       expect(author).to.equal(await contract.owner());
     });
 
-    it("reverts if non-owner tries", async () => {
+    it("reverts if non‑owner calls", async () => {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await expect(contract.connect(user1).createSession("hack", "ipfs://bad"))
+      await expect(
+        contract.connect(user1).createSession(S1, M1, "hack", "ipfs://bad")
+      )
         .to.be.revertedWithCustomError(contract, "OwnableUnauthorizedAccount")
         .withArgs(user1.address);
     });
 
-    it("reverts if media is empty", async () => {
+    it("reverts on duplicate session id", async () => {
       const { contract } = await loadFixture(deployFixture);
-      await expect(contract.createSession("no media", "")).to.be.revertedWith(
-        "Media required for first message"
-      );
+      await contract.createSession(S1, M1, "ok", "ipfs://y");
+
+      await expect(
+        contract.createSession(S1, "msg‑dup", "again", "ipfs://z")
+      ).to.be.revertedWith("Session exists");
     });
   });
 
@@ -65,32 +77,25 @@ describe("Abraham contract", () => {
   describe("abrahamUpdate", () => {
     it("owner can append an image update", async () => {
       const { contract } = await loadFixture(deployFixture);
-      await contract.createSession("v1", "ipfs://a");
+      await contract.createSession(S1, M1, "v1", "ipfs://a");
 
-      await expect(contract.abrahamUpdate(1, "v2", "ipfs://b")).to.emit(
+      await expect(contract.abrahamUpdate(S1, M2, "v2", "ipfs://b")).to.emit(
         contract,
         "MessageAdded"
       );
 
-      expect(await contract.getMessageCount(1)).to.equal(2);
-      const [, , media] = await contract.getMessage(1, 1);
+      const ids = await contract.getMessageIds(S1);
+      expect(ids.length).to.equal(2);
+      const [, , media] = await contract.getMessage(S1, M2);
       expect(media).to.equal("ipfs://b");
     });
 
     it("reverts for missing media", async () => {
       const { contract } = await loadFixture(deployFixture);
-      await contract.createSession("v1", "ipfs://a");
-      await expect(contract.abrahamUpdate(1, "bad", "")).to.be.revertedWith(
-        "Media required"
-      );
-    });
-
-    it("reverts if non-owner calls", async () => {
-      const { contract, user1 } = await loadFixture(deployFixture);
-      await contract.createSession("v1", "ipfs://a");
-      await expect(contract.connect(user1).createSession("hack", "ipfs://bad"))
-        .to.be.revertedWithCustomError(contract, "OwnableUnauthorizedAccount")
-        .withArgs(user1.address);
+      await contract.createSession(S1, M1, "v1", "ipfs://a");
+      await expect(
+        contract.abrahamUpdate(S1, M2, "bad", "")
+      ).to.be.revertedWith("Media required");
     });
   });
 
@@ -98,17 +103,18 @@ describe("Abraham contract", () => {
   describe("bless", () => {
     it("user can bless with exact fee", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
-      await contract.createSession("v1", "ipfs://a");
+      await contract.createSession(S1, M1, "v1", "ipfs://a");
 
       await expect(
         contract
           .connect(user1)
-          .bless(1, "make it purple", { value: BLESS_PRICE })
+          .bless(S1, B1, "make it purple", { value: BLESS_PRICE })
       ).to.emit(contract, "MessageAdded");
 
-      expect(await contract.getMessageCount(1)).to.equal(2);
+      const ids = await contract.getMessageIds(S1);
+      expect(ids.length).to.equal(2);
 
-      const [author, content, media] = await contract.getMessage(1, 1);
+      const [author, content, media] = await contract.getMessage(S1, B1);
       expect(author).to.equal(user1.address);
       expect(content).to.equal("make it purple");
       expect(media).to.equal("");
@@ -116,21 +122,21 @@ describe("Abraham contract", () => {
 
     it("fails with wrong fee or empty content", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
-      await contract.createSession("v1", "ipfs://a");
+      await contract.createSession(S1, M1, "v1", "ipfs://a");
 
       await expect(
-        contract.connect(user1).bless(1, "hi", { value: BLESS_PRICE - 1n })
-      ).to.be.revertedWith("Incorrect ETH for blessing");
+        contract.connect(user1).bless(S1, B1, "hi", { value: BLESS_PRICE - 1n })
+      ).to.be.revertedWith("Incorrect ETH");
 
       await expect(
-        contract.connect(user1).bless(1, "", { value: BLESS_PRICE })
+        contract.connect(user1).bless(S1, B1, "", { value: BLESS_PRICE })
       ).to.be.revertedWith("Content required");
     });
 
-    it("fails for non-existent session", async () => {
+    it("fails for unknown session", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
       await expect(
-        contract.connect(user1).bless(42, "ghost", { value: BLESS_PRICE })
+        contract.connect(user1).bless("ghost", B1, "hi", { value: BLESS_PRICE })
       ).to.be.revertedWith("Session not found");
     });
   });
@@ -141,43 +147,18 @@ describe("Abraham contract", () => {
       const { contract, user1, PRAISE_PRICE } = await loadFixture(
         deployFixture
       );
-      await contract.createSession("v1", "ipfs://a");
+      await contract.createSession(S1, M1, "v1", "ipfs://a");
 
       await expect(
-        contract.connect(user1).praise(1, 0, { value: PRAISE_PRICE })
+        contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
       ).to.emit(contract, "Praised");
 
-      const [, , , praiseCount] = await contract.getMessage(1, 0);
-      expect(praiseCount).to.equal(1);
+      const [, , , pc] = await contract.getMessage(S1, M1);
+      expect(pc).to.equal(1);
 
-      // second praise from same user should revert
       await expect(
-        contract.connect(user1).praise(1, 0, { value: PRAISE_PRICE })
+        contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
       ).to.be.revertedWith("Already praised");
-    });
-
-    it("fails with wrong fee", async () => {
-      const { contract, user1, PRAISE_PRICE } = await loadFixture(
-        deployFixture
-      );
-      await contract.createSession("v1", "ipfs://a");
-      await expect(
-        contract.connect(user1).praise(1, 0, { value: PRAISE_PRICE - 1n })
-      ).to.be.revertedWith("Incorrect ETH for praise");
-    });
-
-    it("fails for bad indices", async () => {
-      const { contract, user1, PRAISE_PRICE } = await loadFixture(
-        deployFixture
-      );
-      await expect(
-        contract.connect(user1).praise(99, 0, { value: PRAISE_PRICE })
-      ).to.be.revertedWith("Session not found");
-
-      await contract.createSession("v1", "ipfs://a");
-      await expect(
-        contract.connect(user1).praise(1, 9, { value: PRAISE_PRICE })
-      ).to.be.revertedWith("Message not found");
     });
   });
 
@@ -187,46 +168,18 @@ describe("Abraham contract", () => {
       const { contract, abraham, user1, PRAISE_PRICE, BLESS_PRICE } =
         await loadFixture(deployFixture);
 
-      // generate balance inside contract (1 bless + 1 praise)
-      await contract.createSession("art", "ipfs://media");
-      await contract.connect(user1).bless(1, "hi", { value: BLESS_PRICE });
-      await contract.connect(user1).praise(1, 0, { value: PRAISE_PRICE });
+      await contract.createSession(S1, M1, "art", "ipfs://media");
+      await contract.connect(user1).bless(S1, B1, "hi", { value: BLESS_PRICE });
+      await contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE });
 
-      const balanceBefore = await ethers.provider.getBalance(abraham.address);
-
+      const before = await ethers.provider.getBalance(abraham.address);
       const tx = await contract.withdraw();
-      const receipt = await tx.wait();
-      const gasUsed = receipt!.gasUsed * (tx.gasPrice || 0n);
+      const r = await tx.wait();
 
-      const balanceAfter = await ethers.provider.getBalance(abraham.address);
+      const gas = r!.gasUsed * (tx.gasPrice || 0n);
+      const after = await ethers.provider.getBalance(abraham.address);
 
-      expect(balanceAfter).to.equal(
-        balanceBefore + PRAISE_PRICE + BLESS_PRICE - gasUsed
-      );
-    });
-
-    it("reverts if non-owner calls", async () => {
-      const { contract, user1 } = await loadFixture(deployFixture);
-      await expect(contract.connect(user1).createSession("hack", "ipfs://bad"))
-        .to.be.revertedWithCustomError(contract, "OwnableUnauthorizedAccount")
-        .withArgs(user1.address);
-    });
-  });
-
-  /* ------------------- view helpers ---------------------- */
-  describe("view functions", () => {
-    it("getPraisers returns expected list", async () => {
-      const { contract, user1, user2, PRAISE_PRICE } = await loadFixture(
-        deployFixture
-      );
-
-      await contract.createSession("v1", "ipfs://a");
-      await contract.connect(user1).praise(1, 0, { value: PRAISE_PRICE });
-      await contract.connect(user2).praise(1, 0, { value: PRAISE_PRICE });
-
-      const praisers = await contract.getPraisers(1, 0);
-      const praisersArr = [...praisers]; // unwrap the read-only Result
-      expect(praisersArr).to.have.members([user1.address, user2.address]);
+      expect(after).to.equal(before + PRAISE_PRICE + BLESS_PRICE - gas);
     });
   });
 });

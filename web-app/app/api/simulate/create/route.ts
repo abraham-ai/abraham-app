@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import { PinataSDK } from "pinata-web3";
+import { randomUUID } from "crypto";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import fetch from "node-fetch";
 
-/*──────────────────── env ────────────────────*/
+/*──────────────── env vars ─────────────────*/
 const {
   NEXT_PUBLIC_RPC_URL: RPC_URL,
   PRIVATE_KEY,
@@ -12,66 +13,70 @@ const {
   PINATA_JWT,
 } = process.env;
 
-if (!RPC_URL || !PRIVATE_KEY || !CONTRACT || !PINATA_JWT)
-  throw new Error("Missing env vars");
+if (!RPC_URL || !PRIVATE_KEY || !CONTRACT || !PINATA_JWT) {
+  throw new Error("Missing env vars for creation endpoint");
+}
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY!, provider);
-const contract = new ethers.Contract(CONTRACT!, AbrahamAbi, wallet);
+const abraham = new ethers.Contract(CONTRACT!, AbrahamAbi, wallet);
 const pinata = new PinataSDK({ pinataJwt: PINATA_JWT! });
 
-/*──────────────── helper: upload image & metadata ───────────────*/
+/*──────── optional helper: upload to IPFS ───────*/
 async function fetchBytes(url: string) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Image fetch failed: ${res.statusText}`);
+  if (!res.ok) throw new Error(`fetch ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
-
-async function uploadToPinata(imgUrl: string, content: string) {
-  /* 1) image → IPFS */
-  const imgBuf = await fetchBytes(imgUrl);
-  const imgFile = new File([imgBuf], "abraham.png", { type: "image/png" });
-  const imgUp = await pinata.upload.file(imgFile);
-  const imgIpfs = `ipfs://${imgUp.IpfsHash}`;
-
-  /* 2) metadata → IPFS */
-  const meta = {
+async function uploadToPinata(imgUrl: string, text: string) {
+  const buf = await fetchBytes(imgUrl);
+  const file = new File([buf], "cover.png", { type: "image/png" });
+  const img = await pinata.upload.file(file);
+  const meta = await pinata.upload.json({
     name: "Abraham Creation",
-    description: content,
-    image: imgIpfs,
-  };
-  const metaUp = await pinata.upload.json(meta);
-  return `ipfs://${metaUp.IpfsHash}`;
+    description: text,
+    image: `ipfs://${img.IpfsHash}`,
+  });
+  return `ipfs://${meta.IpfsHash}`;
 }
 
-/*──────────────────────── POST /creation ────────────────────────
-   Body: { imageUrl: string, content: string }
-──────────────────────────────────────────────────────────────────*/
+/*──────── POST /api/creations ─────────────*/
 export async function POST(req: NextRequest) {
   try {
-    //const { imageUrl, content } = await req.json();
-    // if (!imageUrl || !content)
-    //   return NextResponse.json(
-    //     { error: "imageUrl & content required" },
-    //     { status: 400 }
+    //   const { imageUrl, content } = await req.json();
+
+    //   if (!imageUrl || !content) {
+    //     return NextResponse.json(
+    //       { error: "imageUrl & content required" },
+    //       { status: 400 }
+    //     );
+    //   }
+
+    //   // const mediaUri = await uploadToPinata(imageUrl, content); // enable if desired
+    //   const mediaUri = imageUrl;
+
+    //   /* fresh UUIDs */
+    //   const sessionId = randomUUID();
+    //   const firstMessageId = randomUUID();
+
+    //   /* send tx */
+    //   const tx = await abraham.createSession(
+    //     sessionId,
+    //     firstMessageId,
+    //     content,
+    //     mediaUri
     //   );
+    //   const rcpt = await tx.wait();
 
-    // // const metadataUri = await uploadToPinata(imageUrl, content);
-
-    // const tx = await contract.createSession(content, imageUrl);
-    // const receipt = await tx.wait();
-
-    // return NextResponse.json(
-    //   {
-    //     txHash: receipt.transactionHash,
-    //     sessionId: receipt.logs[0]?.topics[1] // SessionCreated indexed id
-    //       ? BigInt(receipt.logs[0].topics[1]).toString()
-    //       : "unknown",
-    //     imageUrl,
-    //   },
-    //   { status: 200 }
-    // );
-
+    //   return NextResponse.json(
+    //     {
+    //       txHash: rcpt.transactionHash,
+    //       sessionId,
+    //       firstMessageId,
+    //       imageUrl: mediaUri,
+    //     },
+    //     { status: 200 }
+    //   );
     return NextResponse.json(
       {
         error:
@@ -80,7 +85,7 @@ export async function POST(req: NextRequest) {
       { status: 503 }
     );
   } catch (e: any) {
-    console.error(e);
+    console.error("createSession api:", e);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
