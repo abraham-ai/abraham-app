@@ -52,9 +52,16 @@ export async function GET(_req: NextRequest) {
       const abrahamMsgs = c.messages.filter(
         (m) => m.author.toLowerCase() === OWNER
       );
-      const blessingsRaw = c.messages.filter(
-        (m) => m.author.toLowerCase() !== OWNER
-      );
+      const blessingsRaw = c.messages
+        .filter((m) => m.author.toLowerCase() !== OWNER)
+        .map((m) => ({
+          author: m.author,
+          content: m.content,
+          praiseCount: m.praiseCount,
+          timestamp: m.timestamp,
+          messageIdx: m.index,
+          creationId: c.id,
+        }));
 
       const latest = abrahamMsgs[abrahamMsgs.length - 1] as
         | SubgraphMessage
@@ -69,7 +76,7 @@ export async function GET(_req: NextRequest) {
         messageIndex: latest?.index ?? 0,
         ethTotal: Number((BigInt(c.ethSpent) / BigInt(1e14)).toString()) / 1e4,
         blessingCnt: blessingsRaw.length,
-        blessings: blessingsRaw as Blessing[],
+        blessings: blessingsRaw,
         messages: c.messages,
       };
     });

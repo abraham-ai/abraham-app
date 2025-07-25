@@ -21,6 +21,8 @@ export interface Blessing {
   content: string;
   praiseCount: number;
   timestamp?: string;
+  messageIdx: number; // index of the blessing message
+  creationId: string; // parent creation id
 }
 
 export interface CreationItem {
