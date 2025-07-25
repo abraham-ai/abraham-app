@@ -43,47 +43,47 @@ async function uploadToPinata(imgUrl: string, text: string) {
 /*──────── POST /api/creations ─────────────*/
 export async function POST(req: NextRequest) {
   try {
-    const { imageUrl, content } = await req.json();
+    //   const { imageUrl, content } = await req.json();
 
-    if (!imageUrl || !content) {
-      return NextResponse.json(
-        { error: "imageUrl & content required" },
-        { status: 400 }
-      );
-    }
+    //   if (!imageUrl || !content) {
+    //     return NextResponse.json(
+    //       { error: "imageUrl & content required" },
+    //       { status: 400 }
+    //     );
+    //   }
 
-    // const mediaUri = await uploadToPinata(imageUrl, content); // enable if desired
-    const mediaUri = imageUrl;
+    //   // const mediaUri = await uploadToPinata(imageUrl, content); // enable if desired
+    //   const mediaUri = imageUrl;
 
-    /* fresh UUIDs */
-    const sessionId = randomUUID();
-    const firstMessageId = randomUUID();
+    //   /* fresh UUIDs */
+    //   const sessionId = randomUUID();
+    //   const firstMessageId = randomUUID();
 
-    /* send tx */
-    const tx = await abraham.createSession(
-      sessionId,
-      firstMessageId,
-      content,
-      mediaUri
-    );
-    const rcpt = await tx.wait();
+    //   /* send tx */
+    //   const tx = await abraham.createSession(
+    //     sessionId,
+    //     firstMessageId,
+    //     content,
+    //     mediaUri
+    //   );
+    //   const rcpt = await tx.wait();
 
+    //   return NextResponse.json(
+    //     {
+    //       txHash: rcpt.transactionHash,
+    //       sessionId,
+    //       firstMessageId,
+    //       imageUrl: mediaUri,
+    //     },
+    //     { status: 200 }
+    //   );
     return NextResponse.json(
       {
-        txHash: rcpt.transactionHash,
-        sessionId,
-        firstMessageId,
-        imageUrl: mediaUri,
+        error:
+          "This endpoint is currently disabled. Please uncomment the code in the handler.",
       },
-      { status: 200 }
+      { status: 503 }
     );
-    // return NextResponse.json(
-    //   {
-    //     error:
-    //       "This endpoint is currently disabled. Please uncomment the code in the handler.",
-    //   },
-    //   { status: 503 }
-    // );
   } catch (e: any) {
     console.error("createSession api:", e);
     return NextResponse.json({ error: e.message }, { status: 500 });
