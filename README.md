@@ -1,9 +1,5 @@
 ## How Abraham talks to the on‑chain contract
 
-_(only two things to remember)_
-
----
-
 ### 1  Start a **brand‑new Creation** (session)
 
 1. Upload the **first image** to IPFS
