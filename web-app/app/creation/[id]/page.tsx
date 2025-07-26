@@ -7,6 +7,7 @@ import axios from "axios";
 import AppBar from "@/components/layout/AppBar";
 import CreationCard from "@/components/abraham/creations/Creation";
 import Blessings from "@/components/abraham/creations/Blessings";
+import BlessBox from "@/components/abraham/creations/BlessBox";
 
 import { CreationItem, SubgraphMessage } from "@/types/abraham";
 import { useAuth } from "@/context/auth-context";
@@ -114,7 +115,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
   return (
     <>
       <AppBar />
-      <main className="mt-12 flex flex-col items-center">
+      <main className="mt-12 mb-12 flex flex-col items-center">
         {loading && (
           <div className="flex flex-col items-center mt-10">
             <Loader2Icon className="w-6 h-6 animate-spin text-primary" />
@@ -131,7 +132,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
 
         {!loading && !error && creation && (
           <div className="flex flex-col items-center border-x">
-            {timeline.map((g) => (
+            {timeline.map((g, index) => (
               <div key={g.abraham.uuid} className="w-full">
                 <CreationCard
                   creation={{
@@ -146,12 +147,11 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                     praiseCount: g.abraham.praiseCount,
                     messageUuid: g.abraham.uuid,
                   }}
-                  onNewBlessing={handleNewBlessing}
                 />
 
                 <Blessings
                   blessings={[...g.blessings]
-                    .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
+                    .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
                     .map((b) => ({
                       author: b.author,
                       content: b.content,
@@ -163,6 +163,10 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                 />
               </div>
             ))}
+            <BlessBox 
+              creation={creation} 
+              onNewBlessing={handleNewBlessing}
+            />
           </div>
         )}
       </main>

@@ -24,10 +24,8 @@ import { getRelativeTime } from "@/lib/time-utils";
 
 export default function Creation({
   creation,
-  onNewBlessing,
 }: {
   creation: CreationItem;
-  onNewBlessing?: (...args: any[]) => void;
 }) {
   const { loggedIn, login, loadingAuth } = useAuth();
   const { praise } = useAbrahamContract();
