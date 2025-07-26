@@ -59,7 +59,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         current.blessings.push(m);
       }
     });
-    return groups.reverse(); // newest first
+    return groups; // oldest first
   }, [creation]);
 
   /* optimistic local insert */
