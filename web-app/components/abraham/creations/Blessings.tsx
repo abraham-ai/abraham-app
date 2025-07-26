@@ -10,6 +10,7 @@ import {
 import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
+import { getRelativeTime } from "@/lib/time-utils";
 
 export default function Blessings({ blessings }: { blessings: Blessing[] }) {
   const { loggedIn, login, loadingAuth } = useAuth();
@@ -40,34 +41,30 @@ export default function Blessings({ blessings }: { blessings: Blessing[] }) {
       {blessings.map((b, i) => (
         <div
           key={b.messageUuid}
-          className="grid grid-cols-12 border-b p-4 lg:w-[43vw] w-full"
+          className="border-b p-4 lg:w-[43vw] w-full"
         >
-          <div className="col-span-1 mr-3 overflow-hidden">
-            <RandomPixelAvatar username={b.author} size={32} />
+          <div className="flex items-center mb-3">
+            <div className="mr-3">
+              <RandomPixelAvatar username={b.author} size={40} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-sm">{b.author.slice(0, 6)}...{b.author.slice(-4)}</span>
+              <span className="text-xs text-gray-500">{getRelativeTime(Number(b.timestamp) * 1000)}</span>
+            </div>
           </div>
-          <div className="col-span-11 flex flex-col gap-1">
-            <div>{b.content}</div>
-            <div className="text-xs text-gray-400">
-              {new Date(Number(b.timestamp) * 1000).toLocaleString()}
-            </div>
-            <div className="flex items-center mt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={loadingIdx === i}
-                onClick={() => loginOrPraise(i)}
-              >
-                {loadingIdx === i ? (
-                  <Loader2Icon className="w-4 h-4 animate-spin" />
-                ) : (
-                  "🙌"
-                )}
-              </Button>
-              <span className="ml-2 text-sm">{counts[i]}</span>
-              <span className="ml-2 text-xs text-gray-400">
-                ({PRAISE_PRICE_ETHER.toFixed(5)} ETH)
-              </span>
-            </div>
+          <div className="mb-3">{b.content}</div>
+          <div className="flex items-center pl-2">
+            <button
+              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors"
+              disabled={loadingIdx === i}
+              onClick={() => loginOrPraise(i)}
+            >
+              <span className="text-2xl">🙌</span>
+              <span className="text-base font-medium">{counts[i]} praise{counts[i] !== 1 ? 's' : ''}</span>
+            </button>
+            <span className="ml-4 text-xs text-gray-400">
+              ({PRAISE_PRICE_ETHER.toFixed(5)} ETH)
+            </span>
           </div>
         </div>
       ))}

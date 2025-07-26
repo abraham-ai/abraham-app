@@ -92,10 +92,10 @@ export default function BlessDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
-          className="cursor-pointer hover:scale-110 transition-transform"
+          className="flex items-center space-x-2 text-gray-600 hover:text-blue-500 transition-colors"
           disabled={loading}
         >
-          🙏
+          <span className="text-2xl">🙏</span>
         </button>
       </DialogTrigger>
 

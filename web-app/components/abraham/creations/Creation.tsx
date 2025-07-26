@@ -9,7 +9,6 @@ import {
   useAbrahamContract,
   PRAISE_PRICE_ETHER,
 } from "@/hooks/use-abraham-contract";
-import BlessDialog from "./BlessDialog";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
+import { getRelativeTime } from "@/lib/time-utils";
 
 export default function Creation({
   creation,
@@ -31,9 +31,7 @@ export default function Creation({
 }) {
   const { loggedIn, login, loadingAuth } = useAuth();
   const { praise } = useAbrahamContract();
-  const [totEth, setTotEth] = useState(creation.ethTotal);
   const [praises, setPraises] = useState(creation.praiseCount);
-  const [blessingsCnt, setBlessingsCnt] = useState(creation.blessingCnt);
   const [loadingPraise, setLoadingPraise] = useState(false);
 
   const handlePraise = async () => {
@@ -45,91 +43,74 @@ export default function Creation({
     try {
       await praise(creation.id, creation.messageUuid);
       setPraises((p) => p + 1);
-      setTotEth((e) => e + PRAISE_PRICE_ETHER);
     } finally {
       setLoadingPraise(false);
     }
   };
 
   /* timestamps */
-  const createdAt = new Date(
-    Number(creation.firstMessageAt) * 1000
-  ).toLocaleDateString();
-  const updatedAt = new Date(
-    Number(creation.lastActivityAt) * 1000
-  ).toLocaleString();
+  const createdAt = getRelativeTime(Number(creation.firstMessageAt) * 1000);
+  const updatedAt = getRelativeTime(Number(creation.lastActivityAt) * 1000);
 
   return (
-    <div className="grid grid-cols-12 border-b p-4 lg:w-[43vw] w-full">
-      <Link href={`/creation/${creation.id}`} className="col-span-1 mr-3">
+    <div className="border-b p-4 lg:w-[43vw] w-full">
+      <div className="flex items-center mb-3">
+        <Link href={`/creation/${creation.id}`} className="mr-3">
+          <Image
+            src="/abrahamlogo.png"
+            alt="avatar"
+            width={40}
+            height={40}
+            className="rounded-full border aspect-square"
+          />
+        </Link>
+        <div className="flex flex-col">
+          <span className="font-semibold">Abraham</span>
+          <span className="text-xs text-gray-500">{updatedAt}</span>
+        </div>
+      </div>
+
+      <Link href={`/creation/${creation.id}`} className="block">
+        <p className="mb-3">{creation.description}</p>
         <Image
-          src="/abrahamlogo.png"
-          alt="avatar"
-          width={100}
-          height={100}
-          className="rounded-full border aspect-square"
+          src={creation.image || "/placeholder.svg"}
+          alt="creation"
+          width={500}
+          height={400}
+          className="w-full rounded-lg border"
+          onError={() => showErrorToast(new Error("image"), "Image Error")}
         />
       </Link>
 
-      <div className="col-span-11 flex flex-col">
-        <Link href={`/creation/${creation.id}`} className="flex flex-col pr-8">
-          <p className="mb-1">{creation.description}</p>
-          <Image
-            src={creation.image || "/placeholder.svg"}
-            alt="creation"
-            width={500}
-            height={300}
-            className="w-full rounded-lg aspect-[5/4] object-cover mt-2 border"
-            onError={() => showErrorToast(new Error("image"), "Image Error")}
-          />
-        </Link>
-
-        <div className="text-xs text-gray-400 mt-2">
-          Created {createdAt} • Last {updatedAt}
-        </div>
-
-        {/* actions */}
-        <div className="flex items-center mt-4 mb-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <button
-                className="text-gray-500 hover:text-blue-500"
-                disabled={loadingPraise}
-              >
-                🙌
-              </button>
-            </DialogTrigger>
-            <DialogContent className="bg-white">
-              <DialogHeader>
-                <DialogTitle>Praise Creation</DialogTitle>
-                <DialogDescription>
-                  {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button onClick={handlePraise} disabled={loadingPraise}>
-                  {loadingPraise && (
-                    <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
-                  )}
-                  {loadingPraise ? "Praising…" : "Praise"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <span className="ml-1 text-sm font-semibold">{praises}</span>
-
-          {/* bless */}
-          <div className="ml-10">
-            <BlessDialog
-              creation={creation}
-              blessingsCount={blessingsCnt}
-              setBlessingsCount={setBlessingsCnt}
-              setLocalTotalEthUsed={setTotEth}
-              onNewBlessing={onNewBlessing}
-            />
-          </div>
-          <span className="ml-1 text-sm font-semibold">{blessingsCnt}</span>
-        </div>
+      {/* actions */}
+      <div className="flex items-center mt-3 pl-2">
+        <Dialog>
+          <DialogTrigger asChild>
+            <button
+              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors"
+              disabled={loadingPraise}
+            >
+              <span className="text-3xl">🙌</span>
+              <span className="text-lg font-medium">{praises} praise{praises !== 1 ? 's' : ''}</span>
+            </button>
+          </DialogTrigger>
+          <DialogContent className="bg-white">
+            <DialogHeader>
+              <DialogTitle>Praise Creation</DialogTitle>
+              <DialogDescription>
+                {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button onClick={handlePraise} disabled={loadingPraise}>
+                {loadingPraise && (
+                  <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
+                )}
+                {loadingPraise ? "Praising…" : "Praise"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
