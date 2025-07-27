@@ -38,7 +38,7 @@ export default function Home() {
   return (
     <div>
       <AppBar />
-      <div className="mt-12 flex flex-col items-center justify-center w-full ">
+      <div className="mt-12 mb-12 flex flex-col items-center justify-center w-full ">
         <div className="flex flex-col items-center justify-center border-x ">
           <CreationList creations={creations || []} />
         </div>
