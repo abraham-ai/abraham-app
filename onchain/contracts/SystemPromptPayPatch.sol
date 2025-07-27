@@ -1,22 +1,30 @@
-// SPDX-License-Identifier: MIT
+// SPDX‑License‑Identifier: MIT
 pragma solidity ^0.8.24;
 
+/**
+ *  SystemPromptPayPatch – simple pay‑per‑byte editable document
+ *  ------------------------------------------------------------
+ *  • Stores every version in a `string[] _versions` array.
+ *  • `applyPatch()` uses the 3‑byte KEEP / DELETE / INSERT format.
+ *  • Each patch must prepay `changedBytes × pricePerByte`.
+ *  • No “blob” trick, no inner create call → easier to reason about.
+ */
 contract SystemPromptPayPatch {
-    /* ───────── pricing & ownership ───────── */
-    uint256 public pricePerByte = 1e13;               // 0.00001 ETH
+    /* ─── pricing & ownership ───────────────────────────── */
+    uint256 public pricePerByte = 1e13;          // 0.00001 ETH
     address public immutable owner;
     modifier onlyOwner() { require(msg.sender == owner, "!owner"); _; }
 
-    /* ───────── versioned storage ─────────── */
-    uint256 public latestVersion;                     // starts at 0
-    mapping(uint256 => address) private _blobOf;      // version ⇒ blob ptr
+    /* ─── versioned storage ─────────────────────────────── */
+    string[] private _versions;                  // v0 after deploy
+    uint256  public latestVersion;
 
-    /* ───────── op‑codes ───────────────────── */
+    /* ─── op‑codes ──────────────────────────────────────── */
     uint8 private constant OP_KEEP   = 0x00;
     uint8 private constant OP_DELETE = 0x01;
     uint8 private constant OP_INSERT = 0x02;
 
-    /* ───────── events ─────────────────────── */
+    /* ─── events ────────────────────────────────────────── */
     event Patched(
         uint256 indexed version,
         address indexed editor,
@@ -27,46 +35,51 @@ contract SystemPromptPayPatch {
     );
     event PriceChanged(uint256 newWei);
 
-    /* ───────── ctor ───────────────────────── */
+    /* ─── constructor ───────────────────────────────────── */
     constructor(string memory initialText) {
-        owner         = msg.sender;
-        _blobOf[0]    = _blobWrite(bytes(initialText));
-        latestVersion = 0;
+        owner          = msg.sender;
+        _versions.push(initialText);             // v0
+        latestVersion  = 0;
     }
 
-    /* ───────── public views ───────────────── */
+    /* ─── public views ─────────────────────────────────── */
     function text() public view returns (string memory) {
-        return string(_blobRead(_blobOf[latestVersion]));
+        return _versions[latestVersion];
     }
     function textAt(uint256 v) external view returns (string memory) {
         require(v <= latestVersion, "no such version");
-        return string(_blobRead(_blobOf[v]));
+        return _versions[v];
     }
 
-    /* ───────── admin ──────────────────────── */
-    function setPrice(uint256 newWei) external onlyOwner {
-        pricePerByte = newWei; emit PriceChanged(newWei);
+    /* ─── admin helpers ────────────────────────────────── */
+    function setPrice(uint256 weiPerByte) external onlyOwner {
+        pricePerByte = weiPerByte;
+        emit PriceChanged(weiPerByte);
     }
-    function withdraw(address payable to, uint256 amount) external onlyOwner {
-        to.transfer(amount == 0 ? address(this).balance : amount);
+    function withdraw() external onlyOwner {
+        payable(owner).transfer(address(this).balance);
     }
 
-    /* ───────── main entry: patch + pay ───── */
+    /* ─── main entry: patch + pay ───────────────────────── */
     function applyPatch(bytes calldata ops) external payable {
-        bytes memory old = _blobRead(_blobOf[latestVersion]);
+        bytes memory old = bytes(_versions[latestVersion]);
 
-        uint256 src=0; uint256 op=0; uint256 dst=0; uint256 changed=0;
+        uint256 src = 0;                       // cursor in old
+        uint256 op  = 0;                       // cursor in ops
+        uint256 dst = 0;                       // cursor in buf
+        uint256 changed = 0;                   // bytes inserted+deleted
+
         bytes memory buf = new bytes(old.length + ops.length);
 
         while (op < ops.length) {
-            require(op + 3 <= ops.length, "trunc op");
-            uint8 code = uint8(ops[op]);
-            uint16 n   = (uint16(uint8(ops[op+1]))<<8)|uint8(ops[op+2]);
+            require(op + 3 <= ops.length, "truncated op");
+            uint8  code = uint8(ops[op]);
+            uint16 n    = (uint16(uint8(ops[op+1])) << 8) | uint8(ops[op+2]);
             op += 3;
 
             if (code == OP_KEEP) {
                 require(src + n <= old.length, "KEEP OOB");
-                _cpy(old, src, buf, dst, n); src += n; dst += n;
+                _cpy(old, src, buf, dst, n);  src += n; dst += n;
             } else if (code == OP_DELETE) {
                 require(src + n <= old.length, "DEL OOB");
                 src += n; changed += n;
@@ -77,38 +90,41 @@ contract SystemPromptPayPatch {
             } else revert("bad op");
         }
         require(src == old.length, "patch underruns");
-        assembly { mstore(buf, dst) }                           // shrink
+
+        assembly { mstore(buf, dst) }          // shrink buffer
 
         uint256 due = changed * pricePerByte;
-        require(msg.value >= due, "under-pay");
+        require(msg.value >= due, "under pay");
 
-        address ptr             = _blobWrite(buf);
-        uint256 v               = ++latestVersion;
-        _blobOf[v]              = ptr;
+        string memory newText = string(buf);
+        _versions.push(newText);
+        latestVersion = _versions.length - 1;
+
         if (msg.value > due) payable(msg.sender).transfer(msg.value - due);
 
-        emit Patched(v, msg.sender, changed, due, dst, keccak256(buf));
+        emit Patched(
+            latestVersion,
+            msg.sender,
+            changed,
+            due,
+            dst,
+            keccak256(buf)
+        );
     }
 
-    /* ───────── blob helpers ───────────────── */
-    function _blobWrite(bytes memory data) internal returns (address ptr) {
-        bytes memory code = abi.encodePacked(hex"00", data);
-        assembly { ptr := create(0, add(code, 32), mload(code)) }
-        require(ptr != address(0), "blob fail");
-    }
-    function _blobRead(address ptr) internal view returns (bytes memory d) {
-        uint256 len; assembly { len := sub(extcodesize(ptr), 1) }
-        d = new bytes(len);
-        assembly { extcodecopy(ptr, add(d,32), 1, len) }
-    }
+    /* ─── tiny mem‑copy helpers ────────────────────────── */
+    function _cpy(
+        bytes memory s, uint256 si,
+        bytes memory d, uint256 di,
+        uint256 n
+    ) private pure { for (uint256 i; i < n; ++i) d[di+i] = s[si+i]; }
 
-    /* ───────── mem‑copy helpers ───────────── */
-    function _cpy(bytes memory s,uint256 si,bytes memory d,uint256 di,uint256 n) private pure {
-        for (uint256 i; i<n; ++i) d[di+i] = s[si+i];
-    }
-    function _cpyCalldata(bytes calldata s,uint256 si,bytes memory d,uint256 di,uint256 n) private pure {
-        for (uint256 i; i<n; ++i) d[di+i] = s[si+i];
-    }
+    function _cpyCalldata(
+        bytes calldata s, uint256 si,
+        bytes memory   d, uint256 di,
+        uint256 n
+    ) private pure { for (uint256 i; i < n; ++i) d[di+i] = s[si+i]; }
 
+    /* ─── receive accidental ETH / tips ────────────────── */
     receive() external payable {}
 }
