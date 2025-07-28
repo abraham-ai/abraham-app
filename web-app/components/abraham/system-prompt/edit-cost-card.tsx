@@ -30,7 +30,7 @@ export function EditCostCard({
           </div>
           <div>
             <div className="text-sm font-medium text-gray-900">Edit Cost</div>
-            <div className="text-xs text-gray-500">Transaction fees</div>
+            <div className="text-xs text-gray-500">Price effect changes</div>
           </div>
         </div>
         <div className="space-y-2 text-sm">
