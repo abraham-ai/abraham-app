@@ -18,7 +18,7 @@ export function StatusMessages({
   if (dirty && loggedIn) {
     return (
       <div
-        className={`flex items-center gap-2 p-3 rounded-xl text-sm ${
+        className={`flex items-center gap-2 p-3 rounded-lg text-sm ${
           canAfford
             ? "bg-green-50 text-green-700 border border-green-100"
             : "bg-red-50 text-red-700 border border-red-100"
