@@ -112,11 +112,12 @@ export default function SystemPrompt() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="bg-white">
+        <AppBar />
         <div className="flex items-center justify-center min-h-screen">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            <p className="text-gray-500">Loading...</p>
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin " />
+            <p className="text-xs">Loading system prompt</p>
           </div>
         </div>
       </div>
@@ -124,7 +125,7 @@ export default function SystemPrompt() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="bg-white">
       <AppBar />
 
       {/* Main Content */}
