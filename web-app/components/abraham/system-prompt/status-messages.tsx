@@ -40,9 +40,9 @@ export function StatusMessages({
 
   if (!loggedIn) {
     return (
-      <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 text-sm">
+      <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 text-sm">
         <AlertCircle className="h-4 w-4" />
-        <span>Connect your wallet to save changes</span>
+        <span>Sign in to your account to save changes</span>
       </div>
     );
   }
