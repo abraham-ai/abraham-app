@@ -73,8 +73,8 @@ export default function Creation({
         <Image
           src={creation.image || "/placeholder.svg"}
           alt="creation"
-          width={500}
-          height={400}
+          width={1280}
+          height={1024}
           className="w-full rounded-lg border"
           onError={() => showErrorToast(new Error("image"), "Image Error")}
         />
