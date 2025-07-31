@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import AppBar from "@/components/layout/AppBar";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon, CircleXIcon } from "lucide-react";
@@ -26,32 +32,57 @@ import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 
 type SortOption = "most-praised" | "latest";
 
+const PAGE_SIZE = 18;
+
+/* ───────────────────────────────────── component */
 export default function CreationsGrid() {
   const { loggedIn, login, loadingAuth } = useAuth();
   const { praise } = useAbrahamContract();
   const [creations, setCreations] = useState<CreationItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>("latest");
+  const [sortBy, setSortBy] = useState<SortOption>("most-praised");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [praiseCounts, setPraiseCounts] = useState<{[key: string]: number}>({});
   const [loadingPraise, setLoadingPraise] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchCreations = async () => {
-      try {
-        const response = await fetch("/api/creations");
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || `Network error: ${response.statusText}`
-          );
-        }
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-        const { creations } = await response.json();
-        setCreations(creations);
+  /* -------------------------------- fetch helper */
+  const fetchPage = useCallback(async (pageNo: number, sort: SortOption) => {
+    const params = new URLSearchParams({
+      first: PAGE_SIZE.toString(),
+      skip: (pageNo * PAGE_SIZE).toString(),
+      sort,
+    });
+    const res = await fetch(`/api/creations?${params.toString()}`);
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || res.statusText);
+    }
+    const { creations: newCreations } = await res.json();
+    return newCreations as CreationItem[];
+  }, []);
+
+  /* -------------------------------- reset + first load whenever sort changes */
+  useEffect(() => {
+    setCreations([]);
+    setPage(0);
+    setHasMore(true);
+    setLoadingInitial(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const firstBatch = await fetchPage(0, sortBy);
+        setCreations(firstBatch);
+        setHasMore(firstBatch.length === PAGE_SIZE);
+        
         // Initialize praise counts
         const initialCounts: {[key: string]: number} = {};
-        creations.forEach((creation: CreationItem) => {
+        firstBatch.forEach((creation: CreationItem) => {
           const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
           const totalPraises = creation.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
           const blessingCount = creation.messages.filter(
@@ -61,17 +92,56 @@ export default function CreationsGrid() {
         });
         setPraiseCounts(initialCounts);
       } catch (err: any) {
-        console.error("Fetch Error:", err);
         setError(err.message || "An unknown error occurred.");
       } finally {
-        setLoading(false);
+        setLoadingInitial(false);
       }
-    };
+    })();
+  }, [sortBy, fetchPage]);
 
-    fetchCreations();
-  }, []);
+  /* -------------------------------- infinite scroll */
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || loadingMore || !hasMore) return;
 
-  // Calculate total praises for each creation
+    const observer = new IntersectionObserver(
+      async ([entry]) => {
+        if (entry.isIntersecting && !loadingMore && hasMore) {
+          setLoadingMore(true);
+          try {
+            const nextPage = page + 1;
+            const batch = await fetchPage(nextPage, sortBy);
+            setCreations((c) => [...c, ...batch]);
+            setPage(nextPage);
+            setHasMore(batch.length === PAGE_SIZE);
+            
+            // Update praise counts for new batch
+            const newCounts: {[key: string]: number} = {};
+            batch.forEach((creation: CreationItem) => {
+              const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
+              const totalPraises = creation.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
+              const blessingCount = creation.messages.filter(
+                msg => msg.author.toLowerCase() !== ownerAddress
+              ).length;
+              newCounts[creation.id] = totalPraises + (2 * blessingCount);
+            });
+            setPraiseCounts(prev => ({ ...prev, ...newCounts }));
+          } catch (err: any) {
+            console.error(err);
+            setError(err.message || "An unknown error occurred.");
+          } finally {
+            setLoadingMore(false);
+          }
+        }
+      },
+      { rootMargin: "600px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [sentinelRef.current, hasMore, loadingMore, page, sortBy, fetchPage]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* -------------------------------- derived data */
   const creationsWithTotalPraises = useMemo(() => {
     return creations.map(creation => {
       const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
@@ -105,8 +175,9 @@ export default function CreationsGrid() {
     });
   }, [creations, praiseCounts]);
 
-  // Sort creations based on selected option
   const sortedCreations = useMemo(() => {
+    // API already sends correct order for each sort option,
+    // but we keep this as a local fallback.
     const sorted = [...creationsWithTotalPraises];
     if (sortBy === "most-praised") {
       sorted.sort((a, b) => {
@@ -118,8 +189,9 @@ export default function CreationsGrid() {
         return Number(b.lastActivityAt) - Number(a.lastActivityAt);
       });
     } else {
-      // Latest - already sorted by lastActivityAt from API
-      sorted.sort((a, b) => Number(b.lastActivityAt) - Number(a.lastActivityAt));
+      sorted.sort(
+        (a, b) => Number(b.lastActivityAt) - Number(a.lastActivityAt)
+      );
     }
     return sorted;
   }, [creationsWithTotalPraises, sortBy]);
@@ -141,13 +213,14 @@ export default function CreationsGrid() {
     }
   };
 
-  if (loading) {
+  /* ───────────────────────────────────── render states */
+  if (loadingInitial) {
     return (
       <div>
         <AppBar />
         <div className="mt-24 flex flex-col items-center justify-center">
           <Loader2Icon className="w-6 h-6 animate-spin text-primary" />
-          <p className="mt-2 text-sm">Loading creations...</p>
+          <p className="mt-2 text-sm">Loading creations…</p>
         </div>
       </div>
     );
@@ -165,10 +238,12 @@ export default function CreationsGrid() {
     );
   }
 
+  /* ───────────────────────────────────── main grid */
   return (
     <div>
       <AppBar />
-      <div className="mt-16 mb-12 px-2 sm:px-3 lg:px-4 max-w-7xl mx-auto">
+
+      <div className="mt-16 mb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Sort controls */}
         <div className="flex justify-end mb-6">
           <div className="flex gap-2">
@@ -201,8 +276,10 @@ export default function CreationsGrid() {
                       src={creation.lastImage}
                       alt={creation.description}
                       fill
+                      sizes="(max-width: 768px) 100vw,(max-width: 1200px) 50vw,33vw"
                       className="object-cover"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      quality={100}
+                      onError={() => console.error("image failed")}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -260,7 +337,15 @@ export default function CreationsGrid() {
           ))}
         </div>
 
-        {sortedCreations.length === 0 && (
+        {/* infinite-scroll sentinel & loader */}
+        <div ref={sentinelRef} className="h-px" />
+        {loadingMore && (
+          <div className="flex justify-center py-6">
+            <Loader2Icon className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        )}
+
+        {sortedCreations.length === 0 && !loadingMore && (
           <div className="text-center py-12 text-gray-500">
             No creations yet
           </div>

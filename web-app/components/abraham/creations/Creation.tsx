@@ -22,11 +22,7 @@ import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import { getRelativeTime } from "@/lib/time-utils";
 
-export default function Creation({
-  creation,
-}: {
-  creation: CreationItem;
-}) {
+export default function Creation({ creation }: { creation: CreationItem }) {
   const { loggedIn, login, loadingAuth } = useAuth();
   const { praise } = useAbrahamContract();
   const [praises, setPraises] = useState(creation.praiseCount);
@@ -76,6 +72,7 @@ export default function Creation({
           width={1280}
           height={1024}
           className="w-full rounded-lg border"
+          quality={100}
           onError={() => showErrorToast(new Error("image"), "Image Error")}
         />
       </Link>
@@ -94,7 +91,9 @@ export default function Creation({
                   Praise
                 </span>
               </span>
-              {praises > 0 && <span className="text-lg font-medium">{praises}</span>}
+              {praises > 0 && (
+                <span className="text-lg font-medium">{praises}</span>
+              )}
             </button>
           </DialogTrigger>
           <DialogContent className="bg-white">
