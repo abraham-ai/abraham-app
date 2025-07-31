@@ -9,6 +9,7 @@ export interface SubgraphMessage {
 
 export interface SubgraphCreation {
   id: string;
+  closed: boolean;
   ethSpent: string;
   firstMessageAt: string;
   lastActivityAt: string;
@@ -26,6 +27,7 @@ export interface Blessing {
 
 export interface CreationItem {
   id: string;
+  closed: boolean;
   image: string;
   description: string;
   praiseCount: number;

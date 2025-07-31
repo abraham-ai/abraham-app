@@ -14,13 +14,7 @@ import { useAuth } from "@/context/auth-context";
 
 const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
-/* ─────────────────────────────────────────── types */
-interface MessageGroup {
-  abraham: SubgraphMessage;
-  blessings: SubgraphMessage[];
-}
-
-/* ─────────────────────────────────────────── page */
+/* ───────────────────────────────────────── page */
 export default function CreationPage({ params }: { params: { id: string } }) {
   const { loggedIn, authState } = useAuth();
   const userAddr = authState.walletAddress?.toLowerCase();
@@ -28,38 +22,43 @@ export default function CreationPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* fetch creation */
+  /* fetch single creation */
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       setLoading(true);
       try {
         const { data } = await axios.get<CreationItem>(
           `/api/creations/creation?creationId=${params.id}`
         );
-        setCreation(data);
-        setError(null);
+        if (!cancelled) {
+          setCreation(data);
+          setError(null);
+        }
       } catch (e: any) {
-        setError(e.message ?? "fetch error");
+        if (!cancelled) setError(e.message ?? "fetch error");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [params.id, loggedIn, userAddr]);
 
-  /* auto-scroll to bottom on page load */
+  /* scroll to bottom when loaded */
   useEffect(() => {
     if (!loading && creation) {
-      setTimeout(() => {
-        window.scrollTo(0, document.body.scrollHeight);
-      }, 100);
+      setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
     }
   }, [loading, creation]);
 
-  /* group Abraham + blessings */
-  const timeline: MessageGroup[] = useMemo(() => {
+  /* group abraham + blessings */
+  const timeline = useMemo(() => {
     if (!creation) return [];
-    const groups: MessageGroup[] = [];
-    let current: MessageGroup | null = null;
+    const groups: { abraham: SubgraphMessage; blessings: SubgraphMessage[] }[] =
+      [];
+    let current: (typeof groups)[number] | null = null;
 
     creation.messages.forEach((m) => {
       if (m.author.toLowerCase() === OWNER) {
@@ -69,10 +68,10 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         current.blessings.push(m);
       }
     });
-    return groups; // oldest first
+    return groups;
   }, [creation]);
 
-  /* optimistic local insert */
+  /* optimistic blessing insert */
   const handleNewBlessing = (b: {
     userAddress: string;
     message: string;
@@ -82,27 +81,27 @@ export default function CreationPage({ params }: { params: { id: string } }) {
   }) =>
     setCreation((prev) => {
       if (!prev) return prev;
-      const msgs = [...prev.messages];
+      if (prev.closed) return prev; // extra safety
 
-      const abrahamIdx = msgs
+      const msgs = [...prev.messages];
+      const lastAbrahamIdx = msgs
         .map((m, i) => ({ ...m, i }))
         .reverse()
         .find((x) => x.author.toLowerCase() === OWNER)?.i;
 
-      if (abrahamIdx === undefined) return prev;
+      if (lastAbrahamIdx === undefined) return prev;
 
-      const nowTs =
-        b.blockTimestamp ?? Math.floor(Date.now() / 1000).toString();
+      const ts = b.blockTimestamp ?? Math.floor(Date.now() / 1000).toString();
       const newMsg: SubgraphMessage = {
         uuid: b.messageUuid,
         author: b.userAddress,
         content: b.message,
         media: null,
         praiseCount: 0,
-        timestamp: nowTs,
+        timestamp: ts,
       };
 
-      msgs.splice(abrahamIdx + 1, 0, newMsg);
+      msgs.splice(lastAbrahamIdx + 1, 0, newMsg);
 
       return {
         ...prev,
@@ -112,7 +111,6 @@ export default function CreationPage({ params }: { params: { id: string } }) {
             ...newMsg,
             creationId: prev.id,
             messageUuid: newMsg.uuid,
-            praiseCount: 0,
           },
           ...prev.blessings,
         ],
@@ -120,7 +118,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
       };
     });
 
-  /* render */
+  /* ───────────── render ───────────── */
   return (
     <>
       <AppBar />
@@ -141,7 +139,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
 
         {!loading && !error && creation && (
           <div className="flex flex-col items-center border-x">
-            {timeline.map((g, index) => (
+            {timeline.map((g) => (
               <div key={g.abraham.uuid} className="w-full">
                 <CreationCard
                   creation={{
@@ -157,7 +155,6 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                     messageUuid: g.abraham.uuid,
                   }}
                 />
-
                 <Blessings
                   blessings={[...g.blessings]
                     .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
@@ -169,13 +166,15 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                       creationId: creation.id,
                       messageUuid: b.uuid,
                     }))}
+                  closed={creation.closed}
                 />
               </div>
             ))}
-            <BlessBox 
-              creation={creation} 
-              onNewBlessing={handleNewBlessing}
-            />
+
+            {/* bless box hidden if session closed */}
+            {!creation.closed && (
+              <BlessBox creation={creation} onNewBlessing={handleNewBlessing} />
+            )}
           </div>
         )}
       </main>

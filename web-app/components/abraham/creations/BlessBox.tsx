@@ -27,9 +27,18 @@ interface Props {
 export default function BlessBox({ creation, onNewBlessing }: Props) {
   const { loggedIn, login, loadingAuth, authState } = useAuth();
   const { bless } = useAbrahamContract();
-  const userAddress = authState.walletAddress?.toLowerCase() ?? "";
+
+  const userAddr = authState.walletAddress?.toLowerCase() ?? "";
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+
+  if (creation.closed) {
+    return (
+      <div className="p-6 text-center text-sm text-gray-500">
+        Session is closed – no more blessings.
+      </div>
+    );
+  }
 
   const submit = async () => {
     if (!loggedIn) {
@@ -46,15 +55,14 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
       const { msgUuid } = await bless(creation.id, text.trim());
 
       onNewBlessing?.({
-        userAddress,
+        userAddress: userAddr,
         message: text.trim(),
         ethUsed: (BLESS_PRICE_ETHER * 10 ** 18).toString(),
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),
         messageUuid: msgUuid,
       });
-
       setText("");
-    } catch (e) {
+    } catch (_) {
       /* toast handled in hook */
     } finally {
       setLoading(false);
@@ -67,8 +75,8 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
     <div className="border-t p-4 lg:w-[43vw] w-full">
       <div className="flex gap-3">
         <div className="flex-shrink-0">
-          {userAddress ? (
-            <RandomPixelAvatar username={userAddress} size={40} />
+          {userAddr ? (
+            <RandomPixelAvatar username={userAddr} size={40} />
           ) : (
             <div className="w-10 h-10 rounded-full bg-gray-200" />
           )}
@@ -87,8 +95,8 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
                 <span className="text-sm text-gray-500">
                   {text.length > 300 && `${text.length}/320 characters`}
                 </span>
-                <Button 
-                  onClick={submit} 
+                <Button
+                  onClick={submit}
                   disabled={loading || !text.trim()}
                   size="sm"
                 >
@@ -101,7 +109,9 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
             </>
           ) : (
             <div className="flex flex-col items-center py-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-600 mb-3">Connect your wallet to bless this creation</p>
+              <p className="text-gray-600 mb-3">
+                Connect your wallet to bless this creation
+              </p>
               <Button onClick={handleLogin} disabled={loadingAuth}>
                 {loadingAuth ? (
                   <>

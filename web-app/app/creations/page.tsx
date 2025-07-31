@@ -31,26 +31,27 @@ import {
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 
 type SortOption = "most-praised" | "latest";
-
 const PAGE_SIZE = 18;
 
 /* ───────────────────────────────────── component */
 export default function CreationsGrid() {
-  const { loggedIn, login, loadingAuth } = useAuth();
+  const { loggedIn } = useAuth();
   const { praise } = useAbrahamContract();
+
   const [creations, setCreations] = useState<CreationItem[]>([]);
-  const [loadingInitial, setLoadingInitial] = useState(true);
+  const [loadingInit, setLoadingInit] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("most-praised");
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [praiseCounts, setPraiseCounts] = useState<{[key: string]: number}>({});
+  const [praiseCounts, setPraiseCounts] = useState<Record<string, number>>({});
   const [loadingPraise, setLoadingPraise] = useState<string | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
-  /* -------------------------------- fetch helper */
+  /* -------- fetch helper -------- */
   const fetchPage = useCallback(async (pageNo: number, sort: SortOption) => {
     const params = new URLSearchParams({
       first: PAGE_SIZE.toString(),
@@ -59,47 +60,45 @@ export default function CreationsGrid() {
     });
     const res = await fetch(`/api/creations?${params.toString()}`);
     if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.error || res.statusText);
+      const err = await res.json();
+      throw new Error(err.error || res.statusText);
     }
-    const { creations: newCreations } = await res.json();
-    return newCreations as CreationItem[];
+    const { creations: batch } = await res.json();
+    return batch as CreationItem[];
   }, []);
 
-  /* -------------------------------- reset + first load whenever sort changes */
+  /* -------- reset + first load whenever sort changes -------- */
   useEffect(() => {
-    setCreations([]);
-    setPage(0);
-    setHasMore(true);
-    setLoadingInitial(true);
-    setError(null);
-
+    let cancelled = false;
     (async () => {
+      setLoadingInit(true);
+      setError(null);
       try {
         const firstBatch = await fetchPage(0, sortBy);
+        if (cancelled) return;
+
         setCreations(firstBatch);
+        setPage(0);
         setHasMore(firstBatch.length === PAGE_SIZE);
-        
-        // Initialize praise counts
-        const initialCounts: {[key: string]: number} = {};
-        firstBatch.forEach((creation: CreationItem) => {
-          const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
-          const totalPraises = creation.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
-          const blessingCount = creation.messages.filter(
-            msg => msg.author.toLowerCase() !== ownerAddress
-          ).length;
-          initialCounts[creation.id] = totalPraises + (2 * blessingCount);
+
+        /* initialise praise counts = SUM(praiseCount) */
+        const cnt: Record<string, number> = {};
+        firstBatch.forEach((c) => {
+          cnt[c.id] = c.messages.reduce((s, m) => s + m.praiseCount, 0);
         });
-        setPraiseCounts(initialCounts);
+        setPraiseCounts(cnt);
       } catch (err: any) {
-        setError(err.message || "An unknown error occurred.");
+        if (!cancelled) setError(err.message);
       } finally {
-        setLoadingInitial(false);
+        if (!cancelled) setLoadingInit(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [sortBy, fetchPage]);
 
-  /* -------------------------------- infinite scroll */
+  /* -------- infinite scroll -------- */
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node || loadingMore || !hasMore) return;
@@ -109,26 +108,20 @@ export default function CreationsGrid() {
         if (entry.isIntersecting && !loadingMore && hasMore) {
           setLoadingMore(true);
           try {
-            const nextPage = page + 1;
-            const batch = await fetchPage(nextPage, sortBy);
-            setCreations((c) => [...c, ...batch]);
-            setPage(nextPage);
+            const next = page + 1;
+            const batch = await fetchPage(next, sortBy);
+
+            setCreations((prev) => [...prev, ...batch]);
+            setPage(next);
             setHasMore(batch.length === PAGE_SIZE);
-            
-            // Update praise counts for new batch
-            const newCounts: {[key: string]: number} = {};
-            batch.forEach((creation: CreationItem) => {
-              const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
-              const totalPraises = creation.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
-              const blessingCount = creation.messages.filter(
-                msg => msg.author.toLowerCase() !== ownerAddress
-              ).length;
-              newCounts[creation.id] = totalPraises + (2 * blessingCount);
+
+            const cnt: Record<string, number> = {};
+            batch.forEach((c) => {
+              cnt[c.id] = c.messages.reduce((s, m) => s + m.praiseCount, 0);
             });
-            setPraiseCounts(prev => ({ ...prev, ...newCounts }));
+            setPraiseCounts((prev) => ({ ...prev, ...cnt }));
           } catch (err: any) {
-            console.error(err);
-            setError(err.message || "An unknown error occurred.");
+            setError(err.message);
           } finally {
             setLoadingMore(false);
           }
@@ -136,115 +129,100 @@ export default function CreationsGrid() {
       },
       { rootMargin: "600px" }
     );
-
     observer.observe(node);
     return () => observer.disconnect();
-  }, [sentinelRef.current, hasMore, loadingMore, page, sortBy, fetchPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadingMore, hasMore, page, sortBy, fetchPage]);
 
-  /* -------------------------------- derived data */
-  const creationsWithTotalPraises = useMemo(() => {
-    return creations.map(creation => {
-      const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
-      
-      // Use dynamic praise count from state, fallback to calculated
-      const currentPraiseCount = praiseCounts[creation.id] ?? (() => {
-        const totalPraises = creation.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
-        const blessingCount = creation.messages.filter(
-          msg => msg.author.toLowerCase() !== ownerAddress
-        ).length;
-        return totalPraises + (2 * blessingCount);
-      })();
-      
-      // Find the last Abraham message with an image
-      const abrahamMessages = creation.messages.filter(
-        msg => msg.author.toLowerCase() === ownerAddress
+  /* -------- derive latest image + praise totals -------- */
+  const creationsWithComputed = useMemo(() => {
+    return creations.map((c) => {
+      const total =
+        praiseCounts[c.id] ??
+        c.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
+
+      const abrahamMsgs = c.messages.filter(
+        (m) => m.author.toLowerCase() === OWNER
       );
-      const lastImageMessage = [...abrahamMessages]
-        .reverse()
-        .find(msg => msg.media);
-      
-      const lastImage = lastImageMessage?.media?.replace(/^ipfs:\/\//, "https://gateway.pinata.cloud/ipfs/") || "";
-      const lastMessageUuid = lastImageMessage?.uuid || creation.messageUuid;
+      const latestImgMsg = [...abrahamMsgs].reverse().find((m) => m.media);
 
       return {
-        ...creation,
-        totalPraises: currentPraiseCount,
-        lastImage: lastImage || creation.image, // fallback to creation.image if no image found
-        lastMessageUuid: lastMessageUuid // UUID of the message with the last image
+        ...c,
+        totalPraises: total,
+        lastImage:
+          latestImgMsg?.media?.replace(
+            /^ipfs:\/\//,
+            "https://gateway.pinata.cloud/ipfs/"
+          ) || c.image,
+        lastMessageUuid: latestImgMsg?.uuid || c.messageUuid,
       };
     });
-  }, [creations, praiseCounts]);
+  }, [creations, praiseCounts, OWNER]);
 
-  const sortedCreations = useMemo(() => {
-    // API already sends correct order for each sort option,
-    // but we keep this as a local fallback.
-    const sorted = [...creationsWithTotalPraises];
+  /* -------- local sort (fallback) -------- */
+  const sorted = useMemo(() => {
+    const arr = [...creationsWithComputed];
     if (sortBy === "most-praised") {
-      sorted.sort((a, b) => {
-        // Primary sort: by total praises (descending)
-        if (b.totalPraises !== a.totalPraises) {
+      arr.sort((a, b) => {
+        if (b.totalPraises !== a.totalPraises)
           return b.totalPraises - a.totalPraises;
-        }
-        // Tiebreaker: by newest first (descending lastActivityAt)
         return Number(b.lastActivityAt) - Number(a.lastActivityAt);
       });
     } else {
-      sorted.sort(
-        (a, b) => Number(b.lastActivityAt) - Number(a.lastActivityAt)
-      );
+      arr.sort((a, b) => Number(b.lastActivityAt) - Number(a.lastActivityAt));
     }
-    return sorted;
-  }, [creationsWithTotalPraises, sortBy]);
+    return arr;
+  }, [creationsWithComputed, sortBy]);
 
-  const handlePraise = async (creation: any) => {
+  /* -------- praise action -------- */
+  const handlePraise = async (c: { id: string; lastMessageUuid: string }) => {
     if (!loggedIn) {
       showWarningToast("Authentication Required", "Please log in.");
       return;
     }
-    setLoadingPraise(creation.id);
+    if (loadingPraise) return;
+    setLoadingPraise(c.id);
     try {
-      await praise(creation.id, creation.lastMessageUuid);
-      setPraiseCounts(prev => ({
+      await praise(c.id, c.lastMessageUuid);
+      setPraiseCounts((prev) => ({
         ...prev,
-        [creation.id]: (prev[creation.id] || 0) + 1
+        [c.id]: (prev[c.id] ?? 0) + 1,
       }));
     } finally {
       setLoadingPraise(null);
     }
   };
 
-  /* ───────────────────────────────────── render states */
-  if (loadingInitial) {
+  /* ──────────────── RENDER STATES ─────────────── */
+  if (loadingInit) {
     return (
-      <div>
+      <>
         <AppBar />
-        <div className="mt-24 flex flex-col items-center justify-center">
+        <div className="mt-24 flex flex-col items-center">
           <Loader2Icon className="w-6 h-6 animate-spin text-primary" />
           <p className="mt-2 text-sm">Loading creations…</p>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div>
+      <>
         <AppBar />
-        <div className="mt-24 flex flex-col items-center justify-center">
+        <div className="mt-24 flex flex-col items-center">
           <CircleXIcon className="w-6 h-6 text-red-500" />
           <p className="mt-2 text-sm">{error}</p>
         </div>
-      </div>
+      </>
     );
   }
 
-  /* ───────────────────────────────────── main grid */
+  /* ──────────────── MAIN GRID ─────────────── */
   return (
-    <div>
+    <>
       <AppBar />
-
       <div className="mt-16 mb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        {/* Sort controls */}
+        {/* sort controls */}
         <div className="flex justify-end mb-6">
           <div className="flex gap-2">
             <Button
@@ -264,22 +242,25 @@ export default function CreationsGrid() {
           </div>
         </div>
 
-        {/* Grid */}
+        {/* grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {sortedCreations.map((creation) => (
-            <div key={creation.id} className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-              {/* Image - clickable link */}
-              <Link href={`/creation/${creation.id}`} className="block">
+          {sorted.map((c) => (
+            <div
+              key={c.id}
+              className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+            >
+              {/* image link */}
+              <Link href={`/creation/${c.id}`} className="block">
                 <div className="aspect-square relative bg-gray-100">
-                  {creation.lastImage ? (
+                  {c.lastImage ? (
                     <Image
-                      src={creation.lastImage}
-                      alt={creation.description}
+                      src={c.lastImage}
+                      alt={c.description}
                       fill
-                      sizes="(max-width: 768px) 100vw,(max-width: 1200px) 50vw,33vw"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover"
                       quality={100}
-                      onError={() => console.error("image failed")}
+                      onError={() => console.error("image error")}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -289,46 +270,54 @@ export default function CreationsGrid() {
                 </div>
               </Link>
 
-              {/* Info - separate from link */}
+              {/* info */}
               <div className="p-4">
                 <div className="flex items-center justify-between">
                   <Dialog>
                     <DialogTrigger asChild>
                       <button
-                        className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-colors group relative"
-                        disabled={loadingPraise === creation.id}
+                        className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50"
+                        disabled={c.closed || loadingPraise === c.id}
                       >
                         <span className="text-2xl relative">
                           🙌
-                          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                            Praise
+                          <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
+                            {c.closed ? "Closed" : "Praise"}
                           </span>
                         </span>
-                        {creation.totalPraises > 0 && (
-                          <span className="text-lg font-medium">{creation.totalPraises}</span>
+                        {c.totalPraises > 0 && (
+                          <span className="text-lg font-medium">
+                            {c.totalPraises}
+                          </span>
                         )}
                       </button>
                     </DialogTrigger>
-                    <DialogContent className="bg-white">
-                      <DialogHeader>
-                        <DialogTitle>Praise Creation</DialogTitle>
-                        <DialogDescription>
-                          {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button onClick={() => handlePraise(creation)} disabled={loadingPraise === creation.id}>
-                          {loadingPraise === creation.id && (
-                            <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
-                          )}
-                          {loadingPraise === creation.id ? "Praising…" : "Praise"}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
+                    {!c.closed && (
+                      <DialogContent className="bg-white">
+                        <DialogHeader>
+                          <DialogTitle>Praise Creation</DialogTitle>
+                          <DialogDescription>
+                            {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <Button
+                            onClick={() => handlePraise(c)}
+                            disabled={loadingPraise === c.id}
+                          >
+                            {loadingPraise === c.id && (
+                              <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
+                            )}
+                            {loadingPraise === c.id ? "Praising…" : "Praise"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    )}
                   </Dialog>
-                  <Link href={`/creation/${creation.id}`}>
+
+                  <Link href={`/creation/${c.id}`}>
                     <span className="text-sm text-gray-500 hover:text-gray-700">
-                      {getRelativeTime(Number(creation.lastActivityAt) * 1000)}
+                      {getRelativeTime(Number(c.lastActivityAt) * 1000)}
                     </span>
                   </Link>
                 </div>
@@ -337,20 +326,17 @@ export default function CreationsGrid() {
           ))}
         </div>
 
-        {/* infinite-scroll sentinel & loader */}
+        {/* infinite-scroll sentinel */}
         <div ref={sentinelRef} className="h-px" />
         {loadingMore && (
           <div className="flex justify-center py-6">
             <Loader2Icon className="w-6 h-6 animate-spin text-primary" />
           </div>
         )}
-
-        {sortedCreations.length === 0 && !loadingMore && (
-          <div className="text-center py-12 text-gray-500">
-            No creations yet
-          </div>
+        {sorted.length === 0 && !loadingMore && (
+          <p className="text-center py-12 text-gray-500">No creations yet</p>
         )}
       </div>
-    </div>
+    </>
   );
 }
