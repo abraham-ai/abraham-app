@@ -8,14 +8,33 @@ import Image from "next/image";
 import Link from "next/link";
 import { getRelativeTime } from "@/lib/time-utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/auth-context";
+import {
+  useAbrahamContract,
+  PRAISE_PRICE_ETHER,
+} from "@/hooks/use-abraham-contract";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 
 type SortOption = "most-praised" | "latest";
 
 export default function CreationsGrid() {
+  const { loggedIn, login, loadingAuth } = useAuth();
+  const { praise } = useAbrahamContract();
   const [creations, setCreations] = useState<CreationItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>("most-praised");
+  const [sortBy, setSortBy] = useState<SortOption>("latest");
+  const [praiseCounts, setPraiseCounts] = useState<{[key: string]: number}>({});
+  const [loadingPraise, setLoadingPraise] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCreations = async () => {
@@ -30,6 +49,17 @@ export default function CreationsGrid() {
 
         const { creations } = await response.json();
         setCreations(creations);
+        // Initialize praise counts
+        const initialCounts: {[key: string]: number} = {};
+        creations.forEach((creation: CreationItem) => {
+          const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
+          const totalPraises = creation.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
+          const blessingCount = creation.messages.filter(
+            msg => msg.author.toLowerCase() !== ownerAddress
+          ).length;
+          initialCounts[creation.id] = totalPraises + (2 * blessingCount);
+        });
+        setPraiseCounts(initialCounts);
       } catch (err: any) {
         console.error("Fetch Error:", err);
         setError(err.message || "An unknown error occurred.");
@@ -44,36 +74,72 @@ export default function CreationsGrid() {
   // Calculate total praises for each creation
   const creationsWithTotalPraises = useMemo(() => {
     return creations.map(creation => {
-      const totalPraises = creation.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
-      
-      // Find the last image from Abraham's messages
       const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
+      
+      // Use dynamic praise count from state, fallback to calculated
+      const currentPraiseCount = praiseCounts[creation.id] ?? (() => {
+        const totalPraises = creation.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
+        const blessingCount = creation.messages.filter(
+          msg => msg.author.toLowerCase() !== ownerAddress
+        ).length;
+        return totalPraises + (2 * blessingCount);
+      })();
+      
+      // Find the last Abraham message with an image
       const abrahamMessages = creation.messages.filter(
         msg => msg.author.toLowerCase() === ownerAddress
       );
-      const lastImage = [...abrahamMessages]
+      const lastImageMessage = [...abrahamMessages]
         .reverse()
-        .find(msg => msg.media)?.media?.replace(/^ipfs:\/\//, "https://ipfs.io/ipfs/") || "";
+        .find(msg => msg.media);
+      
+      const lastImage = lastImageMessage?.media?.replace(/^ipfs:\/\//, "https://ipfs.io/ipfs/") || "";
+      const lastMessageUuid = lastImageMessage?.uuid || creation.messageUuid;
 
       return {
         ...creation,
-        totalPraises,
-        lastImage: lastImage || creation.image // fallback to creation.image if no image found
+        totalPraises: currentPraiseCount,
+        lastImage: lastImage || creation.image, // fallback to creation.image if no image found
+        lastMessageUuid: lastMessageUuid // UUID of the message with the last image
       };
     });
-  }, [creations]);
+  }, [creations, praiseCounts]);
 
   // Sort creations based on selected option
   const sortedCreations = useMemo(() => {
     const sorted = [...creationsWithTotalPraises];
     if (sortBy === "most-praised") {
-      sorted.sort((a, b) => b.totalPraises - a.totalPraises);
+      sorted.sort((a, b) => {
+        // Primary sort: by total praises (descending)
+        if (b.totalPraises !== a.totalPraises) {
+          return b.totalPraises - a.totalPraises;
+        }
+        // Tiebreaker: by newest first (descending lastActivityAt)
+        return Number(b.lastActivityAt) - Number(a.lastActivityAt);
+      });
     } else {
       // Latest - already sorted by lastActivityAt from API
       sorted.sort((a, b) => Number(b.lastActivityAt) - Number(a.lastActivityAt));
     }
     return sorted;
   }, [creationsWithTotalPraises, sortBy]);
+
+  const handlePraise = async (creation: any) => {
+    if (!loggedIn) {
+      showWarningToast("Authentication Required", "Please log in.");
+      return;
+    }
+    setLoadingPraise(creation.id);
+    try {
+      await praise(creation.id, creation.lastMessageUuid);
+      setPraiseCounts(prev => ({
+        ...prev,
+        [creation.id]: (prev[creation.id] || 0) + 1
+      }));
+    } finally {
+      setLoadingPraise(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -102,7 +168,7 @@ export default function CreationsGrid() {
   return (
     <div>
       <AppBar />
-      <div className="mt-16 mb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div className="mt-16 mb-12 px-2 sm:px-3 lg:px-4 max-w-7xl mx-auto">
         {/* Sort controls */}
         <div className="flex justify-end mb-6">
           <div className="flex gap-2">
@@ -124,15 +190,11 @@ export default function CreationsGrid() {
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {sortedCreations.map((creation) => (
-            <Link
-              key={creation.id}
-              href={`/creation/${creation.id}`}
-              className="group block"
-            >
-              <div className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-                {/* Image */}
+            <div key={creation.id} className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+              {/* Image - clickable link */}
+              <Link href={`/creation/${creation.id}`} className="block">
                 <div className="aspect-square relative bg-gray-100">
                   {creation.lastImage ? (
                     <Image
@@ -148,23 +210,53 @@ export default function CreationsGrid() {
                     </div>
                   )}
                 </div>
+              </Link>
 
-                {/* Info */}
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">🙌</span>
-                      {creation.totalPraises > 0 && (
-                        <span className="text-lg font-medium">{creation.totalPraises}</span>
-                      )}
-                    </div>
-                    <span className="text-sm text-gray-500">
+              {/* Info - separate from link */}
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button
+                        className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-colors group relative"
+                        disabled={loadingPraise === creation.id}
+                      >
+                        <span className="text-2xl relative">
+                          🙌
+                          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                            Praise
+                          </span>
+                        </span>
+                        {creation.totalPraises > 0 && (
+                          <span className="text-lg font-medium">{creation.totalPraises}</span>
+                        )}
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-white">
+                      <DialogHeader>
+                        <DialogTitle>Praise Creation</DialogTitle>
+                        <DialogDescription>
+                          {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button onClick={() => handlePraise(creation)} disabled={loadingPraise === creation.id}>
+                          {loadingPraise === creation.id && (
+                            <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
+                          )}
+                          {loadingPraise === creation.id ? "Praising…" : "Praise"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  <Link href={`/creation/${creation.id}`}>
+                    <span className="text-sm text-gray-500 hover:text-gray-700">
                       {getRelativeTime(Number(creation.lastActivityAt) * 1000)}
                     </span>
-                  </div>
+                  </Link>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
 

@@ -79,7 +79,7 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
               <Textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="How should I proceed?"
+                placeholder="How should Abraham proceed?"
                 className="min-h-[120px] resize-none"
                 maxLength={320}
               />
