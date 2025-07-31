@@ -19,6 +19,7 @@ type SortOption = "most-praised" | "latest";
 
 const PAGE_SIZE = 18;
 
+/* ───────────────────────────────────── component */
 export default function CreationsGrid() {
   const [creations, setCreations] = useState<CreationItem[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -31,25 +32,32 @@ export default function CreationsGrid() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   /* -------------------------------- fetch helper */
-  const fetchPage = useCallback(async (pageNo: number) => {
+  const fetchPage = useCallback(async (pageNo: number, sort: SortOption) => {
     const params = new URLSearchParams({
       first: PAGE_SIZE.toString(),
       skip: (pageNo * PAGE_SIZE).toString(),
+      sort,
     });
-    const response = await fetch(`/api/creations?${params.toString()}`);
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || response.statusText);
+    const res = await fetch(`/api/creations?${params.toString()}`);
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || res.statusText);
     }
-    const { creations: newCreations } = await response.json();
+    const { creations: newCreations } = await res.json();
     return newCreations as CreationItem[];
   }, []);
 
-  /* -------------------------------- first load */
+  /* -------------------------------- reset + first load whenever sort changes */
   useEffect(() => {
+    setCreations([]);
+    setPage(0);
+    setHasMore(true);
+    setLoadingInitial(true);
+    setError(null);
+
     (async () => {
       try {
-        const firstBatch = await fetchPage(0);
+        const firstBatch = await fetchPage(0, sortBy);
         setCreations(firstBatch);
         setHasMore(firstBatch.length === PAGE_SIZE);
       } catch (err: any) {
@@ -58,7 +66,7 @@ export default function CreationsGrid() {
         setLoadingInitial(false);
       }
     })();
-  }, [fetchPage]);
+  }, [sortBy, fetchPage]);
 
   /* -------------------------------- infinite scroll */
   useEffect(() => {
@@ -71,7 +79,7 @@ export default function CreationsGrid() {
           setLoadingMore(true);
           try {
             const nextPage = page + 1;
-            const batch = await fetchPage(nextPage);
+            const batch = await fetchPage(nextPage, sortBy);
             setCreations((c) => [...c, ...batch]);
             setPage(nextPage);
             setHasMore(batch.length === PAGE_SIZE);
@@ -83,13 +91,14 @@ export default function CreationsGrid() {
           }
         }
       },
-      { rootMargin: "600px" } // pre-fetch while 600 px away
+      { rootMargin: "600px" }
     );
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [sentinelRef.current, hasMore, loadingMore, page, fetchPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sentinelRef.current, hasMore, loadingMore, page, sortBy, fetchPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* -------------------------------- derived data */
   const creationsWithTotalPraises = useMemo(() => {
     const ownerAddress =
       process.env.NEXT_PUBLIC_OWNER_ADDRESS?.toLowerCase() || "";
@@ -117,6 +126,8 @@ export default function CreationsGrid() {
   }, [creations]);
 
   const sortedCreations = useMemo(() => {
+    // API already sends correct order for each sort option,
+    // but we keep this as a local fallback.
     const sorted = [...creationsWithTotalPraises];
     if (sortBy === "most-praised") {
       sorted.sort((a, b) => b.totalPraises - a.totalPraises);
@@ -153,6 +164,7 @@ export default function CreationsGrid() {
     );
   }
 
+  /* ───────────────────────────────────── main grid */
   return (
     <div>
       <AppBar />
