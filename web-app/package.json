@@ -23,7 +23,7 @@
     "@radix-ui/react-scroll-area": "^1.1.0",
     "@radix-ui/react-select": "^2.1.1",
     "@radix-ui/react-slider": "^1.2.0",
-    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-switch": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.0",
     "@radix-ui/react-toast": "^1.2.14",
@@ -40,6 +40,7 @@
     "axios": "^1.7.7",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "diff-match-patch": "^1.0.5",
     "graphql": "^16.10.0",
     "jose": "^5.9.3",
     "lucide-react": "^0.441.0",
@@ -58,6 +59,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/diff-match-patch": "^1.0.36",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
