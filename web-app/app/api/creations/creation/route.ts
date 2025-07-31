@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     const creation: CreationItem = {
       id: c.id,
       image:
-        latest?.media?.replace(/^ipfs:\/\//, "https://ipfs.io/ipfs/") ?? "",
+        latest?.media?.replace(/^ipfs:\/\//, "https://gateway.pinata.cloud/ipfs/") ?? "",
       description: latest?.content ?? "(no description)",
       praiseCount: latest?.praiseCount ?? 0,
       messageUuid: latest?.uuid ?? "",

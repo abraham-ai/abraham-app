@@ -163,7 +163,7 @@ export default function CreationsGrid() {
         .reverse()
         .find(msg => msg.media);
       
-      const lastImage = lastImageMessage?.media?.replace(/^ipfs:\/\//, "https://ipfs.io/ipfs/") || "";
+      const lastImage = lastImageMessage?.media?.replace(/^ipfs:\/\//, "https://gateway.pinata.cloud/ipfs/") || "";
       const lastMessageUuid = lastImageMessage?.uuid || creation.messageUuid;
 
       return {

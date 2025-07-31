@@ -149,7 +149,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                     image: g.abraham.media
                       ? g.abraham.media.replace(
                           /^ipfs:\/\//,
-                          "https://ipfs.io/ipfs/"
+                          "https://gateway.pinata.cloud/ipfs/"
                         )
                       : "",
                     description: g.abraham.content,
