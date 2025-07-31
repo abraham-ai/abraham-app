@@ -2,7 +2,7 @@
   "name": "hardhat-project",
   "scripts": {
     "compile": "hardhat compile",
-    "deploy:base-sepolia": "hardhat run scripts/deploy.ts --network base-sepolia",
+    "deploy:abraham:base-sepolia": "hardhat run scripts/deploy.ts --network base-sepolia",
     "deploy:paypatch:base-sepolia": "hardhat run scripts/deploy-paypatch.ts --network base-sepolia"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@ type Creation @entity(immutable: false) {
   firstMessageAt: BigInt!
   lastActivityAt: BigInt!
   ethSpent: BigInt!
+  closed: Boolean! # ⇦ NEW
   messages: [Message!]! @derivedFrom(field: "creation")
 }
 
@@ -20,7 +21,7 @@ type Message @entity(immutable: false) {
 }
 
 type Praise @entity(immutable: true) {
-  id: ID! # `${messageId}-${praiser}`
+  id: ID! # `${messageId}-${txHash}-${logIdx}`
   message: Message!
   praiser: Bytes!
   timestamp: BigInt!
