@@ -51,46 +51,46 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <MiniKitProvider
-        apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-        chain={{
-          id: base.id,
-          name: base.name,
-          nativeCurrency: {
-            name: "ETH",
-            symbol: "ETH",
-            decimals: 18,
-          },
-          rpcUrls: {
-            default: {
-              http: [base.rpcUrls.default.http[0]],
-            },
-            public: {
-              http: [base.rpcUrls.default.http[0]],
-            },
-          },
-        }}
-        config={{
-          appearance: {
-            mode: "auto",
-            name: "Abraham",
-            logo: "/abrahamlogo.png",
-          },
-        }}
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>
-          <AuthProvider>
-            <body
-              className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-            >
+        <MiniKitProvider
+          apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+          chain={{
+            id: base.id,
+            name: base.name,
+            nativeCurrency: {
+              name: "ETH",
+              symbol: "ETH",
+              decimals: 18,
+            },
+            rpcUrls: {
+              default: {
+                http: [base.rpcUrls.default.http[0]],
+              },
+              public: {
+                http: [base.rpcUrls.default.http[0]],
+              },
+            },
+          }}
+          config={{
+            appearance: {
+              mode: "auto",
+              name: "Abraham",
+              logo: "/abrahamlogo.png",
+            },
+          }}
+        >
+          <Providers>
+            <AuthProvider>
               <ErrorBoundary>
                 {children}
                 <Toaster />
               </ErrorBoundary>
-            </body>
-          </AuthProvider>
-        </Providers>
-      </MiniKitProvider>
+            </AuthProvider>
+          </Providers>
+        </MiniKitProvider>
+      </body>
     </html>
   );
 }
