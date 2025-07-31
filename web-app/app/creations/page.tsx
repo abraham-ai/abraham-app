@@ -206,8 +206,10 @@ export default function CreationsGrid() {
                       src={creation.lastImage}
                       alt={creation.description}
                       fill
+                      sizes="(max-width: 768px) 100vw,(max-width: 1200px) 50vw,33vw"
                       className="object-cover"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      quality={100}
+                      onError={() => console.error("image failed")}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
