@@ -7,9 +7,11 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract Abraham is Ownable, ReentrancyGuard {
     constructor() Ownable(msg.sender) ReentrancyGuard() {}
 
+    /*──────────────────────── constants ───────────────────────*/
     uint256 public constant PRAISE_PRICE = 10_000_000_000_000; // 0.00001 ETH
     uint256 public constant BLESS_PRICE  = 20_000_000_000_000; // 0.00002 ETH
 
+    /*──────────────────────── structs ─────────────────────────*/
     struct Message {
         string   id;          // uuid
         address  author;
@@ -19,40 +21,42 @@ contract Abraham is Ownable, ReentrancyGuard {
     }
 
     struct Session {
-        string id;                    // uuid
-        string[] messageIds;          // ordering
-        uint256 messageCount;
+        string   id;               // uuid
+        string[] messageIds;       // ordering
+        uint256  messageCount;
+        bool     closed;           // ⇦ NEW: true ⇢ no praises / blessings
     }
 
-    /*──────────────────────── storage ──────────────────────────*/
-    mapping(string => Session) private sessions;              // sessionId → Session
-    mapping(string => mapping(string => Message)) private messages;         // sessionId → messageId → Message
-    mapping(string => mapping(string => mapping(address => bool))) private hasPraised; // sessionId → messageId → user
+    /*──────────────────────── storage ─────────────────────────*/
+    mapping(string => Session) private sessions;    // sessionId → Session
+    mapping(string => mapping(string => Message)) private messages; // sessionId → messageId → Message
 
-    uint256 public sessionTotal; // purely analytics
+    uint256 public sessionTotal; // analytics
 
-   
+    /*──────────────────────── events ──────────────────────────*/
     event SessionCreated(string sessionId);
+    event SessionClosed(string sessionId);
+    event SessionReopened(string sessionId);
     event MessageAdded(string sessionId, string messageId, address author, string content, string media);
     event Praised(string sessionId, string messageId, address praiser);
 
-  
+    /*──────────────────────── modifiers ───────────────────────*/
     modifier sessionExists(string memory sessionId) {
         require(bytes(sessions[sessionId].id).length != 0, "Session not found");
         _;
     }
-
     modifier uniqueSession(string memory sessionId) {
         require(bytes(sessions[sessionId].id).length == 0, "Session exists");
         _;
     }
-
     modifier uniqueMessage(string memory sessionId, string memory messageId) {
         require(bytes(messages[sessionId][messageId].id).length == 0, "Message exists");
         _;
     }
 
-    /// @notice Create a new session with its first message.
+    /*──────────────────────── public / external ───────────────*/
+
+    /// @notice Create a new session with its first (image + text) message.
     function createSession(
         string calldata sessionId,
         string calldata firstMessageId,
@@ -66,30 +70,29 @@ contract Abraham is Ownable, ReentrancyGuard {
     {
         require(bytes(media).length > 0, "Media required");
 
-        // init session
-        Session storage s  = sessions[sessionId];
-        s.id               = sessionId;
-        s.messageCount     = 0;
+        // initialise session
+        Session storage s = sessions[sessionId];
+        s.id       = sessionId;
+        s.closed   = false;
+        s.messageCount = 0;
 
-        // first message from Abraham
-        _addMessageInternal(
-            s,
-            firstMessageId,
-            msg.sender,
-            content,
-            media
-        );
+        _addMessageInternal(s, firstMessageId, msg.sender, content, media);
 
         unchecked { ++sessionTotal; }
         emit SessionCreated(sessionId);
     }
 
-    /// @notice Abraham adds another image+text message to a session.
+    /**
+     * @notice Abraham adds another image + text message
+     *         **and** (optionally) closes / reopens the session.
+     * @param closed Desired session state after this call.
+     */
     function abrahamUpdate(
         string calldata sessionId,
         string calldata messageId,
         string calldata content,
-        string calldata media
+        string calldata media,
+        bool   closed              // ⇦ NEW PARAM
     )
         external
         onlyOwner
@@ -100,9 +103,19 @@ contract Abraham is Ownable, ReentrancyGuard {
 
         Session storage s = sessions[sessionId];
         _addMessageInternal(s, messageId, msg.sender, content, media);
+
+        // handle (re-)opening / closing
+        if (s.closed != closed) {
+            s.closed = closed;
+            if (closed) {
+                emit SessionClosed(sessionId);
+            } else {
+                emit SessionReopened(sessionId);
+            }
+        }
     }
 
-    /// @notice Any user adds a text‑only blessing (pays BLESS_PRICE).
+    /// @notice Any user adds a text-only blessing (pays BLESS_PRICE).
     function bless(
         string calldata sessionId,
         string calldata messageId,
@@ -114,14 +127,18 @@ contract Abraham is Ownable, ReentrancyGuard {
         sessionExists(sessionId)
         uniqueMessage(sessionId, messageId)
     {
+        Session storage s = sessions[sessionId];
+        require(!s.closed, "Session closed");
         require(msg.value == BLESS_PRICE, "Incorrect ETH");
         require(bytes(content).length > 0, "Content required");
 
-        Session storage s = sessions[sessionId];
         _addMessageInternal(s, messageId, msg.sender, content, "");
     }
 
-    /// @notice Praise any message once (pays PRAISE_PRICE).
+    /**
+     * @notice Praise any message.  
+     *         Users can praise **as many times as they like** (each costs PRAISE_PRICE).
+     */
     function praise(
         string calldata sessionId,
         string calldata messageId
@@ -131,19 +148,18 @@ contract Abraham is Ownable, ReentrancyGuard {
         nonReentrant
         sessionExists(sessionId)
     {
+        Session storage s = sessions[sessionId];
+        require(!s.closed, "Session closed");
         require(msg.value == PRAISE_PRICE, "Incorrect ETH");
 
         Message storage m = messages[sessionId][messageId];
         require(bytes(m.id).length != 0, "Message not found");
-        require(!hasPraised[sessionId][messageId][msg.sender], "Already praised");
 
-        hasPraised[sessionId][messageId][msg.sender] = true;
-        m.praisers.push(msg.sender);
-
+        m.praisers.push(msg.sender);           // duplicates allowed
         emit Praised(sessionId, messageId, msg.sender);
     }
 
-    /*──────────────────────── view helpers ─────────────────────*/
+    /*──────────────────────── view helpers ────────────────────*/
     function getMessage(
         string calldata sessionId,
         string calldata messageId
@@ -151,10 +167,10 @@ contract Abraham is Ownable, ReentrancyGuard {
         external
         view
         returns (
-            address author,
+            address   author,
             string memory content,
             string memory media,
-            uint256 praiseCount
+            uint256   praiseCount
         )
     {
         Message storage m = messages[sessionId][messageId];
@@ -169,12 +185,20 @@ contract Abraham is Ownable, ReentrancyGuard {
         return sessions[sessionId].messageIds;
     }
 
-    /*──────────────────────── admin ────────────────────────────*/
+    function isSessionClosed(string calldata sessionId)
+        external
+        view
+        returns (bool)
+    {
+        return sessions[sessionId].closed;
+    }
+
+    /*──────────────────────── admin ───────────────────────────*/
     function withdraw() external onlyOwner {
         payable(owner()).transfer(address(this).balance);
     }
 
-    /*──────────────────────── internal ─────────────────────────*/
+    /*──────────────────────── internal ────────────────────────*/
     function _addMessageInternal(
         Session storage s,
         string memory messageId,
@@ -183,10 +207,10 @@ contract Abraham is Ownable, ReentrancyGuard {
         string memory media
     ) private {
         messages[s.id][messageId] = Message({
-            id: messageId,
-            author: author,
-            content: content,
-            media: media,
+            id:       messageId,
+            author:   author,
+            content:  content,
+            media:    media,
             praisers: new address[](0)
         });
 
@@ -196,7 +220,7 @@ contract Abraham is Ownable, ReentrancyGuard {
         emit MessageAdded(s.id, messageId, author, content, media);
     }
 
-    /* fallback / receive */
+    /*fallback / receive */
     receive() external payable {}
     fallback() external payable {}
 }

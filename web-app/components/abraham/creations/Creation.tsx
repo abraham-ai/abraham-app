@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -23,26 +24,28 @@ import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import { getRelativeTime } from "@/lib/time-utils";
 
 export default function Creation({ creation }: { creation: CreationItem }) {
-  const { loggedIn, login, loadingAuth } = useAuth();
+  const { loggedIn } = useAuth();
   const { praise } = useAbrahamContract();
+
   const [praises, setPraises] = useState(creation.praiseCount);
-  const [loadingPraise, setLoadingPraise] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handlePraise = async () => {
     if (!loggedIn) {
       showWarningToast("Authentication Required", "Please log in.");
       return;
     }
-    setLoadingPraise(true);
+    if (creation.closed) return;
+
+    setLoading(true);
     try {
       await praise(creation.id, creation.messageUuid);
       setPraises((p) => p + 1);
     } finally {
-      setLoadingPraise(false);
+      setLoading(false);
     }
   };
 
-  /* timestamps */
   const createdAt = getRelativeTime(Number(creation.firstMessageAt) * 1000);
   const updatedAt = getRelativeTime(Number(creation.lastActivityAt) * 1000);
 
@@ -55,12 +58,14 @@ export default function Creation({ creation }: { creation: CreationItem }) {
             alt="avatar"
             width={40}
             height={40}
-            className="rounded-full border aspect-square"
+            className="rounded-full border"
           />
         </Link>
         <div className="flex flex-col">
           <span className="font-semibold">Abraham</span>
-          <span className="text-xs text-gray-500">{updatedAt}</span>
+          <span className="text-xs text-gray-500">
+            {creation.closed ? "Session closed" : updatedAt}
+          </span>
         </div>
       </div>
 
@@ -82,13 +87,13 @@ export default function Creation({ creation }: { creation: CreationItem }) {
         <Dialog>
           <DialogTrigger asChild>
             <button
-              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative"
-              disabled={loadingPraise}
+              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50"
+              disabled={loading || creation.closed}
             >
               <span className="text-3xl relative">
                 🙌
-                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                  Praise
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
+                  {creation.closed ? "Closed" : "Praise"}
                 </span>
               </span>
               {praises > 0 && (
@@ -96,22 +101,24 @@ export default function Creation({ creation }: { creation: CreationItem }) {
               )}
             </button>
           </DialogTrigger>
-          <DialogContent className="bg-white">
-            <DialogHeader>
-              <DialogTitle>Praise Creation</DialogTitle>
-              <DialogDescription>
-                {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button onClick={handlePraise} disabled={loadingPraise}>
-                {loadingPraise && (
-                  <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
-                )}
-                {loadingPraise ? "Praising…" : "Praise"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
+          {!creation.closed && (
+            <DialogContent className="bg-white">
+              <DialogHeader>
+                <DialogTitle>Praise Creation</DialogTitle>
+                <DialogDescription>
+                  {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={handlePraise} disabled={loading}>
+                  {loading && (
+                    <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
+                  )}
+                  {loading ? "Praising…" : "Praise"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          )}
         </Dialog>
       </div>
     </div>

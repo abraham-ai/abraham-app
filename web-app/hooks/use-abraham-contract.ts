@@ -13,14 +13,18 @@ import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { useAuth } from "@/context/auth-context";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 
-export const CONTRACT_ADDRESS = "0x702596A9C2CBF923E3dd2B5A99e95AbE156F5Dd6";
+export const CONTRACT_ADDRESS = "0x7bad02F4354F2eed7E1A76794721FFbd1f7bF1a5";
 export const PRAISE_PRICE_ETHER = 0.00001;
 export const BLESS_PRICE_ETHER = 0.00002;
 
+/**
+ * Read-/write helpers for the Abraham contract.
+ * Guards against wallet absence and insufficient balance.
+ */
 export function useAbrahamContract() {
   const { eip1193Provider } = useAuth();
 
-  /* read‑only viem client */
+  /* read-only viem client */
   const [publicClient] = useState(() =>
     createPublicClient({
       chain: baseSepolia,
@@ -58,18 +62,19 @@ export function useAbrahamContract() {
   const waitAndToast = async (hash: `0x${string}`, msg: string) => {
     const rcpt = await publicClient.waitForTransactionReceipt({ hash });
     if (rcpt.status === "success") {
-      showSuccessToast(msg, "Transaction confirmed on‑chain.");
+      showSuccessToast(msg, "Transaction confirmed on-chain.");
     } else throw new Error("tx failed");
   };
 
-  /* ---------- contract calls ---------- */
+  /* ---------- contract writes ---------- */
 
-  /** Praise an existing message once */
+  /** Praise any message (unlimited). */
   const praise = async (sessionUuid: string, messageUuid: string) => {
     if (!walletClient) {
       showErrorToast(new Error("wallet"), "Wallet not connected");
       throw new Error("wallet not ready");
     }
+
     const [sender] = await walletClient.getAddresses();
     const valueWei = parseEther(PRAISE_PRICE_ETHER.toString());
     await ensureBalance(sender, valueWei);
@@ -93,7 +98,7 @@ export function useAbrahamContract() {
     }
   };
 
-  /** Bless (new message) – generates fresh message UUID client‑side */
+  /** Bless (add a text-only message). Generates UUID client-side. */
   const bless = async (sessionUuid: string, content: string) => {
     if (!walletClient) {
       showErrorToast(new Error("wallet"), "Wallet not connected");
@@ -103,11 +108,12 @@ export function useAbrahamContract() {
       showErrorToast(new Error("content"), "Content required");
       throw new Error("content required");
     }
+
     const [sender] = await walletClient.getAddresses();
     const valueWei = parseEther(BLESS_PRICE_ETHER.toString());
     await ensureBalance(sender, valueWei);
 
-    const msgUuid = crypto.randomUUID(); // ✨
+    const msgUuid = crypto.randomUUID();
 
     try {
       const hash = await walletClient.writeContract({

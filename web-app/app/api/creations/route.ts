@@ -5,13 +5,14 @@ import {
   SubgraphMessage,
 } from "@/types/abraham";
 
+/* ───────── Graph endpoint ───────── */
 const ENDPOINT =
   "https://api.studio.thegraph.com/query/102152/abraham/version/latest";
 
-/* 100 records / round-trip keeps latency reasonable. */
+/* paging & limits */
 const GRAPH_PAGE_SIZE = 100;
-const MSG_LIMIT = 100; // enough to compute total praises + last image
-const PRAISE_SORT_LIMIT = 1_000; // safety cap: fetch at most 1 000 creations
+const MSG_LIMIT = 100; // messages fetched per creation
+const PRAISE_SORT_LIMIT = 1_000; // safety cap for most-praised path
 
 const LIST_QUERY = `
   query AllCreations($first: Int!, $skip: Int!, $msgLimit: Int!) {
@@ -22,14 +23,11 @@ const LIST_QUERY = `
       orderDirection: desc
     ) {
       id
+      closed
       ethSpent
       firstMessageAt
       lastActivityAt
-      messages(
-        first: $msgLimit
-        orderBy: timestamp
-        orderDirection: asc
-      ) {
+      messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
         uuid
         author
         content
@@ -44,7 +42,7 @@ const LIST_QUERY = `
 export const revalidate = 0;
 const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
-/* ───────────────────────────────────── helpers */
+/* ───────────── helper: turn subgraph rows → front-end shape ────────── */
 function shapeCreations(
   raw: SubgraphCreation[]
 ): (CreationItem & { totalPraises: number })[] {
@@ -52,6 +50,7 @@ function shapeCreations(
     const abrahamMsgs = c.messages.filter(
       (m) => m.author.toLowerCase() === OWNER
     );
+
     const blessingsRaw = c.messages
       .filter((m) => m.author.toLowerCase() !== OWNER)
       .map((m) => ({
@@ -63,7 +62,8 @@ function shapeCreations(
         creationId: c.id,
       }));
 
-    const latest = abrahamMsgs.at(-1) as SubgraphMessage | undefined;
+    const latestAbraham = abrahamMsgs.at(-1) as SubgraphMessage | undefined;
+
     const totalPraises = c.messages.reduce(
       (sum, msg) => sum + msg.praiseCount,
       0
@@ -71,21 +71,22 @@ function shapeCreations(
 
     return {
       id: c.id,
+      closed: c.closed,
       image:
-        latest?.media?.replace(/^ipfs:\/\//, "https://gateway.pinata.cloud/ipfs/") ?? "",
-      description: latest?.content ?? "(no description)",
-      praiseCount: latest?.praiseCount ?? 0,
-      messageUuid: latest?.uuid ?? "",
-
+        latestAbraham?.media?.replace(
+          /^ipfs:\/\//,
+          "https://gateway.pinata.cloud/ipfs/"
+        ) ?? "",
+      description: latestAbraham?.content ?? "(no description)",
+      praiseCount: latestAbraham?.praiseCount ?? 0,
+      messageUuid: latestAbraham?.uuid ?? "",
       ethTotal: Number((BigInt(c.ethSpent) / BigInt(1e14)).toString()) / 1e4,
       blessingCnt: blessingsRaw.length,
-
       firstMessageAt: c.firstMessageAt,
       lastActivityAt: c.lastActivityAt,
-
       blessings: blessingsRaw,
       messages: c.messages,
-
+      /* helper ------------------------------------ */
       totalPraises,
     };
   });
@@ -101,8 +102,9 @@ export async function GET(req: NextRequest) {
     );
     const skip = parseInt(url.searchParams.get("skip") ?? "0", 10);
 
+    /* ------ FAST PATH: latest / default ordering ------ */
     if (sort !== "most-praised") {
-      const r = await fetch(ENDPOINT, {
+      const { data, errors } = await fetch(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -110,25 +112,24 @@ export async function GET(req: NextRequest) {
           variables: { first, skip, msgLimit: MSG_LIMIT },
         }),
         next: { revalidate: 0 },
-      });
+      }).then((r) => r.json());
 
-      const { data, errors } = await r.json();
       if (errors) throw new Error(errors.map((e: any) => e.message).join(", "));
-      const creations = shapeCreations(data.creations).map(
-        ({ totalPraises, ...c }) => c
-      ); // drop helper prop
+
+      const creations: CreationItem[] = shapeCreations(data.creations).map(
+        ({ totalPraises, ...rest }) => rest as CreationItem
+      );
+
       return NextResponse.json({ creations }, { status: 200 });
     }
 
-    /* ---------- SLOW PATH: sort = most-praised ---------- */
-    /* We must pull enough creations to sort *globally* by praise total. */
-    const needed = skip + first;
-    let graphSkip = 0;
+    /* ------ SLOW PATH: global most-praised ordering ------ */
+    const neededRows = skip + first;
     const acc: SubgraphCreation[] = [];
+    let graphSkip = 0;
 
-    /* Keep fetching until we have ≥ needed OR we hit cap / run out */
-    while (acc.length < needed && acc.length < PRAISE_SORT_LIMIT) {
-      const r = await fetch(ENDPOINT, {
+    while (acc.length < neededRows && acc.length < PRAISE_SORT_LIMIT) {
+      const { data, errors } = await fetch(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -140,25 +141,24 @@ export async function GET(req: NextRequest) {
           },
         }),
         next: { revalidate: 0 },
-      });
+      }).then((r) => r.json());
 
-      const { data, errors } = await r.json();
       if (errors) throw new Error(errors.map((e: any) => e.message).join(", "));
+
       const batch: SubgraphCreation[] = data.creations;
-      if (batch.length === 0) break; // no more rows
+      if (batch.length === 0) break;
 
       acc.push(...batch);
       graphSkip += GRAPH_PAGE_SIZE;
     }
 
-    /* Shape + global sort */
+    /* shape + global sort */
     const shaped = shapeCreations(acc);
     shaped.sort((a, b) => b.totalPraises - a.totalPraises);
 
-    /* Slice to the requested page, strip helper prop */
-    const page = shaped
+    const page: CreationItem[] = shaped
       .slice(skip, skip + first)
-      .map(({ totalPraises, ...c }) => c);
+      .map(({ totalPraises, ...rest }) => rest as CreationItem);
 
     return NextResponse.json({ creations: page }, { status: 200 });
   } catch (e: any) {

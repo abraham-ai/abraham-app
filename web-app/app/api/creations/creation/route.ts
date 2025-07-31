@@ -8,10 +8,11 @@ const DETAIL_QUERY = /* GraphQL */ `
   query One($id: ID!, $msgLimit: Int!) {
     creation(id: $id) {
       id
+      closed
       ethSpent
       firstMessageAt
       lastActivityAt
-      messages(orderBy: timestamp, orderDirection: asc, first: $msgLimit) {
+      messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
         uuid
         author
         content
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "missing id" }, { status: 400 });
 
   try {
-    const r = await fetch(ENDPOINT, {
+    const { data, errors } = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -39,8 +40,8 @@ export async function GET(req: NextRequest) {
         variables: { id, msgLimit: 1000 },
       }),
       next: { revalidate: 0 },
-    });
-    const { data, errors } = await r.json();
+    }).then((r) => r.json());
+
     if (errors) throw new Error(errors.map((e: any) => e.message).join(","));
     if (!data.creation)
       return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -60,12 +61,16 @@ export async function GET(req: NextRequest) {
         creationId: c.id,
       }));
 
-    const latest = abrahamMsgs[abrahamMsgs.length - 1];
+    const latest = abrahamMsgs.at(-1);
 
     const creation: CreationItem = {
       id: c.id,
+      closed: c.closed,
       image:
-        latest?.media?.replace(/^ipfs:\/\//, "https://gateway.pinata.cloud/ipfs/") ?? "",
+        latest?.media?.replace(
+          /^ipfs:\/\//,
+          "https://gateway.pinata.cloud/ipfs/"
+        ) ?? "",
       description: latest?.content ?? "(no description)",
       praiseCount: latest?.praiseCount ?? 0,
       messageUuid: latest?.uuid ?? "",
