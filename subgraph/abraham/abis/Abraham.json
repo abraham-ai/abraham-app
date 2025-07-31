@@ -122,7 +122,33 @@
         "type": "string"
       }
     ],
+    "name": "SessionClosed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      }
+    ],
     "name": "SessionCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      }
+    ],
+    "name": "SessionReopened",
     "type": "event"
   },
   {
@@ -176,6 +202,11 @@
         "internalType": "string",
         "name": "media",
         "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "closed",
+        "type": "bool"
       }
     ],
     "name": "abrahamUpdate",
@@ -287,6 +318,25 @@
         "internalType": "string[]",
         "name": "",
         "type": "string[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      }
+    ],
+    "name": "isSessionClosed",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
