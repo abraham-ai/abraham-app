@@ -8,15 +8,19 @@ import {
 const ENDPOINT =
   "https://api.studio.thegraph.com/query/102152/abraham/version/latest";
 
-/* note: no more numeric index; order by blockchain timestamp */
-const LIST_QUERY = /* GraphQL */ `
-  query AllCreations($first: Int!, $msgLimit: Int!) {
-    creations(first: $first, orderBy: lastActivityAt, orderDirection: desc) {
+const LIST_QUERY = `
+  query AllCreations($first: Int!, $skip: Int!, $msgLimit: Int!) {
+    creations(
+      first: $first
+      skip: $skip
+      orderBy: lastActivityAt
+      orderDirection: desc
+    ) {
       id
       ethSpent
       firstMessageAt
       lastActivityAt
-      messages(orderBy: timestamp, orderDirection: asc, first: $msgLimit) {
+      messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
         uuid
         author
         content
@@ -31,17 +35,27 @@ const LIST_QUERY = /* GraphQL */ `
 export const revalidate = 0;
 const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
+    /* ----- pagination params ----- */
+    const url = new URL(req.url);
+    const first = Math.min(
+      parseInt(url.searchParams.get("first") ?? "18", 10) || 18,
+      100
+    ); // hard-cap at 100
+    const skip = parseInt(url.searchParams.get("skip") ?? "0", 10) || 0;
+
+    /* ----- GraphQL fetch ----- */
     const r = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query: LIST_QUERY,
-        variables: { first: 100, msgLimit: 200 },
+        variables: { first, skip, msgLimit: 100 },
       }),
       next: { revalidate: 0 },
     });
+
     const { data, errors } = await r.json();
     if (errors) throw new Error(errors.map((e: any) => e.message).join(", "));
 
@@ -62,9 +76,7 @@ export async function GET(_req: NextRequest) {
           creationId: c.id,
         }));
 
-      const latest = abrahamMsgs[abrahamMsgs.length - 1] as
-        | SubgraphMessage
-        | undefined;
+      const latest = abrahamMsgs.at(-1) as SubgraphMessage | undefined;
 
       return {
         id: c.id,
