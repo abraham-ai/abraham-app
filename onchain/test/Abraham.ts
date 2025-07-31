@@ -19,15 +19,17 @@ async function deployFixture() {
 }
 
 /* helper uuids */
-const S1 = "session‑aaa"; // simple ascii UUIDs for clarity
-const M1 = "msg‑0001";
-const M2 = "msg‑0002";
-const B1 = "bless‑01";
+const S1 = "session-aaa"; // simple ascii ids for clarity
+const M1 = "msg-0001";
+const M2 = "msg-0002";
+const M3 = "msg-0003";
+const B1 = "bless-01";
+const B2 = "bless-02";
 
 /* ---------------------------------------------------------- */
 /*                        TESTS                               */
 /* ---------------------------------------------------------- */
-describe("Abraham contract (UUID ids)", () => {
+describe("Abraham contract (updated)", () => {
   /* ----------------------- deploy ------------------------ */
   it("sets deployer as owner", async () => {
     const { contract, abraham } = await loadFixture(deployFixture);
@@ -52,9 +54,11 @@ describe("Abraham contract (UUID ids)", () => {
       const [author, , media] = await contract.getMessage(S1, M1);
       expect(media).to.equal("ipfs://hashA");
       expect(author).to.equal(await contract.owner());
+
+      expect(await contract.isSessionClosed(S1)).to.equal(false);
     });
 
-    it("reverts if non‑owner calls", async () => {
+    it("reverts if non-owner calls", async () => {
       const { contract, user1 } = await loadFixture(deployFixture);
       await expect(
         contract.connect(user1).createSession(S1, M1, "hack", "ipfs://bad")
@@ -68,33 +72,66 @@ describe("Abraham contract (UUID ids)", () => {
       await contract.createSession(S1, M1, "ok", "ipfs://y");
 
       await expect(
-        contract.createSession(S1, "msg‑dup", "again", "ipfs://z")
+        contract.createSession(S1, "msg-dup", "again", "ipfs://z")
       ).to.be.revertedWith("Session exists");
     });
   });
 
   /* ------------------ abrahamUpdate ---------------------- */
   describe("abrahamUpdate", () => {
-    it("owner can append an image update", async () => {
+    it("owner can append an image update while keeping session open", async () => {
       const { contract } = await loadFixture(deployFixture);
       await contract.createSession(S1, M1, "v1", "ipfs://a");
 
-      await expect(contract.abrahamUpdate(S1, M2, "v2", "ipfs://b")).to.emit(
-        contract,
-        "MessageAdded"
-      );
+      await expect(
+        contract.abrahamUpdate(S1, M2, "v2", "ipfs://b", false) // closed = false
+      ).to.emit(contract, "MessageAdded");
 
       const ids = await contract.getMessageIds(S1);
       expect(ids.length).to.equal(2);
       const [, , media] = await contract.getMessage(S1, M2);
       expect(media).to.equal("ipfs://b");
+      expect(await contract.isSessionClosed(S1)).to.equal(false);
+    });
+
+    it("owner can close and later reopen the session", async () => {
+      const { contract, user1, PRAISE_PRICE, BLESS_PRICE } = await loadFixture(
+        deployFixture
+      );
+
+      /* create and then CLOSE */
+      await contract.createSession(S1, M1, "v1", "ipfs://a");
+      await expect(
+        contract.abrahamUpdate(S1, M2, "closing msg", "ipfs://b", true)
+      ).to.emit(contract, "SessionClosed");
+      expect(await contract.isSessionClosed(S1)).to.equal(true);
+
+      /* bless / praise should revert while closed */
+      await expect(
+        contract.connect(user1).bless(S1, B1, "hi", { value: BLESS_PRICE })
+      ).to.be.revertedWith("Session closed");
+      await expect(
+        contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
+      ).to.be.revertedWith("Session closed");
+
+      /* now REOPEN */
+      await expect(
+        contract.abrahamUpdate(S1, M3, "reopen msg", "ipfs://c", false)
+      ).to.emit(contract, "SessionReopened");
+      expect(await contract.isSessionClosed(S1)).to.equal(false);
+
+      /* bless / praise succeed again */
+      await contract
+        .connect(user1)
+        .bless(S1, B2, "thanks", { value: BLESS_PRICE });
+      await contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE });
     });
 
     it("reverts for missing media", async () => {
       const { contract } = await loadFixture(deployFixture);
       await contract.createSession(S1, M1, "v1", "ipfs://a");
       await expect(
-        contract.abrahamUpdate(S1, M2, "bad", "")
+        contract.abrahamUpdate(S1, M2, "bad", "", false)
       ).to.be.revertedWith("Media required");
     });
   });
@@ -143,22 +180,40 @@ describe("Abraham contract (UUID ids)", () => {
 
   /* ---------------------- praise ------------------------- */
   describe("praise", () => {
-    it("user can praise once with correct fee", async () => {
+    it("user can praise multiple times; each praise costs fee", async () => {
+      const { contract, user1, PRAISE_PRICE } = await loadFixture(
+        deployFixture
+      );
+      await contract.createSession(S1, M1, "v1", "ipfs://a");
+
+      /* first praise */
+      await expect(
+        contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
+      ).to.emit(contract, "Praised");
+      let [, , , pc] = await contract.getMessage(S1, M1);
+      expect(pc).to.equal(1);
+
+      /* second praise by SAME user */
+      await expect(
+        contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
+      ).to.emit(contract, "Praised");
+      [, , , pc] = await contract.getMessage(S1, M1);
+      expect(pc).to.equal(2);
+    });
+
+    it("fails with wrong fee or unknown message", async () => {
       const { contract, user1, PRAISE_PRICE } = await loadFixture(
         deployFixture
       );
       await contract.createSession(S1, M1, "v1", "ipfs://a");
 
       await expect(
-        contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
-      ).to.emit(contract, "Praised");
-
-      const [, , , pc] = await contract.getMessage(S1, M1);
-      expect(pc).to.equal(1);
+        contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE - 1n })
+      ).to.be.revertedWith("Incorrect ETH");
 
       await expect(
-        contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
-      ).to.be.revertedWith("Already praised");
+        contract.connect(user1).praise(S1, "ghost-msg", { value: PRAISE_PRICE })
+      ).to.be.revertedWith("Message not found");
     });
   });
 
@@ -175,7 +230,6 @@ describe("Abraham contract (UUID ids)", () => {
       const before = await ethers.provider.getBalance(abraham.address);
       const tx = await contract.withdraw();
       const r = await tx.wait();
-
       const gas = r!.gasUsed * (tx.gasPrice || 0n);
       const after = await ethers.provider.getBalance(abraham.address);
 
