@@ -55,16 +55,18 @@ export default function Blessings({ blessings }: { blessings: Blessing[] }) {
           <div className="mb-3">{b.content}</div>
           <div className="flex items-center pl-2">
             <button
-              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors"
+              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative"
               disabled={loadingIdx === i}
               onClick={() => loginOrPraise(i)}
             >
-              <span className="text-2xl">🙌</span>
-              <span className="text-base font-medium">{counts[i]} praise{counts[i] !== 1 ? 's' : ''}</span>
+              <span className="text-2xl relative">
+                🙌
+                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                  Praise
+                </span>
+              </span>
+              {counts[i] > 0 && <span className="text-base font-medium">{counts[i]}</span>}
             </button>
-            <span className="ml-4 text-xs text-gray-400">
-              ({PRAISE_PRICE_ETHER.toFixed(5)} ETH)
-            </span>
           </div>
         </div>
       ))}

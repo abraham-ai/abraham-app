@@ -79,13 +79,13 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
               <Textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={`Bless this creation for ${BLESS_PRICE_ETHER} ETH...`}
+                placeholder="How should I proceed?"
                 className="min-h-[120px] resize-none"
-                maxLength={500}
+                maxLength={320}
               />
               <div className="flex justify-between items-center mt-2">
                 <span className="text-sm text-gray-500">
-                  {text.length}/500 characters
+                  {text.length > 300 && `${text.length}/320 characters`}
                 </span>
                 <Button 
                   onClick={submit} 
@@ -95,7 +95,7 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
                   {loading && (
                     <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
                   )}
-                  {loading ? "Blessing…" : `Bless (${BLESS_PRICE_ETHER} ETH)`}
+                  {loading ? "Blessing…" : `Bless for ${BLESS_PRICE_ETHER} ETH`}
                 </Button>
               </div>
             </>

@@ -85,11 +85,16 @@ export default function Creation({
         <Dialog>
           <DialogTrigger asChild>
             <button
-              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors"
+              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative"
               disabled={loadingPraise}
             >
-              <span className="text-3xl">🙌</span>
-              <span className="text-lg font-medium">{praises} praise{praises !== 1 ? 's' : ''}</span>
+              <span className="text-3xl relative">
+                🙌
+                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                  Praise
+                </span>
+              </span>
+              {praises > 0 && <span className="text-lg font-medium">{praises}</span>}
             </button>
           </DialogTrigger>
           <DialogContent className="bg-white">

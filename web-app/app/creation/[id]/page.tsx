@@ -46,6 +46,15 @@ export default function CreationPage({ params }: { params: { id: string } }) {
     })();
   }, [params.id, loggedIn, userAddr]);
 
+  /* auto-scroll to bottom on page load */
+  useEffect(() => {
+    if (!loading && creation) {
+      setTimeout(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+      }, 100);
+    }
+  }, [loading, creation]);
+
   /* group Abraham + blessings */
   const timeline: MessageGroup[] = useMemo(() => {
     if (!creation) return [];
