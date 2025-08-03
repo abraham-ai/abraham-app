@@ -10,7 +10,7 @@ const ENDPOINT =
   "https://api.studio.thegraph.com/query/102152/abraham/version/latest";
 
 /* paging & limits */
-const GRAPH_PAGE_SIZE = 100;
+const GRAPH_PAGE_SIZE = 500;
 const MSG_LIMIT = 100; // messages fetched per creation
 const PRAISE_SORT_LIMIT = 1_000; // safety cap for most-praised path
 

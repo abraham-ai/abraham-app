@@ -298,6 +298,7 @@ export default function CreationsGrid() {
                             {c.totalPraises}
                           </span>
                         )}
+                        <span className={`w-2 h-2 rounded-full ml-1 ${c.closed ? 'bg-red-500' : 'bg-green-500'}`}></span>
                       </button>
                     </DialogTrigger>
                     {!c.closed && (

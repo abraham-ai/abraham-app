@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { Loader2Icon } from "lucide-react";
 import { CreationItem } from "@/types/abraham";
 import { useAuth } from "@/context/auth-context";
@@ -52,7 +51,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
   return (
     <div className="border-b p-4 lg:w-[43vw] w-full">
       <div className="flex items-center mb-3">
-        <Link href={`/creation/${creation.id}`} className="mr-3">
+        <div className="mr-3">
           <Image
             src="/abrahamlogo.png"
             alt="avatar"
@@ -60,7 +59,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
             height={40}
             className="rounded-full border"
           />
-        </Link>
+        </div>
         <div className="flex flex-col">
           <span className="font-semibold">Abraham</span>
           <span className="text-xs text-gray-500">
@@ -69,7 +68,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
         </div>
       </div>
 
-      <Link href={`/creation/${creation.id}`} className="block">
+      <div>
         <p className="mb-3">{creation.description}</p>
         <Image
           src={creation.image || "/placeholder.svg"}
@@ -80,7 +79,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
           quality={100}
           onError={() => showErrorToast(new Error("image"), "Image Error")}
         />
-      </Link>
+      </div>
 
       {/* actions */}
       <div className="flex items-center mt-3 pl-2">
