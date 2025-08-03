@@ -42,7 +42,7 @@ export default function CreationsGrid() {
   const [loadingInit, setLoadingInit] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>("most-praised");
+  const [sortBy, setSortBy] = useState<SortOption>("latest");
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [praiseCounts, setPraiseCounts] = useState<Record<string, number>>({});
@@ -81,10 +81,12 @@ export default function CreationsGrid() {
         setPage(0);
         setHasMore(firstBatch.length === PAGE_SIZE);
 
-        /* initialise praise counts = SUM(praiseCount) */
+        /* initialise praise counts = SUM(praiseCount) + 2 * blessings */
         const cnt: Record<string, number> = {};
         firstBatch.forEach((c) => {
-          cnt[c.id] = c.messages.reduce((s, m) => s + m.praiseCount, 0);
+          const totalPraises = c.messages.reduce((s, m) => s + m.praiseCount, 0);
+          const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
+          cnt[c.id] = totalPraises + (2 * blessingCount);
         });
         setPraiseCounts(cnt);
       } catch (err: any) {
@@ -117,7 +119,9 @@ export default function CreationsGrid() {
 
             const cnt: Record<string, number> = {};
             batch.forEach((c) => {
-              cnt[c.id] = c.messages.reduce((s, m) => s + m.praiseCount, 0);
+              const totalPraises = c.messages.reduce((s, m) => s + m.praiseCount, 0);
+              const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
+              cnt[c.id] = totalPraises + (2 * blessingCount);
             });
             setPraiseCounts((prev) => ({ ...prev, ...cnt }));
           } catch (err: any) {
@@ -138,7 +142,11 @@ export default function CreationsGrid() {
     return creations.map((c) => {
       const total =
         praiseCounts[c.id] ??
-        c.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
+        (() => {
+          const totalPraises = c.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
+          const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
+          return totalPraises + (2 * blessingCount);
+        })();
 
       const abrahamMsgs = c.messages.filter(
         (m) => m.author.toLowerCase() === OWNER
@@ -290,6 +298,7 @@ export default function CreationsGrid() {
                             {c.totalPraises}
                           </span>
                         )}
+                        <span className={`w-2 h-2 rounded-full ml-1 ${c.closed ? 'bg-red-500' : 'bg-green-500'}`}></span>
                       </button>
                     </DialogTrigger>
                     {!c.closed && (
