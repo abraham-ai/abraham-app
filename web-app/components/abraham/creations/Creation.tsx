@@ -69,18 +69,20 @@ export default function Creation({ creation }: { creation: CreationItem }) {
         </div>
       </div>
 
-      <Link href={`/creation/${creation.id}`} className="block">
-        <p className="mb-3">{creation.description}</p>
-        <Image
-          src={creation.image || "/placeholder.svg"}
-          alt="creation"
-          width={1280}
-          height={1024}
-          className="w-full rounded-lg border"
-          quality={100}
-          onError={() => showErrorToast(new Error("image"), "Image Error")}
-        />
-      </Link>
+      {creation.image && creation.image !== "" && (
+        <Link href={`/creation/${creation.id}`} className="block">
+          <p className="mb-3">{creation.description}</p>
+          <Image
+            src={creation.image || "/placeholder.svg"}
+            alt="creation"
+            width={1280}
+            height={1024}
+            className="w-full rounded-lg border"
+            quality={100}
+            onError={() => showErrorToast(new Error("image"), "Image Error")}
+          />
+        </Link>
+      )}
 
       {/* actions */}
       <div className="flex items-center mt-3 pl-2">

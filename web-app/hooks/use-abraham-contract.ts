@@ -13,7 +13,7 @@ import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { useAuth } from "@/context/auth-context";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 
-export const CONTRACT_ADDRESS = "0x7bad02F4354F2eed7E1A76794721FFbd1f7bF1a5";
+export const CONTRACT_ADDRESS = "0x9C248314D9deA9335496593031e2118Bed775672";
 export const PRAISE_PRICE_ETHER = 0.00001;
 export const BLESS_PRICE_ETHER = 0.00002;
 
