@@ -16,7 +16,7 @@ contract Abraham is Ownable, ReentrancyGuard {
         string   id;          // uuid
         address  author;
         string   content;
-        string   media;       // empty for blessings
+        string   media;       // may be empty
         address[] praisers;
     }
 
@@ -24,7 +24,7 @@ contract Abraham is Ownable, ReentrancyGuard {
         string   id;               // uuid
         string[] messageIds;       // ordering
         uint256  messageCount;
-        bool     closed;           // ⇦ NEW: true ⇢ no praises / blessings
+        bool     closed;           // true ⇢ no praises / blessings
     }
 
     /*──────────────────────── storage ─────────────────────────*/
@@ -56,7 +56,7 @@ contract Abraham is Ownable, ReentrancyGuard {
 
     /*──────────────────────── public / external ───────────────*/
 
-    /// @notice Create a new session with its first (image + text) message.
+    /// @notice Create a new session with its first message (content and/or media).
     function createSession(
         string calldata sessionId,
         string calldata firstMessageId,
@@ -68,7 +68,7 @@ contract Abraham is Ownable, ReentrancyGuard {
         uniqueSession(sessionId)
         uniqueMessage(sessionId, firstMessageId)
     {
-        require(bytes(media).length > 0, "Media required");
+        _requireSomePayload(content, media);
 
         // initialise session
         Session storage s = sessions[sessionId];
@@ -83,8 +83,7 @@ contract Abraham is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Abraham adds another image + text message
-     *         **and** (optionally) closes / reopens the session.
+     * @notice Abraham adds a message (with media or without) and can close/reopen the session.
      * @param closed Desired session state after this call.
      */
     function abrahamUpdate(
@@ -92,14 +91,15 @@ contract Abraham is Ownable, ReentrancyGuard {
         string calldata messageId,
         string calldata content,
         string calldata media,
-        bool   closed              // ⇦ NEW PARAM
+        bool   closed
     )
         external
         onlyOwner
         sessionExists(sessionId)
         uniqueMessage(sessionId, messageId)
     {
-        require(bytes(media).length > 0, "Media required");
+        // NEW: media is optional now; ensure not both empty
+        _requireSomePayload(content, media);
 
         Session storage s = sessions[sessionId];
         _addMessageInternal(s, messageId, msg.sender, content, media);
@@ -210,7 +210,7 @@ contract Abraham is Ownable, ReentrancyGuard {
             id:       messageId,
             author:   author,
             content:  content,
-            media:    media,
+            media:    media,               // can be empty
             praisers: new address[](0)
         });
 
@@ -218,6 +218,13 @@ contract Abraham is Ownable, ReentrancyGuard {
         unchecked { ++s.messageCount; }
 
         emit MessageAdded(s.id, messageId, author, content, media);
+    }
+
+    function _requireSomePayload(string calldata content, string calldata media) private pure {
+        require(
+            bytes(content).length > 0 || bytes(media).length > 0,
+            "Empty message"
+        );
     }
 
     /*fallback / receive */
