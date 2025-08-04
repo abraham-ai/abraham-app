@@ -1,4 +1,5 @@
 "use client";
+"use client";
 
 import { useState } from "react";
 import Image from "next/image";
@@ -68,11 +69,11 @@ export default function Creation({ creation }: { creation: CreationItem }) {
         </div>
       </div>
 
-      <div>
-        <p className="mb-3">{creation.description}</p>
-        {creation.image && (
+      {creation.image && creation.image !== "" && (
+        <div>
+          <p className="mb-3">{creation.description}</p>
           <Image
-            src={creation.image}
+            src={creation.image || "/placeholder.svg"}
             alt="creation"
             width={1280}
             height={1024}
@@ -80,8 +81,8 @@ export default function Creation({ creation }: { creation: CreationItem }) {
             quality={100}
             onError={() => showErrorToast(new Error("image"), "Image Error")}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* actions */}
       <div className="flex items-center mt-3 pl-2">

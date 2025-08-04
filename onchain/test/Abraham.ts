@@ -38,7 +38,7 @@ describe("Abraham contract (updated)", () => {
 
   /* ------------------ session creation ------------------- */
   describe("createSession", () => {
-    it("owner can create a session with media", async () => {
+    it("owner can create a session with media (and optional content)", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       await expect(
@@ -56,6 +56,54 @@ describe("Abraham contract (updated)", () => {
       expect(author).to.equal(await contract.owner());
 
       expect(await contract.isSessionClosed(S1)).to.equal(false);
+    });
+
+    it("owner can create a session with content-only (media empty)", async () => {
+      const { contract } = await loadFixture(deployFixture);
+
+      await expect(
+        contract.createSession("session-txt", "msg-t1", "hello world", "")
+      )
+        .to.emit(contract, "SessionCreated")
+        .withArgs("session-txt");
+
+      const ids = await contract.getMessageIds("session-txt");
+      expect(ids.length).to.equal(1);
+      const [author, content, media, praises] = await contract.getMessage(
+        "session-txt",
+        "msg-t1"
+      );
+      expect(author).to.equal(await contract.owner());
+      expect(content).to.equal("hello world");
+      expect(media).to.equal("");
+      expect(praises).to.equal(0);
+    });
+
+    it("owner can create a session with media-only (content empty)", async () => {
+      const { contract } = await loadFixture(deployFixture);
+
+      await expect(
+        contract.createSession("session-media", "msg-m1", "", "ipfs://only")
+      )
+        .to.emit(contract, "SessionCreated")
+        .withArgs("session-media");
+
+      const [author, content, media, praises] = await contract.getMessage(
+        "session-media",
+        "msg-m1"
+      );
+      expect(author).to.equal(await contract.owner());
+      expect(content).to.equal("");
+      expect(media).to.equal("ipfs://only");
+      expect(praises).to.equal(0);
+    });
+
+    it("reverts if both content and media are empty", async () => {
+      const { contract } = await loadFixture(deployFixture);
+
+      await expect(
+        contract.createSession("empty-session", "msg-empty", "", "")
+      ).to.be.revertedWith("Empty message");
     });
 
     it("reverts if non-owner calls", async () => {
@@ -94,6 +142,21 @@ describe("Abraham contract (updated)", () => {
       expect(await contract.isSessionClosed(S1)).to.equal(false);
     });
 
+    it("owner can append a content-only update (no media)", async () => {
+      const { contract } = await loadFixture(deployFixture);
+      await contract.createSession(S1, M1, "v1", "ipfs://a");
+
+      await expect(
+        contract.abrahamUpdate(S1, M2, "text-only v2", "", false)
+      ).to.emit(contract, "MessageAdded");
+
+      const [author, content, media, pc] = await contract.getMessage(S1, M2);
+      expect(author).to.equal(await contract.owner());
+      expect(content).to.equal("text-only v2");
+      expect(media).to.equal("");
+      expect(pc).to.equal(0);
+    });
+
     it("owner can close and later reopen the session", async () => {
       const { contract, user1, PRAISE_PRICE, BLESS_PRICE } = await loadFixture(
         deployFixture
@@ -114,9 +177,9 @@ describe("Abraham contract (updated)", () => {
         contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
       ).to.be.revertedWith("Session closed");
 
-      /* now REOPEN */
+      /* now REOPEN (content-only is fine) */
       await expect(
-        contract.abrahamUpdate(S1, M3, "reopen msg", "ipfs://c", false)
+        contract.abrahamUpdate(S1, M3, "reopen msg", "", false)
       ).to.emit(contract, "SessionReopened");
       expect(await contract.isSessionClosed(S1)).to.equal(false);
 
@@ -127,12 +190,12 @@ describe("Abraham contract (updated)", () => {
       await contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE });
     });
 
-    it("reverts for missing media", async () => {
+    it("reverts when both content and media are empty", async () => {
       const { contract } = await loadFixture(deployFixture);
       await contract.createSession(S1, M1, "v1", "ipfs://a");
       await expect(
-        contract.abrahamUpdate(S1, M2, "bad", "", false)
-      ).to.be.revertedWith("Media required");
+        contract.abrahamUpdate(S1, M2, "", "", false)
+      ).to.be.revertedWith("Empty message");
     });
   });
 
@@ -230,7 +293,7 @@ describe("Abraham contract (updated)", () => {
       const before = await ethers.provider.getBalance(abraham.address);
       const tx = await contract.withdraw();
       const r = await tx.wait();
-      const gas = r!.gasUsed * (tx.gasPrice || 0n);
+      const gas = r!.gasUsed * r!.gasPrice;
       const after = await ethers.provider.getBalance(abraham.address);
 
       expect(after).to.equal(before + PRAISE_PRICE + BLESS_PRICE - gas);
