@@ -38,4 +38,5 @@ export interface CreationItem {
   lastActivityAt: string;
   blessings: Blessing[];
   messages: SubgraphMessage[];
+  timestamp?: string; // Individual message timestamp
 }

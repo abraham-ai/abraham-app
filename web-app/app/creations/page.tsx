@@ -29,6 +29,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
+import { HIDDEN_SESSION_IDS } from "@/config/hidden-sessions";
 
 type SortOption = "most-praised" | "latest";
 const PAGE_SIZE = 18;
@@ -77,13 +78,18 @@ export default function CreationsGrid() {
         const firstBatch = await fetchPage(0, sortBy);
         if (cancelled) return;
 
-        setCreations(firstBatch);
+        // Filter out hidden sessions
+        const filteredBatch = firstBatch.filter(
+          (c) => !HIDDEN_SESSION_IDS.includes(c.id)
+        );
+
+        setCreations(filteredBatch);
         setPage(0);
         setHasMore(firstBatch.length === PAGE_SIZE);
 
         /* initialise praise counts = SUM(praiseCount) + 2 * blessings */
         const cnt: Record<string, number> = {};
-        firstBatch.forEach((c) => {
+        filteredBatch.forEach((c) => {
           const totalPraises = c.messages.reduce((s, m) => s + m.praiseCount, 0);
           const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
           cnt[c.id] = totalPraises + (2 * blessingCount);
@@ -112,13 +118,18 @@ export default function CreationsGrid() {
           try {
             const next = page + 1;
             const batch = await fetchPage(next, sortBy);
+            
+            // Filter out hidden sessions
+            const filteredBatch = batch.filter(
+              (c) => !HIDDEN_SESSION_IDS.includes(c.id)
+            );
 
-            setCreations((prev) => [...prev, ...batch]);
+            setCreations((prev) => [...prev, ...filteredBatch]);
             setPage(next);
             setHasMore(batch.length === PAGE_SIZE);
 
             const cnt: Record<string, number> = {};
-            batch.forEach((c) => {
+            filteredBatch.forEach((c) => {
               const totalPraises = c.messages.reduce((s, m) => s + m.praiseCount, 0);
               const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
               cnt[c.id] = totalPraises + (2 * blessingCount);

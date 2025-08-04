@@ -48,6 +48,10 @@ export default function Creation({ creation }: { creation: CreationItem }) {
 
   const createdAt = getRelativeTime(Number(creation.firstMessageAt) * 1000);
   const updatedAt = getRelativeTime(Number(creation.lastActivityAt) * 1000);
+  // Use individual message timestamp if available, otherwise fall back to lastActivityAt
+  const messageTime = creation.timestamp 
+    ? getRelativeTime(Number(creation.timestamp) * 1000)
+    : updatedAt;
 
   return (
     <div className="border-b p-4 lg:w-[43vw] w-full">
@@ -64,65 +68,69 @@ export default function Creation({ creation }: { creation: CreationItem }) {
         <div className="flex flex-col">
           <span className="font-semibold">Abraham</span>
           <span className="text-xs text-gray-500">
-            {updatedAt}
+            {messageTime}
           </span>
         </div>
       </div>
 
+      {creation.description && (
+        <p className="mb-3">{creation.description}</p>
+      )}
+      
       {creation.image && creation.image !== "" && (
-        <div>
-          <p className="mb-3">{creation.description}</p>
-          <Image
-            src={creation.image || "/placeholder.svg"}
-            alt="creation"
-            width={1280}
-            height={1024}
-            className="w-full rounded-lg border"
-            quality={100}
-            onError={() => showErrorToast(new Error("image"), "Image Error")}
-          />
-        </div>
+        <Image
+          src={creation.image || "/placeholder.svg"}
+          alt="creation"
+          width={1280}
+          height={1024}
+          className="w-full rounded-lg border"
+          quality={100}
+          onError={() => showErrorToast(new Error("image"), "Image Error")}
+        />
       )}
 
       {/* actions */}
-      <div className="flex items-center mt-3 pl-2">
-        <Dialog>
-          <DialogTrigger asChild>
-            <button
-              className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50"
-              disabled={loading || creation.closed}
-            >
-              <span className="text-3xl relative">
-                🙌
-                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
-                  {creation.closed ? "Closed" : "Praise"}
+      {/* Hide praise button for closed creations with 0 praises */}
+      {(!creation.closed || praises > 0) && (
+        <div className="flex items-center mt-3 pl-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50"
+                disabled={loading || creation.closed}
+              >
+                <span className="text-3xl relative">
+                  🙌
+                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
+                    {creation.closed ? "Closed" : "Praise"}
+                  </span>
                 </span>
-              </span>
-              {praises > 0 && (
-                <span className="text-lg font-medium">{praises}</span>
-              )}
-            </button>
-          </DialogTrigger>
-          {!creation.closed && (
-            <DialogContent className="bg-white">
-              <DialogHeader>
-                <DialogTitle>Praise Creation</DialogTitle>
-                <DialogDescription>
-                  {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button onClick={handlePraise} disabled={loading}>
-                  {loading && (
-                    <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
-                  )}
-                  {loading ? "Praising…" : "Praise"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          )}
-        </Dialog>
-      </div>
+                {praises > 0 && (
+                  <span className="text-lg font-medium">{praises}</span>
+                )}
+              </button>
+            </DialogTrigger>
+            {!creation.closed && (
+              <DialogContent className="bg-white">
+                <DialogHeader>
+                  <DialogTitle>Praise Creation</DialogTitle>
+                  <DialogDescription>
+                    {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button onClick={handlePraise} disabled={loading}>
+                    {loading && (
+                      <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
+                    )}
+                    {loading ? "Praising…" : "Praise"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            )}
+          </Dialog>
+        </div>
+      )}
     </div>
   );
 }

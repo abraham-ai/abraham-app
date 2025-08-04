@@ -69,17 +69,6 @@ export default function CreationPage({ params }: { params: { id: string } }) {
       }
     });
     
-    // TEMPORARY HACK: Remove hardcoded image from last message of closed sessions
-    // TODO: Remove this code once the contract is fixed to not include images in closing messages
-    const HARDCODED_CLOSING_IMAGE = "https://gateway.pinata.cloud/ipfs/QmedHKRuiiWURppDy6cguCSWMJkngpBQK21EU7hfHMuCHp";
-    if (creation.closed && groups.length > 0) {
-      const lastGroup = groups[groups.length - 1];
-      if (lastGroup.abraham.media === HARDCODED_CLOSING_IMAGE || 
-          lastGroup.abraham.media === `ipfs://QmedHKRuiiWURppDy6cguCSWMJkngpBQK21EU7hfHMuCHp`) {
-        lastGroup.abraham.media = null;
-      }
-    }
-    
     return groups;
   }, [creation]);
 
@@ -165,6 +154,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                     description: g.abraham.content,
                     praiseCount: g.abraham.praiseCount,
                     messageUuid: g.abraham.uuid,
+                    timestamp: g.abraham.timestamp,
                   }}
                 />
                 <Blessings
