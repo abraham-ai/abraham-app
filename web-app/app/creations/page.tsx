@@ -169,15 +169,25 @@ export default function CreationsGrid() {
   /* -------- local sort (fallback) -------- */
   const sorted = useMemo(() => {
     const arr = [...creationsWithComputed];
-    if (sortBy === "most-praised") {
-      arr.sort((a, b) => {
-        if (b.totalPraises !== a.totalPraises)
+    arr.sort((a, b) => {
+      // Primary sort: open creations first
+      if (a.closed !== b.closed) {
+        return a.closed ? 1 : -1;
+      }
+      
+      // Secondary sort based on selected option
+      if (sortBy === "most-praised") {
+        // By praise count
+        if (b.totalPraises !== a.totalPraises) {
           return b.totalPraises - a.totalPraises;
+        }
+        // Tertiary: by latest activity
         return Number(b.lastActivityAt) - Number(a.lastActivityAt);
-      });
-    } else {
-      arr.sort((a, b) => Number(b.lastActivityAt) - Number(a.lastActivityAt));
-    }
+      } else {
+        // By latest activity
+        return Number(b.lastActivityAt) - Number(a.lastActivityAt);
+      }
+    });
     return arr;
   }, [creationsWithComputed, sortBy]);
 
@@ -255,7 +265,7 @@ export default function CreationsGrid() {
           {sorted.map((c) => (
             <div
               key={c.id}
-              className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+              className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow relative"
             >
               {/* image link */}
               <Link href={`/creation/${c.id}`} className="block">
@@ -274,6 +284,10 @@ export default function CreationsGrid() {
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
                       <span className="text-6xl">🎨</span>
                     </div>
+                  )}
+                  {/* White overlay for closed creations */}
+                  {c.closed && (
+                    <div className="absolute inset-0 bg-white/60 pointer-events-none" />
                   )}
                 </div>
               </Link>
@@ -298,7 +312,6 @@ export default function CreationsGrid() {
                             {c.totalPraises}
                           </span>
                         )}
-                        <span className={`w-2 h-2 rounded-full ml-1 ${c.closed ? 'bg-red-500' : 'bg-green-500'}`}></span>
                       </button>
                     </DialogTrigger>
                     {!c.closed && (

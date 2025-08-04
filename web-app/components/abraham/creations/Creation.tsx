@@ -63,22 +63,24 @@ export default function Creation({ creation }: { creation: CreationItem }) {
         <div className="flex flex-col">
           <span className="font-semibold">Abraham</span>
           <span className="text-xs text-gray-500">
-            {creation.closed ? "Session closed" : updatedAt}
+            {updatedAt}
           </span>
         </div>
       </div>
 
       <div>
         <p className="mb-3">{creation.description}</p>
-        <Image
-          src={creation.image || "/placeholder.svg"}
-          alt="creation"
-          width={1280}
-          height={1024}
-          className="w-full rounded-lg border"
-          quality={100}
-          onError={() => showErrorToast(new Error("image"), "Image Error")}
-        />
+        {creation.image && (
+          <Image
+            src={creation.image}
+            alt="creation"
+            width={1280}
+            height={1024}
+            className="w-full rounded-lg border"
+            quality={100}
+            onError={() => showErrorToast(new Error("image"), "Image Error")}
+          />
+        )}
       </div>
 
       {/* actions */}
