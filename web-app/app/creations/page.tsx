@@ -78,18 +78,13 @@ export default function CreationsGrid() {
         const firstBatch = await fetchPage(0, sortBy);
         if (cancelled) return;
 
-        // Filter out hidden sessions
-        const filteredBatch = firstBatch.filter(
-          (c) => !HIDDEN_SESSION_IDS.includes(c.id)
-        );
-
-        setCreations(filteredBatch);
+        setCreations(firstBatch);
         setPage(0);
         setHasMore(firstBatch.length === PAGE_SIZE);
 
         /* initialise praise counts = SUM(praiseCount) + 2 * blessings */
         const cnt: Record<string, number> = {};
-        filteredBatch.forEach((c) => {
+        firstBatch.forEach((c) => {
           const totalPraises = c.messages.reduce((s, m) => s + m.praiseCount, 0);
           const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
           cnt[c.id] = totalPraises + (2 * blessingCount);
@@ -119,17 +114,12 @@ export default function CreationsGrid() {
             const next = page + 1;
             const batch = await fetchPage(next, sortBy);
             
-            // Filter out hidden sessions
-            const filteredBatch = batch.filter(
-              (c) => !HIDDEN_SESSION_IDS.includes(c.id)
-            );
-
-            setCreations((prev) => [...prev, ...filteredBatch]);
+            setCreations((prev) => [...prev, ...batch]);
             setPage(next);
             setHasMore(batch.length === PAGE_SIZE);
 
             const cnt: Record<string, number> = {};
-            filteredBatch.forEach((c) => {
+            batch.forEach((c) => {
               const totalPraises = c.messages.reduce((s, m) => s + m.praiseCount, 0);
               const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
               cnt[c.id] = totalPraises + (2 * blessingCount);
@@ -179,7 +169,12 @@ export default function CreationsGrid() {
 
   /* -------- local sort (fallback) -------- */
   const sorted = useMemo(() => {
-    const arr = [...creationsWithComputed];
+    // First filter out hidden sessions, then sort
+    const filteredCreations = creationsWithComputed.filter(
+      (c) => !HIDDEN_SESSION_IDS.includes(c.id)
+    );
+    
+    const arr = [...filteredCreations];
     arr.sort((a, b) => {
       // Primary sort: open creations first
       if (a.closed !== b.closed) {
@@ -200,7 +195,7 @@ export default function CreationsGrid() {
       }
     });
     return arr;
-  }, [creationsWithComputed, sortBy]);
+  }, [creationsWithComputed, sortBy, HIDDEN_SESSION_IDS]);
 
   /* -------- praise action -------- */
   const handlePraise = async (c: { id: string; lastMessageUuid: string }) => {
@@ -368,6 +363,15 @@ export default function CreationsGrid() {
         )}
         {sorted.length === 0 && !loadingMore && (
           <p className="text-center py-12 text-gray-500">No creations yet</p>
+        )}
+        
+        {/* Display visible session IDs */}
+        {sorted.length > 0 && (
+          <div className="mt-8 mb-4 text-center">
+            <p className="text-sm text-gray-500">
+              Visible session IDs: {sorted.map(c => `"${c.id}"`).join(", ")}
+            </p>
+          </div>
         )}
       </div>
     </>
