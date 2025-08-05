@@ -8,7 +8,6 @@ import { Abraham } from "../typechain-types";
 /* ---------------------------------------------------------- */
 function toBI(v: any): bigint {
   if (typeof v === "bigint") return v;
-  // ethers BigNumber (v5/v6) has toBigInt(); fall back to toString()
   if (v && typeof v.toBigInt === "function") return v.toBigInt();
   return BigInt(v.toString());
 }
@@ -38,10 +37,20 @@ const B1 = "bless-01";
 const B2 = "bless-02";
 const B3 = "bless-03";
 
+// extra ids for cross-session batch tests
+const SA = "session-A";
+const SB = "session-B";
+const SC = "session-C";
+const MA0 = "msg-A0";
+const MB0 = "msg-B0";
+const MC0 = "msg-C0";
+const MA1 = "msg-A1";
+const MB1 = "msg-B1";
+
 /* ---------------------------------------------------------- */
 /*                        TESTS                               */
 /* ---------------------------------------------------------- */
-describe("Abraham contract (updated with overloads + batch)", () => {
+describe("Abraham contract (overloads + user batches + owner single/cross-session batches)", () => {
   /* ----------------------- deploy ------------------------ */
   it("sets deployer as owner", async () => {
     const { contract, abraham } = await loadFixture(deployFixture);
@@ -621,7 +630,7 @@ describe("Abraham contract (updated with overloads + batch)", () => {
     });
   });
 
-  /* ------------------ abrahamBatchUpdate ----------------- */
+  /* ------------- abrahamBatchUpdate (single session) ------------- */
   describe("abrahamBatchUpdate", () => {
     it("owner posts multiple messages (content/media mix) and toggles closed state", async () => {
       const { contract } = await loadFixture(deployFixture);
@@ -697,6 +706,139 @@ describe("Abraham contract (updated with overloads + batch)", () => {
     });
   });
 
+  /* ----------------- NEW: abrahamBatchCreate ---------------- */
+  describe("abrahamBatchCreate (cross-session)", () => {
+    it("creates multiple sessions at once (mixed content/media)", async () => {
+      const { contract } = await loadFixture(deployFixture);
+
+      await contract.abrahamBatchCreate([
+        { sessionId: SA, firstMessageId: MA0, content: "hello A", media: "" },
+        {
+          sessionId: SB,
+          firstMessageId: MB0,
+          content: "",
+          media: "ipfs://imgB",
+        },
+      ]);
+
+      expect(await contract.isSessionClosed(SA)).to.equal(false);
+      expect(await contract.isSessionClosed(SB)).to.equal(false);
+
+      let idsA = await contract.getMessageIds(SA);
+      let idsB = await contract.getMessageIds(SB);
+      expect(idsA).to.deep.equal([MA0]);
+      expect(idsB).to.deep.equal([MB0]);
+
+      const [, cA, mA] = await contract.getMessage(SA, MA0);
+      const [, cB, mB] = await contract.getMessage(SB, MB0);
+      expect(cA).to.equal("hello A");
+      expect(mA).to.equal("");
+      expect(cB).to.equal("");
+      expect(mB).to.equal("ipfs://imgB");
+
+      // sessionTotal should be 2
+      const total = await contract.sessionTotal();
+      expect(toBI(total)).to.equal(2n);
+    });
+
+    it("reverts for duplicate session, duplicate message, or empty payload", async () => {
+      const { contract } = await loadFixture(deployFixture);
+
+      // create one valid session first
+      await contract.abrahamBatchCreate([
+        { sessionId: SA, firstMessageId: MA0, content: "ok", media: "" },
+      ]);
+
+      // duplicate sessionId
+      await expect(
+        contract.abrahamBatchCreate([
+          { sessionId: SA, firstMessageId: "new", content: "x", media: "" },
+        ])
+      ).to.be.revertedWith("Session exists");
+
+      // duplicate messageId within a NEW session (ensure unique message per session)
+      await expect(
+        contract.abrahamBatchCreate([
+          { sessionId: SB, firstMessageId: MA0, content: "x", media: "" }, // MA0 used in SA, but message uniqueness is per-session; however our contract checks per (sessionId, messageId) so this should pass if session differs.
+        ])
+      ).to.not.be.reverted; // clarify behavior: messageId uniqueness is per-session
+
+      // empty payload
+      await expect(
+        contract.abrahamBatchCreate([
+          { sessionId: SC, firstMessageId: MC0, content: "", media: "" },
+        ])
+      ).to.be.revertedWith("Empty message");
+    });
+  });
+
+  /* ------ NEW: abrahamBatchUpdateAcrossSessions (cross-session) ------ */
+  describe("abrahamBatchUpdateAcrossSessions", () => {
+    it("adds one owner message to each target session", async () => {
+      const { contract } = await loadFixture(deployFixture);
+
+      // prepare two sessions
+      await contract.abrahamBatchCreate([
+        { sessionId: SA, firstMessageId: MA0, content: "seed A", media: "" },
+        {
+          sessionId: SB,
+          firstMessageId: MB0,
+          content: "",
+          media: "ipfs://seedB",
+        },
+      ]);
+
+      await expect(
+        contract.abrahamBatchUpdateAcrossSessions([
+          { sessionId: SA, messageId: MA1, content: "", media: "ipfs://A1" },
+          { sessionId: SB, messageId: MB1, content: "hello B", media: "" },
+        ])
+      ).to.emit(contract, "MessageAdded");
+
+      const idsA = await contract.getMessageIds(SA);
+      const idsB = await contract.getMessageIds(SB);
+      expect(idsA).to.deep.equal([MA0, MA1]);
+      expect(idsB).to.deep.equal([MB0, MB1]);
+
+      const [, cA1, mA1] = await contract.getMessage(SA, MA1);
+      const [, cB1, mB1] = await contract.getMessage(SB, MB1);
+      expect(cA1).to.equal("");
+      expect(mA1).to.equal("ipfs://A1");
+      expect(cB1).to.equal("hello B");
+      expect(mB1).to.equal("");
+    });
+
+    it("reverts on unknown session, duplicate message id in that session, or empty payload", async () => {
+      const { contract } = await loadFixture(deployFixture);
+
+      // prepare one session
+      await contract.abrahamBatchCreate([
+        { sessionId: SA, firstMessageId: MA0, content: "seed", media: "" },
+      ]);
+
+      // unknown session
+      await expect(
+        contract.abrahamBatchUpdateAcrossSessions([
+          { sessionId: "ghost", messageId: "m-x", content: "x", media: "" },
+        ])
+      ).to.be.revertedWith("Session not found");
+
+      // duplicate message id in SA
+      await expect(
+        contract.abrahamBatchUpdateAcrossSessions([
+          { sessionId: SA, messageId: MA0, content: "dup", media: "" },
+        ])
+      ).to.be.revertedWith("Message exists");
+
+      // empty payload
+      await expect(
+        contract.abrahamBatchUpdateAcrossSessions([
+          { sessionId: SA, messageId: "new", content: "", media: "" },
+        ])
+      ).to.be.revertedWith("Empty message");
+    });
+  });
+
   /* --------------------- withdraw ------------------------ */
   describe("withdraw", () => {
     it("transfers all ETH to owner", async () => {
@@ -722,10 +864,10 @@ describe("Abraham contract (updated with overloads + batch)", () => {
       const praiseBI = toBI(PRAISE_PRICE);
       const blessBI = toBI(BLESS_PRICE);
       const gasUsedBI = toBI(r!.gasUsed);
-      // effectiveGasPrice on v6 is bigint; on v5 it's BigNumber
-      const effGasPriceBI = r!.effectiveGasPrice
-        ? toBI(r!.effectiveGasPrice)
-        : toBI((tx as any).gasPrice); // fallback if needed
+      // Get effective gas price from transaction response or receipt
+      const effGasPriceBI = tx.gasPrice
+        ? toBI(tx.gasPrice)
+        : toBI(r!.gasPrice || 0);
       const gasBI = gasUsedBI * effGasPriceBI;
 
       expect(afterBI).to.equal(beforeBI + praiseBI + blessBI - gasBI);

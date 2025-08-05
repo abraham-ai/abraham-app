@@ -1,41 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createPublicClient,
   createWalletClient,
   custom,
   http,
   parseEther,
+  type PublicClient,
+  type WalletClient,
 } from "viem";
 import { baseSepolia } from "@/lib/base-sepolia";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { useAuth } from "@/context/auth-context";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 
-export const CONTRACT_ADDRESS = "0x9C248314D9deA9335496593031e2118Bed775672";
+/* ------------------------------------------------------------------ */
+/*                        CONTRACT + PRICES                           */
+/* ------------------------------------------------------------------ */
+export const CONTRACT_ADDRESS =
+  (process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS as `0x${string}`) ??
+  "0xc775399af1fA44c4eDe391F365840CC887E28693";
+
 export const PRAISE_PRICE_ETHER = 0.00001;
 export const BLESS_PRICE_ETHER = 0.00002;
 
+const PRAISE_PRICE_WEI = parseEther(PRAISE_PRICE_ETHER.toString());
+const BLESS_PRICE_WEI = parseEther(BLESS_PRICE_ETHER.toString());
+
 /**
  * Read-/write helpers for the Abraham contract.
- * Guards against wallet absence and insufficient balance.
+ * - Guards against wallet absence and insufficient balance.
+ * - Includes single + batch actions for users (praise/bless).
+ * - All txs will toast on success; rejections won’t spam errors.
  */
 export function useAbrahamContract() {
   const { eip1193Provider } = useAuth();
 
-  /* read-only viem client */
-  const [publicClient] = useState(() =>
-    createPublicClient({
-      chain: baseSepolia,
-      transport: http(baseSepolia.rpcUrls.default.http[0]),
-    })
+  /* ---------- viem clients ---------- */
+  const publicClient: PublicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: baseSepolia,
+        transport: http(baseSepolia.rpcUrls.default.http[0]),
+      }),
+    []
   );
 
-  /* wallet client (writes) */
-  const [walletClient, setWalletClient] = useState<ReturnType<
-    typeof createWalletClient
-  > | null>(null);
+  const [walletClient, setWalletClient] = useState<WalletClient | null>(null);
 
   useEffect(() => {
     if (!eip1193Provider) {
@@ -51,11 +63,27 @@ export function useAbrahamContract() {
   }, [eip1193Provider]);
 
   /* ---------- helpers ---------- */
+  const requireWallet = async () => {
+    if (!walletClient) {
+      const err = new Error("Wallet not connected");
+      showErrorToast(err, "Wallet not connected");
+      throw err;
+    }
+    const accounts = await walletClient.getAddresses();
+    if (!accounts?.length) {
+      const err = new Error("No account found");
+      showErrorToast(err, "Wallet not connected");
+      throw err;
+    }
+    return accounts[0]!;
+  };
+
   const ensureBalance = async (addr: `0x${string}`, cost: bigint) => {
     const bal = await publicClient.getBalance({ address: addr });
     if (bal < cost) {
-      showErrorToast(new Error("insufficient funds"), "Insufficient Balance");
-      throw new Error("insufficient funds");
+      const err = new Error("Insufficient funds");
+      showErrorToast(err, "Insufficient Balance");
+      throw err;
     }
   };
 
@@ -63,24 +91,27 @@ export function useAbrahamContract() {
     const rcpt = await publicClient.waitForTransactionReceipt({ hash });
     if (rcpt.status === "success") {
       showSuccessToast(msg, "Transaction confirmed on-chain.");
-    } else throw new Error("tx failed");
+    } else {
+      throw new Error("Transaction failed");
+    }
   };
 
-  /* ---------- contract writes ---------- */
+  const isUserReject = (e: any) =>
+    typeof e?.message === "string" &&
+    e.message.toLowerCase().includes("user rejected");
+
+  /* ------------------------------------------------------------------ */
+  /*                             SINGLE ACTIONS                          */
+  /* ------------------------------------------------------------------ */
 
   /** Praise any message (unlimited). */
   const praise = async (sessionUuid: string, messageUuid: string) => {
-    if (!walletClient) {
-      showErrorToast(new Error("wallet"), "Wallet not connected");
-      throw new Error("wallet not ready");
-    }
-
-    const [sender] = await walletClient.getAddresses();
-    const valueWei = parseEther(PRAISE_PRICE_ETHER.toString());
+    const sender = await requireWallet();
+    const valueWei = PRAISE_PRICE_WEI;
     await ensureBalance(sender, valueWei);
 
     try {
-      const hash = await walletClient.writeContract({
+      const hash = await walletClient!.writeContract({
         account: sender,
         address: CONTRACT_ADDRESS,
         abi: AbrahamAbi,
@@ -92,44 +123,40 @@ export function useAbrahamContract() {
       await waitAndToast(hash, "Praise sent! 🙌");
       return hash;
     } catch (e: any) {
-      if (!e.message?.toLowerCase().includes("user rejected"))
-        showErrorToast(e, "Praise Failed");
+      if (!isUserReject(e)) showErrorToast(e, "Praise Failed");
       throw e;
     }
   };
 
   /** Bless (add a text-only message). Generates UUID client-side. */
   const bless = async (sessionUuid: string, content: string) => {
-    if (!walletClient) {
-      showErrorToast(new Error("wallet"), "Wallet not connected");
-      throw new Error("wallet not ready");
-    }
-    if (!content.trim()) {
-      showErrorToast(new Error("content"), "Content required");
-      throw new Error("content required");
+    const trimmed = (content ?? "").trim();
+    if (!trimmed) {
+      const err = new Error("Content required");
+      showErrorToast(err, "Content required");
+      throw err;
     }
 
-    const [sender] = await walletClient.getAddresses();
-    const valueWei = parseEther(BLESS_PRICE_ETHER.toString());
+    const sender = await requireWallet();
+    const valueWei = BLESS_PRICE_WEI;
     await ensureBalance(sender, valueWei);
 
     const msgUuid = crypto.randomUUID();
 
     try {
-      const hash = await walletClient.writeContract({
+      const hash = await walletClient!.writeContract({
         account: sender,
         address: CONTRACT_ADDRESS,
         abi: AbrahamAbi,
         functionName: "bless",
-        args: [sessionUuid, msgUuid, content.trim()],
+        args: [sessionUuid, msgUuid, trimmed],
         value: valueWei,
         chain: baseSepolia,
       });
       await waitAndToast(hash, "Blessing sent! 🙏");
       return { hash, msgUuid };
     } catch (e: any) {
-      if (!e.message?.toLowerCase().includes("user rejected"))
-        showErrorToast(e, "Blessing Failed");
+      if (!isUserReject(e)) showErrorToast(e, "Blessing Failed");
       throw e;
     }
   };

@@ -3,32 +3,32 @@ type Creation @entity(immutable: false) {
   messageCount: Int!
   firstMessageAt: BigInt!
   lastActivityAt: BigInt!
-  ethSpent: BigInt!
-  closed: Boolean! # true when closed (no blessings/praises allowed)
+  ethSpent: BigInt! # total Wei spent on blessings + praises (user costs)
+  closed: Boolean! # true ⇒ no blessings/praises allowed
   messages: [Message!]! @derivedFrom(field: "creation")
 }
 
 type Message @entity(immutable: false) {
   id: ID! # "${sessionId}-${messageId}"
   creation: Creation!
-  uuid: String! # message UUID
+  uuid: String! # original per-session message UUID
   author: Bytes!
-  content: String! # may be empty string if Abraham posted media-only
-  media: String # nullable; null when no media
+  content: String! # may be an empty string for media-only owner posts
+  media: String # nullable; null ⇒ no media
   timestamp: BigInt!
   praiseCount: Int!
   praises: [Praise!]! @derivedFrom(field: "message")
 }
 
 type Praise @entity(immutable: true) {
-  id: ID! # "${messageId}-${txHash}-${logIdx}"
+  id: ID! # "${sessionId}-${messageId}-${txHash}-${logIdx}"
   message: Message!
   praiser: Bytes!
   timestamp: BigInt!
 }
 
 type User @entity(immutable: false) {
-  id: ID!
+  id: ID! # address
   praisesGiven: Int!
   praisesReceived: Int!
 }
