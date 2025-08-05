@@ -84,7 +84,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
           width={1280}
           height={1024}
           className="w-full rounded-lg border"
-          quality={100}
+          quality={75}
           onError={() => showErrorToast(new Error("image"), "Image Error")}
         />
       )}
