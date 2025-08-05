@@ -184,6 +184,144 @@
   {
     "inputs": [
       {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "sessionId",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "firstMessageId",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "content",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "media",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct Abraham.CreateItem[]",
+        "name": "items",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "abrahamBatchCreate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      },
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "messageId",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "content",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "media",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct Abraham.OwnerMsg[]",
+        "name": "items",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "bool",
+        "name": "closedAfter",
+        "type": "bool"
+      }
+    ],
+    "name": "abrahamBatchUpdate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "sessionId",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "messageId",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "content",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "media",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct Abraham.UpdateItem[]",
+        "name": "items",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "abrahamBatchUpdateAcrossSessions",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "messageId",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "content",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "closed",
+        "type": "bool"
+      }
+    ],
+    "name": "abrahamUpdate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "string",
         "name": "sessionId",
         "type": "string"
@@ -222,6 +360,47 @@
         "type": "string"
       },
       {
+        "internalType": "string[]",
+        "name": "messageIds",
+        "type": "string[]"
+      },
+      {
+        "internalType": "string[]",
+        "name": "contents",
+        "type": "string[]"
+      }
+    ],
+    "name": "batchBless",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      },
+      {
+        "internalType": "string[]",
+        "name": "messageIds",
+        "type": "string[]"
+      }
+    ],
+    "name": "batchPraise",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      },
+      {
         "internalType": "string",
         "name": "messageId",
         "type": "string"
@@ -235,6 +414,29 @@
     "name": "bless",
     "outputs": [],
     "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "firstMessageId",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "content",
+        "type": "string"
+      }
+    ],
+    "name": "createSession",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
