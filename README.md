@@ -5,6 +5,9 @@ The **Abraham** contract lets the owner (Abraham) create image–text “Creatio
 Anyone can “Bless” (add a text-only message) or “Praise” any message as many
 times as they like—unless the session has been closed.
 
+> **Optionality:** Owner posts can be **content-only**, **media-only**, or **both**.
+> At least one of `content` or `media` must be non-empty.
+
 ---
 
 ### 1 Start a **brand-new Creation**
@@ -47,6 +50,56 @@ That single call …
 - stores text + image on-chain
 - emits `SessionCreated` **and** `MessageAdded`
 
+> There’s also a **3-arg overload** for content-only:
+> `createSession(sessionId, firstMessageId, content)`.
+
+---
+
+### 1b **Batch**: create many new sessions at once
+
+Use **`abrahamBatchCreate(items)`** to create **N sessions** in a single tx.
+
+**Item shape**
+
+```ts
+type CreateItem = {
+  sessionId: string;
+  firstMessageId: string;
+  content: string; // may be ""
+  media: string; // may be ""
+};
+```
+
+- Each item must have **content or media** (at least one non-empty).
+- Each `sessionId` must be unique (reverts with `Session exists` if not).
+- Each `(sessionId, firstMessageId)` pair must be unique (reverts with `Message exists`).
+- Emits one `SessionCreated` and one `MessageAdded` **per item**.
+
+**Example**
+
+```js
+await contract.abrahamBatchCreate([
+  {
+    sessionId: crypto.randomUUID(),
+    firstMessageId: crypto.randomUUID(),
+    content: "A",
+    media: "",
+  },
+  {
+    sessionId: crypto.randomUUID(),
+    firstMessageId: crypto.randomUUID(),
+    content: "",
+    media: "ipfs://bafy…img",
+  },
+  {
+    sessionId: crypto.randomUUID(),
+    firstMessageId: crypto.randomUUID(),
+    content: "C",
+    media: "ipfs://bafy…imgC",
+  },
+]);
+```
+
 ---
 
 ### 2 Add another Abraham image / close or reopen
@@ -58,7 +111,6 @@ That single call …
    ```
 
 2. Choose the `sessionId` to extend and a fresh `messageId`.
-
 3. **Call `abrahamUpdate`** (owner-only):
 
 | Argument    | Example value                                       |
@@ -79,9 +131,61 @@ await contract.abrahamUpdate(
 );
 ```
 
-_Pass `true` in the last slot to **close** the session;
-pass `false` later to **reopen** it.
+_Pass `true` to **close** the session; later pass `false` to **reopen** it.
 The contract emits `SessionClosed` or `SessionReopened` accordingly._
+
+> There’s also a **content-only overload**:
+> `abrahamUpdate(sessionId, messageId, content, closed)`.
+
+---
+
+### 2c **Batch**: post one update to **many sessions** at once
+
+Use **`abrahamBatchUpdateAcrossSessions(items)`** to add **one owner message to each target session** in a single tx. This **does not** toggle closed/open state—use `abrahamUpdate` (or the single-session `abrahamBatchUpdate`) if you need to change `closed`.
+
+**Item shape**
+
+```ts
+type UpdateItem = {
+  sessionId: string;
+  messageId: string;
+  content: string; // may be ""
+  media: string; // may be ""
+};
+```
+
+- Each item must target an **existing** `sessionId` (else `Session not found`).
+- Each `(sessionId, messageId)` must be new (else `Message exists`).
+- Each item requires **content or media** (else `Empty message`).
+- Emits one `MessageAdded` **per item**.
+
+**Example**
+
+```js
+await contract.abrahamBatchUpdateAcrossSessions([
+  {
+    sessionId: "session-uuid-1",
+    messageId: crypto.randomUUID(),
+    content: "note 1",
+    media: "",
+  },
+  {
+    sessionId: "session-uuid-2",
+    messageId: crypto.randomUUID(),
+    content: "",
+    media: "ipfs://bafy…img2",
+  },
+  {
+    sessionId: "session-uuid-3",
+    messageId: crypto.randomUUID(),
+    content: "note 3",
+    media: "ipfs://bafy…img3",
+  },
+]);
+```
+
+> For **many messages within a single session** plus an optional close/reopen toggle, use:
+> `abrahamBatchUpdate(sessionId, OwnerMsg[], closedAfter)`.
 
 ---
 
@@ -127,7 +231,7 @@ const provider = new ethers.JsonRpcProvider(RPC);
 const wallet = new ethers.Wallet(KEY, provider);
 const contract = new ethers.Contract(ADDR, abi, wallet);
 
-// brand-new Creation
+// 1) brand-new Creation
 await contract.createSession(
   crypto.randomUUID(), // sessionId
   crypto.randomUUID(), // firstMessageId
@@ -135,7 +239,23 @@ await contract.createSession(
   "https://gateway.pinata.cloud/ipfs/bafybeih4…abc"
 );
 
-// owner appends an update and closes the session
+// 1b) BATCH create multiple sessions
+await contract.abrahamBatchCreate([
+  {
+    sessionId: crypto.randomUUID(),
+    firstMessageId: crypto.randomUUID(),
+    content: "A",
+    media: "",
+  },
+  {
+    sessionId: crypto.randomUUID(),
+    firstMessageId: crypto.randomUUID(),
+    content: "",
+    media: "ipfs://bafy…imgB",
+  },
+]);
+
+// 2) owner appends an update and closes the session
 await contract.abrahamUpdate(
   "existing-session-uuid",
   crypto.randomUUID(),
@@ -143,6 +263,22 @@ await contract.abrahamUpdate(
   "https://gateway.pinata.cloud/ipfs/bafybeia6…xyz",
   true // closed = true
 );
+
+// 2c) BATCH update across sessions (one message per session, no close/open change)
+await contract.abrahamBatchUpdateAcrossSessions([
+  {
+    sessionId: "existing-session-uuid-1",
+    messageId: crypto.randomUUID(),
+    content: "note 1",
+    media: "",
+  },
+  {
+    sessionId: "existing-session-uuid-2",
+    messageId: crypto.randomUUID(),
+    content: "",
+    media: "ipfs://bafy…img2",
+  },
+]);
 ```
 
 ---
@@ -163,7 +299,7 @@ query Timeline($firstCreations: Int!, $firstMsgs: Int!) {
     where: { closed: false } # hide closed sessions
   ) {
     id
-    closed # Boolean
+    closed
     firstMessageAt
     lastActivityAt
     ethSpent # Wei spent on bless + praise
@@ -183,7 +319,7 @@ query Timeline($firstCreations: Int!, $firstMsgs: Int!) {
 }
 ```
 
-Variables example
+Variables
 
 ```json
 {
@@ -217,7 +353,7 @@ query MessagesForCreation($id: ID!, $firstMsgs: Int!) {
 }
 ```
 
-Variables example
+Variables
 
 ```json
 {
@@ -239,7 +375,7 @@ Variables example
       "messages": [
         {
           "uuid": "5f6b0f39-0d41-4e84-901a-1c1d98fa6b9b",
-          "author": "0x641f…", // Abraham
+          "author": "0x641f…",
           "content": "Here is my first image about love",
           "media": "https://gateway.pinata.cloud/ipfs/bafybeih4…abc",
           "praiseCount": 2,
@@ -251,7 +387,7 @@ Variables example
         },
         {
           "uuid": "a0b3d4e5-f6a7-4988-9bb1-0c0d0e0f1a2b",
-          "author": "0xd930…", // user blessing
+          "author": "0xd930…",
           "content": "Give it a football",
           "media": null,
           "praiseCount": 3,
@@ -268,5 +404,4 @@ Variables example
 }
 ```
 
-_Every `praise` is recorded individually, so `praiseCount` is always the exact
-total—even when the same address praises multiple times._
+_Each batch operation just emits multiple standard events, so the subgraph reflects them automatically (no special indexing logic needed)._

@@ -44,49 +44,69 @@ async function uploadToPinata(imgUrl: string, text: string) {
   return `ipfs://${meta.IpfsHash}`;
 }
 
-/*───────────────── POST /api/creations ─────────*/
+/*───────────────── POST /api/creations ─────────
+  Single **createSession**. Supports:
+  - content-only   → uses 3-arg overload
+  - media-only     → uses 4-arg (content = "")
+  - content+media  → uses 4-arg
+  Body:
+    {
+      imageUrl?: string,      // optional; if present and pin=true we’ll pin to IPFS
+      content?: string,       // optional
+      pin?: boolean           // optional, default false
+    }
+───────────────────────────────────────────────*/
 export async function POST(req: NextRequest) {
   try {
-    //   const { imageUrl, content } = await req.json();
+    const { imageUrl, content, pin = false } = await req.json();
 
-    //   if (!imageUrl || !content) {
-    //     return NextResponse.json(
-    //       { error: "`imageUrl` and `content` are required" },
-    //       { status: 400 }
-    //     );
-    //   }
+    const contentStr = typeof content === "string" ? content : "";
+    let mediaUri = typeof imageUrl === "string" ? imageUrl : "";
 
-    //   /* ••• Uncomment to pin the image + metadata on-chain ••• */
-    //   // const mediaUri = await uploadToPinata(imageUrl, content);
-    //   const mediaUri = imageUrl; // ⬅ simple pass-through (no pinning)
+    if (pin && mediaUri) {
+      mediaUri = await uploadToPinata(mediaUri, contentStr || ""); // optional pin
+    }
 
-    //   const sessionId = randomUUID();
-    //   const firstMessageId = randomUUID();
+    if (!contentStr && !mediaUri) {
+      return NextResponse.json(
+        { error: "At least one of `content` or `imageUrl` is required" },
+        { status: 400 }
+      );
+    }
 
-    //   const tx = await abraham.createSession(
-    //     sessionId,
-    //     firstMessageId,
-    //     content,
-    //     mediaUri
-    //   );
-    //   const rcpt = await tx.wait();
+    const sessionId = randomUUID();
+    const firstMessageId = randomUUID();
 
-    //   return NextResponse.json(
-    //     {
-    //       txHash: rcpt.transactionHash,
-    //       sessionId,
-    //       firstMessageId,
-    //       imageUrl: mediaUri,
-    //       closed: false, // sessions start OPEN by default
-    //     },
-    //     { status: 200 }
-    //   );
+    let tx;
+    if (mediaUri) {
+      // use 4-arg overload (content may be "")
+      tx = await abraham["createSession(string,string,string,string)"](
+        sessionId,
+        firstMessageId,
+        contentStr,
+        mediaUri
+      );
+    } else {
+      // content-only → 3-arg overload requires content non-empty
+      tx = await abraham["createSession(string,string,string)"](
+        sessionId,
+        firstMessageId,
+        contentStr
+      );
+    }
+
+    const rcpt = await tx.wait();
+
     return NextResponse.json(
       {
-        error:
-          "This endpoint is currently disabled. Please uncomment the code in the handler.",
+        txHash: rcpt?.hash ?? rcpt?.transactionHash,
+        sessionId,
+        firstMessageId,
+        imageUrl: mediaUri,
+        content: contentStr,
+        closed: false, // sessions start OPEN by default
       },
-      { status: 503 }
+      { status: 200 }
     );
   } catch (e: any) {
     console.error("/api/creations POST:", e);
@@ -97,46 +117,82 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/*──────────────── PATCH → close session ────────*/
+/*──────────────── PATCH /api/creations ─────────
+  Single **abrahamUpdate**. Supports:
+  - content-only   → 3-arg overload (+ bool)
+  - media-only     → 4-arg (content = "") (+ bool)
+  - content+media  → 4-arg (+ bool)
+  Body:
+    {
+      sessionId: string,
+      content?: string,
+      imageUrl?: string,
+      closed?: boolean, // default true (close); pass false to reopen/keep open
+      pin?: boolean
+    }
+───────────────────────────────────────────────*/
 export async function PATCH(req: NextRequest) {
   try {
-    // const { sessionId, imageUrl, content } = await req.json();
-    // if (!sessionId || !imageUrl || !content)
-    //   return NextResponse.json(
-    //     { error: "sessionId, imageUrl & content required" },
-    //     { status: 400 }
-    //   );
+    const body = await req.json();
+    const sessionId: string = body?.sessionId;
+    if (!sessionId) {
+      return NextResponse.json(
+        { error: "`sessionId` is required" },
+        { status: 400 }
+      );
+    }
 
-    // // const mediaUri = await uploadToPinata(imageUrl, content); // ⬅ optional
-    // const mediaUri = imageUrl;
-    // const messageId = randomUUID();
+    const contentStr = typeof body?.content === "string" ? body.content : "";
+    const closed: boolean =
+      typeof body?.closed === "boolean" ? body.closed : true; // default to close
+    let mediaUri = typeof body?.imageUrl === "string" ? body.imageUrl : "";
+    const pin = !!body?.pin;
 
-    // /* closed = true toggles the flag */
-    // const tx = await abraham.abrahamUpdate(
-    //   sessionId,
-    //   messageId,
-    //   content,
-    //   mediaUri,
-    //   true // ← CLOSE the session
-    // );
-    // const rcpt = await tx.wait();
+    if (pin && mediaUri) {
+      mediaUri = await uploadToPinata(mediaUri, contentStr || "");
+    }
 
-    // return NextResponse.json(
-    //   {
-    //     txHash: rcpt.transactionHash,
-    //     sessionId,
-    //     messageId,
-    //     closed: true,
-    //     imageUrl: mediaUri,
-    //   },
-    //   { status: 200 }
-    // );
+    if (!contentStr && !mediaUri) {
+      return NextResponse.json(
+        { error: "At least one of `content` or `imageUrl` is required" },
+        { status: 400 }
+      );
+    }
+
+    const messageId = randomUUID();
+
+    let tx;
+    if (mediaUri) {
+      // 5-arg update (content can be empty if media is present)
+      tx = await abraham["abrahamUpdate(string,string,string,string,bool)"](
+        sessionId,
+        messageId,
+        contentStr,
+        mediaUri,
+        closed
+      );
+    } else {
+      // content-only → 4-arg overload requires content non-empty
+      tx = await abraham["abrahamUpdate(string,string,string,bool)"](
+        sessionId,
+        messageId,
+        contentStr,
+        closed
+      );
+    }
+
+    const rcpt = await tx.wait();
+
     return NextResponse.json(
       {
-        error:
-          "This endpoint is currently disabled. Please uncomment the code in the handler.",
+        txHash: rcpt?.hash ?? rcpt?.transactionHash,
+        sessionId,
+        messageId,
+        imageUrl: mediaUri,
+        content: contentStr,
+        closed,
       },
-      { status: 503 }
+      { status: 200 }
     );
   } catch (e: any) {
     console.error("/api/creations PATCH:", e);
