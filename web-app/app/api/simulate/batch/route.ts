@@ -1,9 +1,11 @@
+// File: app/api/creations/batch/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { Wallet, JsonRpcProvider, Contract } from "ethers";
 import { PinataSDK } from "pinata-web3";
 import { randomUUID } from "crypto";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import fetch from "node-fetch";
+import { File } from "undici";
 
 /*────────────────── ENV VARS ──────────────────*/
 const {
@@ -27,7 +29,7 @@ const pinata = new PinataSDK({ pinataJwt: PINATA_JWT });
 
 async function fetchBytes(url: string): Promise<Buffer> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`fetch ${res.status}`);
+  if (!res.ok) throw new Error(`fetch ${res.status} for ${url}`);
   return Buffer.from(await res.arrayBuffer());
 }
 
@@ -45,21 +47,21 @@ async function pinIfNeeded(url?: string, text?: string, pin?: boolean) {
 }
 
 /*──────────────── POST /api/creations/batch ──────────────
-  **Batch create sessions** across many sessions:
+  Batch CREATE sessions (cross-session).
   Body:
-    {
-      items: Array<{
-        sessionId?: string,       // optional; generated if missing
-        firstMessageId?: string,  // optional; generated if missing
-        content?: string,         // may be ""
-        imageUrl?: string,        // may be ""; pinned if pin=true
-      }>,
-      pin?: boolean               // optional; default false
-    }
+  {
+    items: Array<{
+      sessionId?: string        // optional; generated if missing
+      firstMessageId?: string   // optional; generated if missing
+      content?: string          // may be ""
+      imageUrl?: string         // may be ""; pinned if pin=true
+      closed?: boolean          // optional; default false
+    }>,
+    pin?: boolean               // optional; default false
+  }
 
-  Notes:
-  - Each item must have content or imageUrl (media).
-  - Emits SessionCreated + MessageAdded per item.
+  - Each item must include content or imageUrl.
+  - Emits SessionCreated + MessageAdded (and SessionClosed if closed=true).
 ──────────────────────────────────────────────────────────*/
 export async function POST(req: NextRequest) {
   try {
@@ -71,13 +73,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No items" }, { status: 400 });
     }
 
-    // Normalize & (optionally) pin
-    const items = [];
+    const items: Array<{
+      sessionId: string;
+      firstMessageId: string;
+      content: string;
+      media: string;
+      closed: boolean;
+    }> = [];
+
     for (const raw of itemsIn) {
       const sessionId =
         typeof raw?.sessionId === "string" && raw.sessionId.length
           ? raw.sessionId
           : randomUUID();
+
       const firstMessageId =
         typeof raw?.firstMessageId === "string" && raw.firstMessageId.length
           ? raw.firstMessageId
@@ -93,11 +102,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const closed =
+        typeof raw?.closed === "boolean" ? (raw.closed as boolean) : false;
+
       items.push({
         sessionId,
         firstMessageId,
         content,
         media: mediaUri,
+        closed,
       });
     }
 
@@ -112,6 +125,7 @@ export async function POST(req: NextRequest) {
           firstMessageId: i.firstMessageId,
           content: i.content,
           media: i.media,
+          closed: i.closed,
         })),
       },
       { status: 200 }
@@ -126,21 +140,21 @@ export async function POST(req: NextRequest) {
 }
 
 /*──────────────── PATCH /api/creations/batch ─────────────
-  **Batch update across sessions** (one message per session):
+  Batch UPDATE across sessions (one message per session).
   Body:
-    {
-      items: Array<{
-        sessionId: string,        // required
-        messageId?: string,       // optional; generated if missing
-        content?: string,         // may be ""
-        imageUrl?: string,        // may be ""; pinned if pin=true
-      }>,
-      pin?: boolean               // optional; default false
-    }
+  {
+    items: Array<{
+      sessionId: string         // required
+      messageId?: string        // optional; generated if missing
+      content?: string          // may be ""
+      imageUrl?: string         // may be ""; pinned if pin=true
+      closed?: boolean          // optional; if omitted, we preserve current state
+    }>,
+    pin?: boolean               // optional; default false
+  }
 
-  Notes:
-  - Does NOT toggle closed/open state. Use single /api/creations PATCH for that.
   - Emits one MessageAdded per item.
+  - Also emits SessionClosed / SessionReopened when `closed` toggles.
 ──────────────────────────────────────────────────────────*/
 export async function PATCH(req: NextRequest) {
   try {
@@ -152,7 +166,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "No items" }, { status: 400 });
     }
 
-    const items = [];
+    // We will preserve session 'closed' state if not provided by the caller.
+    const items: Array<{
+      sessionId: string;
+      messageId: string;
+      content: string;
+      media: string;
+      closed: boolean;
+    }> = [];
+
     for (const raw of itemsIn) {
       const sessionId =
         typeof raw?.sessionId === "string" && raw.sessionId.length
@@ -180,11 +202,21 @@ export async function PATCH(req: NextRequest) {
         );
       }
 
+      // Determine desired closed state: if caller omitted it, preserve current on-chain state.
+      let closed: boolean;
+      if (typeof raw?.closed === "boolean") {
+        closed = raw.closed as boolean;
+      } else {
+        // preserve current
+        closed = await abraham.isSessionClosed(sessionId);
+      }
+
       items.push({
         sessionId,
         messageId,
         content,
         media: mediaUri,
+        closed,
       });
     }
 
@@ -199,6 +231,7 @@ export async function PATCH(req: NextRequest) {
           messageId: i.messageId,
           content: i.content,
           media: i.media,
+          closed: i.closed,
         })),
       },
       { status: 200 }

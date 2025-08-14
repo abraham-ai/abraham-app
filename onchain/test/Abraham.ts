@@ -4,7 +4,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { Abraham } from "../typechain-types";
 
 /* ---------------------------------------------------------- */
-/*                       BIGINT HELPERS                       */
+/* BIGINT HELPERS                                              */
 /* ---------------------------------------------------------- */
 function toBI(v: any): bigint {
   if (typeof v === "bigint") return v;
@@ -13,11 +13,10 @@ function toBI(v: any): bigint {
 }
 
 /* ---------------------------------------------------------- */
-/*                         FIXTURE                            */
+/* FIXTURE                                                     */
 /* ---------------------------------------------------------- */
 async function deployFixture() {
   const [abraham, user1, user2] = await ethers.getSigners();
-
   const AbrahamFactory = await ethers.getContractFactory("Abraham", abraham);
   const contract = (await AbrahamFactory.deploy()) as Abraham;
 
@@ -33,6 +32,7 @@ const M1 = "msg-0001";
 const M2 = "msg-0002";
 const M3 = "msg-0003";
 const M4 = "msg-0004";
+
 const B1 = "bless-01";
 const B2 = "bless-02";
 const B3 = "bless-03";
@@ -48,7 +48,7 @@ const MA1 = "msg-A1";
 const MB1 = "msg-B1";
 
 /* ---------------------------------------------------------- */
-/*                        TESTS                               */
+/* TESTS                                                       */
 /* ---------------------------------------------------------- */
 describe("Abraham contract (overloads + user batches + owner single/cross-session batches)", () => {
   /* ----------------------- deploy ------------------------ */
@@ -80,7 +80,6 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const [author, , media] = await contract.getMessage(S1, M1);
       expect(media).to.equal("ipfs://hashA");
       expect(author).to.equal(await contract.owner());
-
       expect(await contract.isSessionClosed(S1)).to.equal(false);
     });
 
@@ -100,6 +99,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
       const ids = await contract.getMessageIds("session-txt");
       expect(ids.length).to.equal(1);
+
       const [author, content, media, praises] = await contract.getMessage(
         "session-txt",
         "msg-t1"
@@ -172,6 +172,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
     it("reverts if non-owner calls", async () => {
       const { contract, user1 } = await loadFixture(deployFixture);
+
       await expect(
         contract
           .connect(user1)
@@ -188,6 +189,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
     it("reverts on duplicate session id", async () => {
       const { contract } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -210,6 +212,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
   describe("abrahamUpdate", () => {
     it("owner can append an image update while keeping session open (4-arg + bool)", async () => {
       const { contract } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -229,6 +232,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
       const ids = await contract.getMessageIds(S1);
       expect(ids.length).to.equal(2);
+
       const [, , media] = await contract.getMessage(S1, M2);
       expect(media).to.equal("ipfs://b");
       expect(await contract.isSessionClosed(S1)).to.equal(false);
@@ -236,6 +240,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
     it("owner can append a content-only update using 4-arg (media empty)", async () => {
       const { contract } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -262,6 +267,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
     it("owner can append a content-only update using the 3-arg overload (+ bool)", async () => {
       const { contract } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -295,6 +301,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         "v1",
         "ipfs://a"
       );
+
       await expect(
         contract["abrahamUpdate(string,string,string,string,bool)"](
           S1,
@@ -334,12 +341,14 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
     it("reverts when both content and media are empty (4-arg)", async () => {
       const { contract } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
         "v1",
         "ipfs://a"
       );
+
       await expect(
         contract["abrahamUpdate(string,string,string,string,bool)"](
           S1,
@@ -356,6 +365,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
   describe("bless", () => {
     it("user can bless with exact fee", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -380,6 +390,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
     it("fails with wrong fee or empty content", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -398,6 +409,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
     it("fails for unknown session", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
+
       await expect(
         contract.connect(user1).bless("ghost", B1, "hi", { value: BLESS_PRICE })
       ).to.be.revertedWith("Session not found");
@@ -410,6 +422,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const { contract, user1, PRAISE_PRICE } = await loadFixture(
         deployFixture
       );
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -421,6 +434,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       await expect(
         contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
       ).to.emit(contract, "Praised");
+
       let [, , , pc] = await contract.getMessage(S1, M1);
       expect(pc).to.equal(1);
 
@@ -428,6 +442,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       await expect(
         contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
       ).to.emit(contract, "Praised");
+
       [, , , pc] = await contract.getMessage(S1, M1);
       expect(pc).to.equal(2);
     });
@@ -436,6 +451,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const { contract, user1, PRAISE_PRICE } = await loadFixture(
         deployFixture
       );
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -459,6 +475,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const { contract, user1, PRAISE_PRICE } = await loadFixture(
         deployFixture
       );
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -489,6 +506,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const { contract, user1, PRAISE_PRICE } = await loadFixture(
         deployFixture
       );
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -516,6 +534,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         "reopen",
         false
       );
+
       await expect(
         contract.connect(user1).batchPraise(S1, [M1, M2], {
           value: PRAISE_PRICE, // wrong
@@ -527,6 +546,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const { contract, user1, PRAISE_PRICE } = await loadFixture(
         deployFixture
       );
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -550,6 +570,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
   describe("batchBless", () => {
     it("blesses multiple text messages atomically with exact total fee", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -578,6 +599,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
     it("reverts on closed session, length mismatch, empty content, or duplicate id", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         S1,
         M1,
@@ -622,6 +644,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       await contract
         .connect(user1)
         .batchBless(S1, [B1], ["ok"], { value: BLESS_PRICE });
+
       await expect(
         contract
           .connect(user1)
@@ -634,6 +657,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
   describe("abrahamBatchUpdate", () => {
     it("owner posts multiple messages (content/media mix) and toggles closed state", async () => {
       const { contract } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string)"](
         "s-batch",
         "m0",
@@ -659,16 +683,20 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const [, c1, m1] = await contract.getMessage("s-batch", "m1");
       const [, c2, m2] = await contract.getMessage("s-batch", "m2");
       const [, c3, m3] = await contract.getMessage("s-batch", "m3");
+
       expect(c1).to.equal("text-only");
       expect(m1).to.equal("");
+
       expect(c2).to.equal("");
       expect(m2).to.equal("ipfs://x");
+
       expect(c3).to.equal("both");
       expect(m3).to.equal("ipfs://y");
     });
 
     it("reverts on empty items, duplicate message id, or empty payload item", async () => {
       const { contract } = await loadFixture(deployFixture);
+
       await contract["createSession(string,string,string,string)"](
         "s2",
         "m0",
@@ -687,6 +715,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         "ok",
         false
       );
+
       await expect(
         contract.abrahamBatchUpdate(
           "s2",
@@ -708,16 +737,23 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
   /* ----------------- NEW: abrahamBatchCreate ---------------- */
   describe("abrahamBatchCreate (cross-session)", () => {
-    it("creates multiple sessions at once (mixed content/media)", async () => {
+    it("creates multiple sessions at once (mixed content/media) with explicit initial closed=false", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "hello A", media: "" },
+        {
+          sessionId: SA,
+          firstMessageId: MA0,
+          content: "hello A",
+          media: "",
+          closed: false,
+        },
         {
           sessionId: SB,
           firstMessageId: MB0,
           content: "",
           media: "ipfs://imgB",
+          closed: false,
         },
       ]);
 
@@ -741,32 +777,94 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       expect(toBI(total)).to.equal(2n);
     });
 
-    it("reverts for duplicate session, duplicate message, or empty payload", async () => {
+    it("can start a session initially closed, blocking praise/bless until reopened", async () => {
+      const { contract, user1, PRAISE_PRICE, BLESS_PRICE } = await loadFixture(
+        deployFixture
+      );
+
+      await contract.abrahamBatchCreate([
+        {
+          sessionId: SC,
+          firstMessageId: MC0,
+          content: "seed closed",
+          media: "",
+          closed: true,
+        },
+      ]);
+
+      expect(await contract.isSessionClosed(SC)).to.equal(true);
+
+      await expect(
+        contract.connect(user1).praise(SC, MC0, { value: PRAISE_PRICE })
+      ).to.be.revertedWith("Session closed");
+
+      await expect(
+        contract.connect(user1).bless(SC, "b-x", "hi", { value: BLESS_PRICE })
+      ).to.be.revertedWith("Session closed");
+
+      // reopen via owner update
+      await expect(
+        contract["abrahamUpdate(string,string,string,bool)"](
+          SC,
+          "m-open",
+          "reopen",
+          false
+        )
+      ).to.emit(contract, "SessionReopened");
+
+      await contract.connect(user1).praise(SC, MC0, { value: PRAISE_PRICE });
+    });
+
+    it("reverts for duplicate session, handles per-session message uniqueness, and rejects empty payload", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       // create one valid session first
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "ok", media: "" },
+        {
+          sessionId: SA,
+          firstMessageId: MA0,
+          content: "ok",
+          media: "",
+          closed: false,
+        },
       ]);
 
       // duplicate sessionId
       await expect(
         contract.abrahamBatchCreate([
-          { sessionId: SA, firstMessageId: "new", content: "x", media: "" },
+          {
+            sessionId: SA,
+            firstMessageId: "new",
+            content: "x",
+            media: "",
+            closed: false,
+          },
         ])
       ).to.be.revertedWith("Session exists");
 
-      // duplicate messageId within a NEW session (ensure unique message per session)
+      // duplicate messageId name reused in another session is fine (uniqueness is per-session)
       await expect(
         contract.abrahamBatchCreate([
-          { sessionId: SB, firstMessageId: MA0, content: "x", media: "" }, // MA0 used in SA, but message uniqueness is per-session; however our contract checks per (sessionId, messageId) so this should pass if session differs.
+          {
+            sessionId: SB,
+            firstMessageId: MA0,
+            content: "x",
+            media: "",
+            closed: false,
+          },
         ])
-      ).to.not.be.reverted; // clarify behavior: messageId uniqueness is per-session
+      ).to.not.be.reverted;
 
       // empty payload
       await expect(
         contract.abrahamBatchCreate([
-          { sessionId: SC, firstMessageId: MC0, content: "", media: "" },
+          {
+            sessionId: SC,
+            firstMessageId: MC0,
+            content: "",
+            media: "",
+            closed: false,
+          },
         ])
       ).to.be.revertedWith("Empty message");
     });
@@ -774,24 +872,43 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
   /* ------ NEW: abrahamBatchUpdateAcrossSessions (cross-session) ------ */
   describe("abrahamBatchUpdateAcrossSessions", () => {
-    it("adds one owner message to each target session", async () => {
+    it("adds one owner message to each target session and keeps closed state unchanged when closed=false is provided", async () => {
       const { contract } = await loadFixture(deployFixture);
 
-      // prepare two sessions
+      // prepare two sessions (both open)
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "seed A", media: "" },
+        {
+          sessionId: SA,
+          firstMessageId: MA0,
+          content: "seed A",
+          media: "",
+          closed: false,
+        },
         {
           sessionId: SB,
           firstMessageId: MB0,
           content: "",
           media: "ipfs://seedB",
+          closed: false,
         },
       ]);
 
       await expect(
         contract.abrahamBatchUpdateAcrossSessions([
-          { sessionId: SA, messageId: MA1, content: "", media: "ipfs://A1" },
-          { sessionId: SB, messageId: MB1, content: "hello B", media: "" },
+          {
+            sessionId: SA,
+            messageId: MA1,
+            content: "",
+            media: "ipfs://A1",
+            closed: false,
+          },
+          {
+            sessionId: SB,
+            messageId: MB1,
+            content: "hello B",
+            media: "",
+            closed: false,
+          },
         ])
       ).to.emit(contract, "MessageAdded");
 
@@ -806,6 +923,70 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       expect(mA1).to.equal("ipfs://A1");
       expect(cB1).to.equal("hello B");
       expect(mB1).to.equal("");
+
+      // still open
+      expect(await contract.isSessionClosed(SA)).to.equal(false);
+      expect(await contract.isSessionClosed(SB)).to.equal(false);
+    });
+
+    it("can close or reopen sessions per item", async () => {
+      const { contract } = await loadFixture(deployFixture);
+
+      // SA open, SB open
+      await contract.abrahamBatchCreate([
+        {
+          sessionId: SA,
+          firstMessageId: MA0,
+          content: "seed",
+          media: "",
+          closed: false,
+        },
+        {
+          sessionId: SB,
+          firstMessageId: MB0,
+          content: "seed",
+          media: "",
+          closed: false,
+        },
+      ]);
+
+      // Close SA, keep SB open via cross-session batch
+      await expect(
+        contract.abrahamBatchUpdateAcrossSessions([
+          {
+            sessionId: SA,
+            messageId: "sa-close",
+            content: "closing",
+            media: "",
+            closed: true,
+          },
+          {
+            sessionId: SB,
+            messageId: "sb-open",
+            content: "still open",
+            media: "",
+            closed: false,
+          },
+        ])
+      ).to.emit(contract, "SessionClosed");
+
+      expect(await contract.isSessionClosed(SA)).to.equal(true);
+      expect(await contract.isSessionClosed(SB)).to.equal(false);
+
+      // Reopen SA in another call
+      await expect(
+        contract.abrahamBatchUpdateAcrossSessions([
+          {
+            sessionId: SA,
+            messageId: "sa-reopen",
+            content: "re-open",
+            media: "",
+            closed: false,
+          },
+        ])
+      ).to.emit(contract, "SessionReopened");
+
+      expect(await contract.isSessionClosed(SA)).to.equal(false);
     });
 
     it("reverts on unknown session, duplicate message id in that session, or empty payload", async () => {
@@ -813,27 +994,51 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
       // prepare one session
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "seed", media: "" },
+        {
+          sessionId: SA,
+          firstMessageId: MA0,
+          content: "seed",
+          media: "",
+          closed: false,
+        },
       ]);
 
       // unknown session
       await expect(
         contract.abrahamBatchUpdateAcrossSessions([
-          { sessionId: "ghost", messageId: "m-x", content: "x", media: "" },
+          {
+            sessionId: "ghost",
+            messageId: "m-x",
+            content: "x",
+            media: "",
+            closed: false,
+          },
         ])
       ).to.be.revertedWith("Session not found");
 
       // duplicate message id in SA
       await expect(
         contract.abrahamBatchUpdateAcrossSessions([
-          { sessionId: SA, messageId: MA0, content: "dup", media: "" },
+          {
+            sessionId: SA,
+            messageId: MA0,
+            content: "dup",
+            media: "",
+            closed: false,
+          },
         ])
       ).to.be.revertedWith("Message exists");
 
       // empty payload
       await expect(
         contract.abrahamBatchUpdateAcrossSessions([
-          { sessionId: SA, messageId: "new", content: "", media: "" },
+          {
+            sessionId: SA,
+            messageId: "new",
+            content: "",
+            media: "",
+            closed: false,
+          },
         ])
       ).to.be.revertedWith("Empty message");
     });
@@ -851,10 +1056,13 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         "art",
         "ipfs://media"
       );
+
       await contract.connect(user1).bless(S1, B1, "hi", { value: BLESS_PRICE });
+
       await contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE });
 
       const before = await ethers.provider.getBalance(abraham.address);
+
       const tx = await contract.withdraw();
       const r = await tx.wait();
 
@@ -864,6 +1072,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const praiseBI = toBI(PRAISE_PRICE);
       const blessBI = toBI(BLESS_PRICE);
       const gasUsedBI = toBI(r!.gasUsed);
+
       // Get effective gas price from transaction response or receipt
       const effGasPriceBI = tx.gasPrice
         ? toBI(tx.gasPrice)

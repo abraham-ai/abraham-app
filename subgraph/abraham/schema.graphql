@@ -1,3 +1,4 @@
+# schema.graphql
 type Creation @entity(immutable: false) {
   id: ID! # session UUID
   messageCount: Int!
