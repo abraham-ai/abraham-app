@@ -7,7 +7,7 @@ dataSources:
     name: Abraham
     network: base-sepolia
     source:
-      address: "0xc775399af1fA44c4eDe391F365840CC887E28693"
+      address: "0xd2A2aEe7a4576D9A8Fc82eCe64b9bd589f819dEc"
       abi: Abraham
       startBlock: 29329131
     mapping:

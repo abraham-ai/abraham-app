@@ -20,7 +20,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 /* ------------------------------------------------------------------ */
 export const CONTRACT_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS as `0x${string}`) ??
-  "0xc775399af1fA44c4eDe391F365840CC887E28693";
+  "0xd2A2aEe7a4576D9A8Fc82eCe64b9bd589f819dEc";
 
 export const PRAISE_PRICE_ETHER = 0.00001;
 export const BLESS_PRICE_ETHER = 0.00002;

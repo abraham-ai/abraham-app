@@ -1,3 +1,4 @@
+// src/abraham.ts
 import {
   SessionCreated,
   SessionClosed,
@@ -8,22 +9,28 @@ import {
 import { Creation, Message, Praise, User } from "../generated/schema";
 import { Address, BigInt } from "@graphprotocol/graph-ts";
 
-const PRAISE_PRICE = BigInt.fromI64(10_000_000_000_000); // 0.00001 ETH in wei
-const BLESS_PRICE = BigInt.fromI64(20_000_000_000_000); // 0.00002 ETH in wei
+/**
+ * NOTE on prices:
+ * Keep these in sync with the contract constants:
+ * PRAISE_PRICE = 10_000_000_000_000 wei
+ * BLESS_PRICE  = 20_000_000_000_000 wei
+ */
+const PRAISE_PRICE = BigInt.fromI64(10_000_000_000_000); // 0.00001 ETH
+const BLESS_PRICE = BigInt.fromI64(20_000_000_000_000); // 0.00002 ETH
 
 /**
  * Abraham (owner) address used only for ETH bookkeeping:
- * - When a MessageAdded author != ABRAHAM, we treat it as a paid "blessing"
- *   and add BLESS_PRICE to Creation.ethSpent.
- * - Owner posts are free and thus do not change ethSpent.
+ * If MessageAdded.author != ABRAHAM, we treat it as a user "blessing"
+ * and add BLESS_PRICE to Creation.ethSpent. Owner posts are free.
  */
 const ABRAHAM = Address.fromString(
   "0x641f5ffC5F6239A0873Bd00F9975091FB035aAFC"
 );
 
 /* ------------------------------------------------------------------ */
-/*                              Helpers                                */
+/* Helpers                                                            */
 /* ------------------------------------------------------------------ */
+
 function getOrCreateUser(addr: Address): User {
   let id = addr.toHexString();
   let u = User.load(id);
@@ -37,24 +44,32 @@ function getOrCreateUser(addr: Address): User {
 }
 
 /* ------------------------------------------------------------------ */
-/*                          Event Handlers                             */
+/* Event Handlers                                                     */
 /* ------------------------------------------------------------------ */
 
 export function handleSessionCreated(e: SessionCreated): void {
-  // Create a brand new Creation. Safe even if multiple creations occur in batch,
-  // because each emits its own SessionCreated with unique sessionId.
-  const c = new Creation(e.params.sessionId);
-  c.messageCount = 0;
-  c.firstMessageAt = e.block.timestamp;
+  // Create brand-new Creation. (If out-of-order, it may already exist—overwrite safe fields.)
+  let c = Creation.load(e.params.sessionId);
+  if (c == null) {
+    c = new Creation(e.params.sessionId);
+    c.messageCount = 0;
+    c.firstMessageAt = e.block.timestamp;
+    c.ethSpent = BigInt.zero();
+  }
   c.lastActivityAt = e.block.timestamp;
-  c.ethSpent = BigInt.zero();
   c.closed = false;
   c.save();
 }
 
 export function handleSessionClosed(e: SessionClosed): void {
   let c = Creation.load(e.params.sessionId);
-  if (c == null) return;
+  if (c == null) {
+    // Defensive bootstrap in case of out-of-order events relative to startBlock
+    c = new Creation(e.params.sessionId);
+    c.messageCount = 0;
+    c.firstMessageAt = e.block.timestamp;
+    c.ethSpent = BigInt.zero();
+  }
   c.closed = true;
   c.lastActivityAt = e.block.timestamp;
   c.save();
@@ -62,7 +77,12 @@ export function handleSessionClosed(e: SessionClosed): void {
 
 export function handleSessionReopened(e: SessionReopened): void {
   let c = Creation.load(e.params.sessionId);
-  if (c == null) return;
+  if (c == null) {
+    c = new Creation(e.params.sessionId);
+    c.messageCount = 0;
+    c.firstMessageAt = e.block.timestamp;
+    c.ethSpent = BigInt.zero();
+  }
   c.closed = false;
   c.lastActivityAt = e.block.timestamp;
   c.save();
@@ -71,38 +91,37 @@ export function handleSessionReopened(e: SessionReopened): void {
 export function handleMessageAdded(e: MessageAdded): void {
   const sessionId = e.params.sessionId;
   const perSessionMsgId = e.params.messageId;
-  const msgEntityId = `${sessionId}-${perSessionMsgId}`;
+  const msgEntityId = sessionId.concat("-").concat(perSessionMsgId);
 
-  // Bootstrap Creation if events arrive out-of-order (e.g., subgraph startBlock)
+  // Bootstrap Creation if events arrive out-of-order
   let creation = Creation.load(sessionId);
   if (creation == null) {
     creation = new Creation(sessionId);
     creation.messageCount = 0;
     creation.firstMessageAt = e.block.timestamp;
-    creation.lastActivityAt = e.block.timestamp;
     creation.ethSpent = BigInt.zero();
     creation.closed = false;
   }
 
-  // Message entity
+  // Create Message
   const m = new Message(msgEntityId);
   m.creation = sessionId;
   m.uuid = perSessionMsgId;
   m.author = e.params.author;
   m.content = e.params.content; // may be ""
-  m.media = e.params.media.length ? e.params.media : null; // null => no media
+  m.media = e.params.media.length > 0 ? e.params.media : null;
   m.timestamp = e.block.timestamp;
   m.praiseCount = 0;
   m.save();
 
-  // Ensure author exists as User
+  // Ensure author in Users
   getOrCreateUser(e.params.author);
 
-  // Update creation counters
+  // Update Creation counters/last activity
   creation.messageCount = creation.messageCount + 1;
   creation.lastActivityAt = e.block.timestamp;
 
-  // If the author is NOT Abraham, it was a user blessing and cost BLESS_PRICE
+  // Blessings (user-authored messages) increase ethSpent
   if (!e.params.author.equals(ABRAHAM)) {
     creation.ethSpent = creation.ethSpent.plus(BLESS_PRICE);
   }
@@ -113,24 +132,31 @@ export function handleMessageAdded(e: MessageAdded): void {
 export function handlePraised(e: Praised): void {
   const sessionId = e.params.sessionId;
   const perSessionMsgId = e.params.messageId;
-  const msgEntityId = `${sessionId}-${perSessionMsgId}`;
-  const praiseEntityId = `${sessionId}-${perSessionMsgId}-${e.transaction.hash.toHexString()}-${e.logIndex.toString()}`;
+  const msgEntityId = sessionId.concat("-").concat(perSessionMsgId);
+  const praiseEntityId = msgEntityId
+    .concat("-")
+    .concat(e.transaction.hash.toHexString())
+    .concat("-")
+    .concat(e.logIndex.toString());
 
   let msg = Message.load(msgEntityId);
-  if (msg == null) return; // defensive guard
+  if (msg == null) {
+    // If message not found (out-of-order), we cannot properly attach; bail out defensively.
+    return;
+  }
 
-  // Immutable praise entity
+  // Create immutable Praise
   const p = new Praise(praiseEntityId);
   p.message = msgEntityId;
   p.praiser = e.params.praiser;
   p.timestamp = e.block.timestamp;
   p.save();
 
-  // increment praise count on message
+  // Increment message praise count
   msg.praiseCount = msg.praiseCount + 1;
   msg.save();
 
-  // reflect ETH spent and last activity on the creation
+  // Update Creation bookkeeping
   let creation = Creation.load(sessionId);
   if (creation != null) {
     creation.ethSpent = creation.ethSpent.plus(PRAISE_PRICE);
@@ -138,7 +164,7 @@ export function handlePraised(e: Praised): void {
     creation.save();
   }
 
-  // user counters
+  // User counters
   let giver = getOrCreateUser(e.params.praiser);
   giver.praisesGiven = giver.praisesGiven + 1;
   giver.save();
