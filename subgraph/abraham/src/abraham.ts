@@ -1,4 +1,3 @@
-// src/abraham.ts
 import {
   SessionCreated,
   SessionClosed,
@@ -10,27 +9,22 @@ import { Creation, Message, Praise, User } from "../generated/schema";
 import { Address, BigInt } from "@graphprotocol/graph-ts";
 
 /**
- * NOTE on prices:
- * Keep these in sync with the contract constants:
+ * Keep these in sync with contract constants:
  * PRAISE_PRICE = 10_000_000_000_000 wei
  * BLESS_PRICE  = 20_000_000_000_000 wei
  */
-const PRAISE_PRICE = BigInt.fromI64(10_000_000_000_000); // 0.00001 ETH
-const BLESS_PRICE = BigInt.fromI64(20_000_000_000_000); // 0.00002 ETH
+const PRAISE_PRICE = BigInt.fromI64(10_000_000_000_000);
+const BLESS_PRICE = BigInt.fromI64(20_000_000_000_000);
 
 /**
- * Abraham (owner) address used only for ETH bookkeeping:
- * If MessageAdded.author != ABRAHAM, we treat it as a user "blessing"
- * and add BLESS_PRICE to Creation.ethSpent. Owner posts are free.
+ * Abraham (owner) address used for ETH bookkeeping:
+ * If MessageAdded.author != ABRAHAM, treat as user "blessing" and add BLESS_PRICE to Creation.ethSpent.
  */
 const ABRAHAM = Address.fromString(
   "0x641f5ffC5F6239A0873Bd00F9975091FB035aAFC"
 );
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
+/* Helpers */
 function getOrCreateUser(addr: Address): User {
   let id = addr.toHexString();
   let u = User.load(id);
@@ -43,12 +37,8 @@ function getOrCreateUser(addr: Address): User {
   return u as User;
 }
 
-/* ------------------------------------------------------------------ */
-/* Event Handlers                                                     */
-/* ------------------------------------------------------------------ */
-
+/* Event Handlers */
 export function handleSessionCreated(e: SessionCreated): void {
-  // Create brand-new Creation. (If out-of-order, it may already exist—overwrite safe fields.)
   let c = Creation.load(e.params.sessionId);
   if (c == null) {
     c = new Creation(e.params.sessionId);
@@ -57,14 +47,13 @@ export function handleSessionCreated(e: SessionCreated): void {
     c.ethSpent = BigInt.zero();
   }
   c.lastActivityAt = e.block.timestamp;
-  c.closed = false;
+  c.closed = false; // always open at creation
   c.save();
 }
 
 export function handleSessionClosed(e: SessionClosed): void {
   let c = Creation.load(e.params.sessionId);
   if (c == null) {
-    // Defensive bootstrap in case of out-of-order events relative to startBlock
     c = new Creation(e.params.sessionId);
     c.messageCount = 0;
     c.firstMessageAt = e.block.timestamp;
@@ -140,23 +129,17 @@ export function handlePraised(e: Praised): void {
     .concat(e.logIndex.toString());
 
   let msg = Message.load(msgEntityId);
-  if (msg == null) {
-    // If message not found (out-of-order), we cannot properly attach; bail out defensively.
-    return;
-  }
+  if (msg == null) return;
 
-  // Create immutable Praise
   const p = new Praise(praiseEntityId);
   p.message = msgEntityId;
   p.praiser = e.params.praiser;
   p.timestamp = e.block.timestamp;
   p.save();
 
-  // Increment message praise count
   msg.praiseCount = msg.praiseCount + 1;
   msg.save();
 
-  // Update Creation bookkeeping
   let creation = Creation.load(sessionId);
   if (creation != null) {
     creation.ethSpent = creation.ethSpent.plus(PRAISE_PRICE);
@@ -164,7 +147,6 @@ export function handlePraised(e: Praised): void {
     creation.save();
   }
 
-  // User counters
   let giver = getOrCreateUser(e.params.praiser);
   giver.praisesGiven = giver.praisesGiven + 1;
   giver.save();
