@@ -27,7 +27,7 @@ async function deployFixture() {
 }
 
 /* helper uuids */
-const S1 = "session-aaa"; // simple ascii ids for clarity
+const S1 = "session-aaa";
 const M1 = "msg-0001";
 const M2 = "msg-0002";
 const M3 = "msg-0003";
@@ -735,25 +735,18 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
     });
   });
 
-  /* ----------------- NEW: abrahamBatchCreate ---------------- */
+  /* ----------------- abrahamBatchCreate (cross-session) ---------------- */
   describe("abrahamBatchCreate (cross-session)", () => {
-    it("creates multiple sessions at once (mixed content/media) with explicit initial closed=false", async () => {
+    it("creates multiple sessions at once (mixed content/media)", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       await contract.abrahamBatchCreate([
-        {
-          sessionId: SA,
-          firstMessageId: MA0,
-          content: "hello A",
-          media: "",
-          closed: false,
-        },
+        { sessionId: SA, firstMessageId: MA0, content: "hello A", media: "" },
         {
           sessionId: SB,
           firstMessageId: MB0,
           content: "",
           media: "ipfs://imgB",
-          closed: false,
         },
       ]);
 
@@ -777,119 +770,50 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       expect(toBI(total)).to.equal(2n);
     });
 
-    it("can start a session initially closed, blocking praise/bless until reopened", async () => {
-      const { contract, user1, PRAISE_PRICE, BLESS_PRICE } = await loadFixture(
-        deployFixture
-      );
-
-      await contract.abrahamBatchCreate([
-        {
-          sessionId: SC,
-          firstMessageId: MC0,
-          content: "seed closed",
-          media: "",
-          closed: true,
-        },
-      ]);
-
-      expect(await contract.isSessionClosed(SC)).to.equal(true);
-
-      await expect(
-        contract.connect(user1).praise(SC, MC0, { value: PRAISE_PRICE })
-      ).to.be.revertedWith("Session closed");
-
-      await expect(
-        contract.connect(user1).bless(SC, "b-x", "hi", { value: BLESS_PRICE })
-      ).to.be.revertedWith("Session closed");
-
-      // reopen via owner update
-      await expect(
-        contract["abrahamUpdate(string,string,string,bool)"](
-          SC,
-          "m-open",
-          "reopen",
-          false
-        )
-      ).to.emit(contract, "SessionReopened");
-
-      await contract.connect(user1).praise(SC, MC0, { value: PRAISE_PRICE });
-    });
-
-    it("reverts for duplicate session, handles per-session message uniqueness, and rejects empty payload", async () => {
+    it("reverts for duplicate session, per-session message uniqueness, and empty payload", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       // create one valid session first
       await contract.abrahamBatchCreate([
-        {
-          sessionId: SA,
-          firstMessageId: MA0,
-          content: "ok",
-          media: "",
-          closed: false,
-        },
+        { sessionId: SA, firstMessageId: MA0, content: "ok", media: "" },
       ]);
 
       // duplicate sessionId
       await expect(
         contract.abrahamBatchCreate([
-          {
-            sessionId: SA,
-            firstMessageId: "new",
-            content: "x",
-            media: "",
-            closed: false,
-          },
+          { sessionId: SA, firstMessageId: "new", content: "x", media: "" },
         ])
       ).to.be.revertedWith("Session exists");
 
       // duplicate messageId name reused in another session is fine (uniqueness is per-session)
       await expect(
         contract.abrahamBatchCreate([
-          {
-            sessionId: SB,
-            firstMessageId: MA0,
-            content: "x",
-            media: "",
-            closed: false,
-          },
+          { sessionId: SB, firstMessageId: MA0, content: "x", media: "" },
         ])
       ).to.not.be.reverted;
 
       // empty payload
       await expect(
         contract.abrahamBatchCreate([
-          {
-            sessionId: SC,
-            firstMessageId: MC0,
-            content: "",
-            media: "",
-            closed: false,
-          },
+          { sessionId: SC, firstMessageId: MC0, content: "", media: "" },
         ])
       ).to.be.revertedWith("Empty message");
     });
   });
 
-  /* ------ NEW: abrahamBatchUpdateAcrossSessions (cross-session) ------ */
+  /* ------ abrahamBatchUpdateAcrossSessions (cross-session) ------ */
   describe("abrahamBatchUpdateAcrossSessions", () => {
     it("adds one owner message to each target session and keeps closed state unchanged when closed=false is provided", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       // prepare two sessions (both open)
       await contract.abrahamBatchCreate([
-        {
-          sessionId: SA,
-          firstMessageId: MA0,
-          content: "seed A",
-          media: "",
-          closed: false,
-        },
+        { sessionId: SA, firstMessageId: MA0, content: "seed A", media: "" },
         {
           sessionId: SB,
           firstMessageId: MB0,
           content: "",
           media: "ipfs://seedB",
-          closed: false,
         },
       ]);
 
@@ -934,20 +858,8 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
       // SA open, SB open
       await contract.abrahamBatchCreate([
-        {
-          sessionId: SA,
-          firstMessageId: MA0,
-          content: "seed",
-          media: "",
-          closed: false,
-        },
-        {
-          sessionId: SB,
-          firstMessageId: MB0,
-          content: "seed",
-          media: "",
-          closed: false,
-        },
+        { sessionId: SA, firstMessageId: MA0, content: "seed", media: "" },
+        { sessionId: SB, firstMessageId: MB0, content: "seed", media: "" },
       ]);
 
       // Close SA, keep SB open via cross-session batch
@@ -994,13 +906,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
       // prepare one session
       await contract.abrahamBatchCreate([
-        {
-          sessionId: SA,
-          firstMessageId: MA0,
-          content: "seed",
-          media: "",
-          closed: false,
-        },
+        { sessionId: SA, firstMessageId: MA0, content: "seed", media: "" },
       ]);
 
       // unknown session

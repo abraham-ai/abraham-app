@@ -204,11 +204,6 @@
             "internalType": "string",
             "name": "media",
             "type": "string"
-          },
-          {
-            "internalType": "bool",
-            "name": "closed",
-            "type": "bool"
           }
         ],
         "internalType": "struct Abraham.CreateItem[]",

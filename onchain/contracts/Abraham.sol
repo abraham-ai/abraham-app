@@ -27,23 +27,22 @@ contract Abraham is Ownable, ReentrancyGuard {
         bool     closed;           // true ⇢ no praises / blessings
     }
 
-    // For owner batch inside a single session (kept from previous version)
+    // For owner batch inside a single session (kept)
     struct OwnerMsg {
         string messageId;
         string content; // may be ""
         string media;   // may be ""
     }
 
-    // cross-session batch create (now can set initial closed state)
+    // cross-session batch create (NO 'closed' field anymore)
     struct CreateItem {
         string sessionId;
         string firstMessageId;
         string content; // may be ""
         string media;   // may be ""
-        bool   closed;  // desired initial state
     }
 
-    // cross-session batch update (now can set closed state per target session)
+    // cross-session batch update (one update per target session)
     struct UpdateItem {
         string sessionId;
         string messageId;
@@ -99,7 +98,7 @@ contract Abraham is Ownable, ReentrancyGuard {
         // initialise session
         Session storage s = sessions[sessionId];
         s.id = sessionId;
-        s.closed = false;
+        s.closed = false; // always open at creation
         s.messageCount = 0;
 
         _addMessageInternal(s, firstMessageId, msg.sender, content, media);
@@ -124,7 +123,7 @@ contract Abraham is Ownable, ReentrancyGuard {
         // initialise session
         Session storage s = sessions[sessionId];
         s.id = sessionId;
-        s.closed = false;
+        s.closed = false; // always open at creation
         s.messageCount = 0;
 
         _addMessageInternal(s, firstMessageId, msg.sender, content, "");
@@ -306,7 +305,8 @@ contract Abraham is Ownable, ReentrancyGuard {
 
     /*────────────── batch (owner, cross-session) ─────────────*/
 
-    /// @notice Create MANY sessions at once. Each item produces SessionCreated + first MessageAdded, and can set initial closed state.
+    /// @notice Create MANY sessions at once. Each item produces SessionCreated + first MessageAdded.
+    ///         Sessions ALWAYS start open (closed = false).
     function abrahamBatchCreate(CreateItem[] calldata items) external onlyOwner {
         uint256 n = items.length;
         require(n > 0, "No items");
@@ -320,21 +320,16 @@ contract Abraham is Ownable, ReentrancyGuard {
 
             _requireSomePayload(it.content, it.media);
 
-            // init session
+            // init session (always open)
             Session storage s = sessions[it.sessionId];
             s.id = it.sessionId;
-            s.closed = it.closed; // set initial state
+            s.closed = false;
             s.messageCount = 0;
 
             _addMessageInternal(s, it.firstMessageId, msg.sender, it.content, it.media);
 
             unchecked { ++sessionTotal; }
             emit SessionCreated(it.sessionId);
-
-            // If initially closed is true and it wasn't already (creation), emit the closed event
-            if (it.closed) {
-                emit SessionClosed(it.sessionId);
-            }
         }
     }
 

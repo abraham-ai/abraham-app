@@ -15,6 +15,8 @@ Anyone can “Bless” (add a text-only message) or “Praise” any message as 
 
 [https://gateway.pinata.cloud/ipfs/bafybeih4…abc](https://gateway.pinata.cloud/ipfs/bafybeih4…abc)
 
+````
+
 2. **Generate two fresh UUID v4 strings**
 
 | Variable         | Example value                          |
@@ -31,19 +33,20 @@ Anyone can “Bless” (add a text-only message) or “Praise” any message as 
 | `content`        | Any text / caption, e.g. `"Here is my first image …"` |
 | `media`          | The IPFS URL from step 1                              |
 
-````js
+```js
 await contract.createSession(
 "c3f1e9e8-4b99-4329-9a45-6e18c0ab2c30", // sessionId
 "5f6b0f39-0d41-4e84-901a-1c1d98fa6b9b", // firstMessageId
 "Here is my first image about love",
 "https://gateway.pinata.cloud/ipfs/bafybeih4…abc"
 );
+````
 
 That single call …
 
-* **creates** the session (`closed = false`)
-* stores text + image on-chain
-* emits `SessionCreated` **and** `MessageAdded`
+- **creates** the session (**always open** → `closed = false`)
+- stores text + image on-chain
+- emits `SessionCreated` **and** `MessageAdded`
 
 > There’s also a **3-arg overload** for content-only:
 > `createSession(sessionId, firstMessageId, content)`.
@@ -54,6 +57,8 @@ That single call …
 
 Use **`abrahamBatchCreate(items)`** to create **N sessions** in a single tx.
 
+> Sessions created via batch **always start open** (`closed = false`).
+
 **Item shape**
 
 ```ts
@@ -61,16 +66,14 @@ type CreateItem = {
   sessionId: string;
   firstMessageId: string;
   content: string; // may be ""
-  media: string;   // may be ""
-  closed: boolean; // optional, defaults to false
+  media: string; // may be ""
 };
-````
+```
 
 - Each item must have **content or media** (at least one non-empty).
-- `closed` can be set `true` to immediately close the session after creation.
 - Each `sessionId` must be unique (reverts if exists).
 - Each `(sessionId, firstMessageId)` pair must be unique (reverts if exists).
-- Emits one `SessionCreated` and one `MessageAdded` **per item** (and `SessionClosed` if closed).
+- Emits one `SessionCreated` and one `MessageAdded` **per item**.
 
 **Example**
 
@@ -81,14 +84,12 @@ await contract.abrahamBatchCreate([
     firstMessageId: crypto.randomUUID(),
     content: "A",
     media: "",
-    closed: false,
   },
   {
     sessionId: crypto.randomUUID(),
     firstMessageId: crypto.randomUUID(),
     content: "",
     media: "ipfs://bafy…img",
-    closed: true, // create then immediately close
   },
 ]);
 ```
@@ -141,15 +142,14 @@ type UpdateItem = {
   messageId: string;
   content: string; // may be ""
   media: string; // may be ""
-  closed: boolean; // optional; preserves current if omitted
+  closed: boolean; // optional conceptually, but must be provided at call time; preserve current if unsure
 };
 ```
 
 - Targets **existing** `sessionId` (reverts if not found).
 - `(sessionId, messageId)` must be new.
 - Requires **content or media**.
-- If `closed` provided, session is toggled accordingly; if omitted, current state is preserved.
-- Emits `MessageAdded` and `SessionClosed`/`SessionReopened` if applicable.
+- If `closed` toggles, emits `SessionClosed`/`SessionReopened` per item.
 
 **Example**
 
@@ -172,14 +172,20 @@ await contract.abrahamBatchUpdateAcrossSessions([
 ]);
 ```
 
+> For **many messages within a single session** plus an optional close/reopen toggle, use:
+> `abrahamBatchUpdate(sessionId, OwnerMsg[], closedAfter)`.
+
 ---
 
 ### 3 — Anyone can “Bless” (text-only)
 
 ```js
-await contract.bless(sessionId, crypto.randomUUID(), "Make the sky purple", {
-  value: BLESS_PRICE,
-});
+await contract.bless(
+  sessionId,
+  crypto.randomUUID(),
+  "Make the sky purple",
+  { value: BLESS_PRICE } // 0.00002 ETH
+);
 ```
 
 ---
@@ -187,8 +193,14 @@ await contract.bless(sessionId, crypto.randomUUID(), "Make the sky purple", {
 ### 4 — Anyone can “Praise” any message
 
 ```js
-await contract.praise(sessionId, messageId, { value: PRAISE_PRICE });
+await contract.praise(
+  sessionId,
+  messageId,
+  { value: PRAISE_PRICE } // 0.00001 ETH
+);
 ```
+
+A praise succeeds unless the session is closed or the exact ETH amount is wrong.
 
 ---
 
@@ -202,7 +214,7 @@ const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const contract = new ethers.Contract(process.env.ABRAHAM_ADDR, abi, wallet);
 
-// 1) brand-new Creation
+// 1) brand-new Creation (always open)
 await contract.createSession(
   crypto.randomUUID(),
   crypto.randomUUID(),
@@ -210,14 +222,13 @@ await contract.createSession(
   "https://gateway.pinata.cloud/ipfs/bafybeih4…abc"
 );
 
-// 1b) batch create
+// 1b) BATCH create (always open)
 await contract.abrahamBatchCreate([
   {
     sessionId: crypto.randomUUID(),
     firstMessageId: crypto.randomUUID(),
     content: "Batch A",
     media: "",
-    closed: false,
   },
 ]);
 
@@ -266,12 +277,18 @@ query Timeline($firstCreations: Int!, $firstMsgs: Int!) {
     closed
     firstMessageAt
     lastActivityAt
+    ethSpent
     messages(first: $firstMsgs, orderBy: timestamp, orderDirection: asc) {
       uuid
       author
       content
       media
       praiseCount
+      timestamp
+      praises {
+        praiser
+        timestamp
+      }
     }
   }
 }
@@ -290,6 +307,11 @@ query MessagesForCreation($id: ID!, $firstMsgs: Int!) {
       content
       media
       praiseCount
+      timestamp
+      praises {
+        praiser
+        timestamp
+      }
     }
   }
 }
@@ -297,9 +319,4 @@ query MessagesForCreation($id: ID!, $firstMsgs: Int!) {
 
 ---
 
-_Each batch op just emits multiple normal events; subgraph picks them up automatically._
-
-This version now reflects that:
-
-- `closed` is supported in **batch create**.
-- `closed` is also supported in **batch update across sessions** (optional; preserves if omitted).
+_Each batch operation emits multiple standard events—no special indexing logic needed._

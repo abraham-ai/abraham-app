@@ -205,11 +205,6 @@ export const AbrahamAbi = [
             name: "media",
             type: "string",
           },
-          {
-            internalType: "bool",
-            name: "closed",
-            type: "bool",
-          },
         ],
         internalType: "struct Abraham.CreateItem[]",
         name: "items",
