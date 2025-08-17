@@ -4,6 +4,10 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+/**
+ * Abraham: messages live on IPFS as JSON (content + media in one file).
+ * On-chain we store only the IPFS CID and counters (praises/blessings).
+ */
 contract Abraham is Ownable, ReentrancyGuard {
     constructor() Ownable(msg.sender) ReentrancyGuard() {}
 
@@ -13,54 +17,52 @@ contract Abraham is Ownable, ReentrancyGuard {
 
     /*──────────────────────── structs ─────────────────────────*/
     struct Message {
-        string   id;          // uuid
+        string   id;          // uuid (per-session message id)
         address  author;
-        string   content;
-        string   media;       // may be empty
-        address[] praisers;   // duplicates allowed
+        string   cid;         // IPFS CID for the JSON blob (content + media)
+        uint256  praiseCount; // number of praises
     }
 
     struct Session {
         string   id;               // uuid
         string[] messageIds;       // ordering
         uint256  messageCount;
+        uint256  totalBlessings;   // count of user-authored messages
+        uint256  totalPraises;     // sum of praises on all messages
         bool     closed;           // true ⇢ no praises / blessings
     }
 
-    // For owner batch inside a single session (kept)
+    // For owner batch inside a single session
     struct OwnerMsg {
         string messageId;
-        string content; // may be ""
-        string media;   // may be ""
+        string cid; // IPFS CID
     }
 
-    // cross-session batch create (NO 'closed' field anymore)
+    // cross-session batch create (sessions always start open)
     struct CreateItem {
         string sessionId;
         string firstMessageId;
-        string content; // may be ""
-        string media;   // may be ""
+        string cid; // IPFS CID
     }
 
     // cross-session batch update (one update per target session)
     struct UpdateItem {
         string sessionId;
         string messageId;
-        string content; // may be ""
-        string media;   // may be ""
+        string cid;   // IPFS CID
         bool   closed;  // desired state after posting this message
     }
 
     /*──────────────────────── storage ─────────────────────────*/
-    mapping(string => Session) private sessions;                      // sessionId → Session
-    mapping(string => mapping(string => Message)) private messages;   // sessionId → messageId → Message
+    mapping(string => Session) private sessions;                    // sessionId → Session
+    mapping(string => mapping(string => Message)) private messages; // sessionId → messageId → Message
     uint256 public sessionTotal; // analytics
 
     /*──────────────────────── events ──────────────────────────*/
     event SessionCreated(string sessionId);
     event SessionClosed(string sessionId);
     event SessionReopened(string sessionId);
-    event MessageAdded(string sessionId, string messageId, address author, string content, string media);
+    event MessageAdded(string sessionId, string messageId, address author, string cid);
     event Praised(string sessionId, string messageId, address praiser);
 
     /*──────────────────────── modifiers ───────────────────────*/
@@ -81,66 +83,41 @@ contract Abraham is Ownable, ReentrancyGuard {
 
     /*──────────────────────── public / external ───────────────*/
 
-    /// @notice Create a new session with its first message (content and/or media).
+    /// @notice Create a new session with its first message (IPFS CID).
     function createSession(
         string calldata sessionId,
         string calldata firstMessageId,
-        string calldata content,
-        string calldata media
+        string calldata cid
     )
         external
         onlyOwner
         uniqueSession(sessionId)
         uniqueMessage(sessionId, firstMessageId)
     {
-        _requireSomePayload(content, media);
+        _requireNonEmptyCID(cid);
 
-        // initialise session
+        // initialise session (always open)
         Session storage s = sessions[sessionId];
         s.id = sessionId;
-        s.closed = false; // always open at creation
+        s.closed = false;
         s.messageCount = 0;
+        s.totalBlessings = 0;
+        s.totalPraises = 0;
 
-        _addMessageInternal(s, firstMessageId, msg.sender, content, media);
-
-        unchecked { ++sessionTotal; }
-        emit SessionCreated(sessionId);
-    }
-
-    /// @notice Overload: create a new session with content only (no media).
-    function createSession(
-        string calldata sessionId,
-        string calldata firstMessageId,
-        string calldata content
-    )
-        external
-        onlyOwner
-        uniqueSession(sessionId)
-        uniqueMessage(sessionId, firstMessageId)
-    {
-        require(bytes(content).length > 0, "Content required");
-
-        // initialise session
-        Session storage s = sessions[sessionId];
-        s.id = sessionId;
-        s.closed = false; // always open at creation
-        s.messageCount = 0;
-
-        _addMessageInternal(s, firstMessageId, msg.sender, content, "");
+        _addMessageInternal(s, firstMessageId, msg.sender, cid, /*isBlessing*/ false);
 
         unchecked { ++sessionTotal; }
         emit SessionCreated(sessionId);
     }
 
     /**
-     * @notice Abraham adds a message (with media or without) and can close/reopen the session.
+     * @notice Abraham adds a message (by CID) and can close/reopen the session.
      * @param closed Desired session state after this call.
      */
     function abrahamUpdate(
         string calldata sessionId,
         string calldata messageId,
-        string calldata content,
-        string calldata media,
+        string calldata cid,
         bool closed
     )
         external
@@ -148,33 +125,16 @@ contract Abraham is Ownable, ReentrancyGuard {
         sessionExists(sessionId)
         uniqueMessage(sessionId, messageId)
     {
-        _requireSomePayload(content, media);
+        _requireNonEmptyCID(cid);
         Session storage s = sessions[sessionId];
-        _abrahamUpdateInternal(s, messageId, content, media, closed);
+        _abrahamUpdateInternal(s, messageId, cid, closed);
     }
 
-    /// @notice Overload: Abraham adds a content-only message (no media) and can close/reopen the session.
-    function abrahamUpdate(
-        string calldata sessionId,
-        string calldata messageId,
-        string calldata content,
-        bool closed
-    )
-        external
-        onlyOwner
-        sessionExists(sessionId)
-        uniqueMessage(sessionId, messageId)
-    {
-        require(bytes(content).length > 0, "Content required");
-        Session storage s = sessions[sessionId];
-        _abrahamUpdateInternal(s, messageId, content, "", closed);
-    }
-
-    /// @notice Any user adds a text-only blessing (pays BLESS_PRICE).
+    /// @notice Any user adds a blessing (text-only in your UX, but still an IPFS JSON) and pays BLESS_PRICE.
     function bless(
         string calldata sessionId,
         string calldata messageId,
-        string calldata content
+        string calldata cid
     )
         external
         payable
@@ -185,12 +145,12 @@ contract Abraham is Ownable, ReentrancyGuard {
         Session storage s = sessions[sessionId];
         require(!s.closed, "Session closed");
         require(msg.value == BLESS_PRICE, "Incorrect ETH");
-        require(bytes(content).length > 0, "Content required");
+        _requireNonEmptyCID(cid);
 
-        _addMessageInternal(s, messageId, msg.sender, content, "");
+        _addMessageInternal(s, messageId, msg.sender, cid, /*isBlessing*/ true);
     }
 
-    /** @notice Praise any message. Users can praise as many times as they like (each costs PRAISE_PRICE). */
+    /** @notice Praise any existing message. Users can praise as many times as they like (each costs PRAISE_PRICE). */
     function praise(
         string calldata sessionId,
         string calldata messageId
@@ -207,7 +167,11 @@ contract Abraham is Ownable, ReentrancyGuard {
         Message storage m = messages[sessionId][messageId];
         require(bytes(m.id).length != 0, "Message not found");
 
-        m.praisers.push(msg.sender); // duplicates allowed
+        unchecked {
+            m.praiseCount += 1;
+            s.totalPraises += 1;
+        }
+
         emit Praised(sessionId, messageId, msg.sender);
     }
 
@@ -233,16 +197,19 @@ contract Abraham is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < n; i++) {
             Message storage m = messages[sessionId][messageIds[i]];
             require(bytes(m.id).length != 0, "Message not found");
-            m.praisers.push(msg.sender);
+            unchecked {
+                m.praiseCount += 1;
+                s.totalPraises += 1;
+            }
             emit Praised(sessionId, messageIds[i], msg.sender);
         }
     }
 
-    /// @notice Batch bless multiple text-only messages in the same session (payer provides total ETH).
+    /// @notice Batch bless multiple messages (user-authored) in the same session.
     function batchBless(
         string calldata sessionId,
         string[] calldata messageIds,
-        string[] calldata contents
+        string[] calldata cids
     )
         external
         payable
@@ -254,23 +221,21 @@ contract Abraham is Ownable, ReentrancyGuard {
 
         uint256 n = messageIds.length;
         require(n > 0, "No items");
-        require(n == contents.length, "Length mismatch");
+        require(n == cids.length, "Length mismatch");
         require(msg.value == BLESS_PRICE * n, "Incorrect ETH");
 
         for (uint256 i = 0; i < n; i++) {
             string calldata mid = messageIds[i];
             require(bytes(messages[sessionId][mid].id).length == 0, "Message exists");
+            _requireNonEmptyCID(cids[i]);
 
-            string calldata content = contents[i];
-            require(bytes(content).length > 0, "Content required");
-
-            _addMessageInternal(s, mid, msg.sender, content, "");
+            _addMessageInternal(s, mid, msg.sender, cids[i], /*isBlessing*/ true);
         }
     }
 
-    /*────────────── batch (owner, single-session kept) ─────────────*/
+    /*────────────── batch (owner, single-session) ─────────────*/
 
-    /// @notice Owner posts many messages (content and/or media) to ONE session, then optionally toggles closed state.
+    /// @notice Owner posts many messages (by CID) to ONE session, then optionally toggles closed state.
     function abrahamBatchUpdate(
         string calldata sessionId,
         OwnerMsg[] calldata items,
@@ -288,9 +253,9 @@ contract Abraham is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < n; i++) {
             OwnerMsg calldata it = items[i];
             require(bytes(messages[sessionId][it.messageId].id).length == 0, "Message exists");
-            _requireSomePayload(it.content, it.media);
+            _requireNonEmptyCID(it.cid);
 
-            _addMessageInternal(s, it.messageId, msg.sender, it.content, it.media);
+            _addMessageInternal(s, it.messageId, msg.sender, it.cid, /*isBlessing*/ false);
         }
 
         if (s.closed != closedAfter) {
@@ -317,23 +282,24 @@ contract Abraham is Ownable, ReentrancyGuard {
             // Unique session + first message
             require(bytes(sessions[it.sessionId].id).length == 0, "Session exists");
             require(bytes(messages[it.sessionId][it.firstMessageId].id).length == 0, "Message exists");
-
-            _requireSomePayload(it.content, it.media);
+            _requireNonEmptyCID(it.cid);
 
             // init session (always open)
             Session storage s = sessions[it.sessionId];
             s.id = it.sessionId;
             s.closed = false;
             s.messageCount = 0;
+            s.totalBlessings = 0;
+            s.totalPraises = 0;
 
-            _addMessageInternal(s, it.firstMessageId, msg.sender, it.content, it.media);
+            _addMessageInternal(s, it.firstMessageId, msg.sender, it.cid, /*isBlessing*/ false);
 
             unchecked { ++sessionTotal; }
             emit SessionCreated(it.sessionId);
         }
     }
 
-    /// @notice Post one owner message to EACH target session in a single tx, and set closed state per item.
+    /// @notice Post one owner message (by CID) to EACH target session in a single tx, and set closed state per item.
     function abrahamBatchUpdateAcrossSessions(UpdateItem[] calldata items) external onlyOwner {
         uint256 n = items.length;
         require(n > 0, "No items");
@@ -344,14 +310,12 @@ contract Abraham is Ownable, ReentrancyGuard {
             // Session must exist; message must be unique per that session
             require(bytes(sessions[it.sessionId].id).length != 0, "Session not found");
             require(bytes(messages[it.sessionId][it.messageId].id).length == 0, "Message exists");
-            _requireSomePayload(it.content, it.media);
+            _requireNonEmptyCID(it.cid);
 
             Session storage s = sessions[it.sessionId];
 
-            // add the message
-            _addMessageInternal(s, it.messageId, msg.sender, it.content, it.media);
+            _addMessageInternal(s, it.messageId, msg.sender, it.cid, /*isBlessing*/ false);
 
-            // set desired closed state (emit events if changed)
             if (s.closed != it.closed) {
                 s.closed = it.closed;
                 if (it.closed) {
@@ -372,13 +336,13 @@ contract Abraham is Ownable, ReentrancyGuard {
         view
         returns (
             address author,
-            string memory content,
-            string memory media,
+            string memory cid,
             uint256 praiseCount
         )
     {
         Message storage m = messages[sessionId][messageId];
-        return (m.author, m.content, m.media, m.praisers.length);
+        require(bytes(m.id).length != 0, "Message not found");
+        return (m.author, m.cid, m.praiseCount);
     }
 
     function getMessageIds(string calldata sessionId) external view returns (string[] memory) {
@@ -387,6 +351,16 @@ contract Abraham is Ownable, ReentrancyGuard {
 
     function isSessionClosed(string calldata sessionId) external view returns (bool) {
         return sessions[sessionId].closed;
+    }
+
+    function getSessionStats(string calldata sessionId)
+        external
+        view
+        returns (uint256 messageCount, uint256 totalBlessings, uint256 totalPraises, bool closed)
+    {
+        Session storage s = sessions[sessionId];
+        require(bytes(s.id).length != 0, "Session not found");
+        return (s.messageCount, s.totalBlessings, s.totalPraises, s.closed);
     }
 
     /*──────────────────────── admin ───────────────────────────*/
@@ -399,31 +373,32 @@ contract Abraham is Ownable, ReentrancyGuard {
         Session storage s,
         string memory messageId,
         address author,
-        string memory content,
-        string memory media
+        string memory cid,
+        bool isBlessing
     ) private {
         messages[s.id][messageId] = Message({
             id: messageId,
             author: author,
-            content: content,
-            media: media, // may be empty
-            praisers: new address[](0)
+            cid: cid,
+            praiseCount: 0
         });
 
         s.messageIds.push(messageId);
-        unchecked { ++s.messageCount; }
+        unchecked {
+            ++s.messageCount;
+            if (isBlessing) ++s.totalBlessings;
+        }
 
-        emit MessageAdded(s.id, messageId, author, content, media);
+        emit MessageAdded(s.id, messageId, author, cid);
     }
 
     function _abrahamUpdateInternal(
         Session storage s,
         string memory messageId,
-        string memory content,
-        string memory media,
+        string memory cid,
         bool closed
     ) private {
-        _addMessageInternal(s, messageId, msg.sender, content, media);
+        _addMessageInternal(s, messageId, msg.sender, cid, /*isBlessing*/ false);
 
         if (s.closed != closed) {
             s.closed = closed;
@@ -435,11 +410,8 @@ contract Abraham is Ownable, ReentrancyGuard {
         }
     }
 
-    function _requireSomePayload(string calldata content, string calldata media) private pure {
-        require(
-            bytes(content).length > 0 || bytes(media).length > 0,
-            "Empty message"
-        );
+    function _requireNonEmptyCID(string calldata cid) private pure {
+        require(bytes(cid).length > 0, "CID required");
     }
 
     /*fallback / receive */

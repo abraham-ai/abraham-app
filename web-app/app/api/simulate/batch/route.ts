@@ -11,10 +11,11 @@ const {
   PRIVATE_KEY,
   NEXT_PUBLIC_ABRAHAM_ADDRESS: CONTRACT,
   PINATA_JWT,
+  NEXT_PUBLIC_IPFS_GATEWAY,
 } = process.env as Record<string, string>;
 
 if (!RPC_URL || !PRIVATE_KEY || !CONTRACT || !PINATA_JWT) {
-  throw new Error("Missing env vars for /api/creations/batch route");
+  throw new Error("Missing env vars for /api/simulate/create/batch route");
 }
 
 /*────────────────── ETHERS SETUP ───────────────*/
@@ -22,30 +23,73 @@ const provider = new JsonRpcProvider(RPC_URL);
 const wallet = new Wallet(PRIVATE_KEY, provider);
 const abraham = new Contract(CONTRACT, AbrahamAbi, wallet);
 
-/*────────────────── PINATA (optional) ──────────*/
+/*────────────────── PINATA ─────────────────────*/
 const pinata = new PinataSDK({ pinataJwt: PINATA_JWT });
 
 async function fetchBytes(url: string): Promise<Buffer> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`fetch ${res.status}`);
+  if (!res.ok) throw new Error(`fetch ${res.status} ${url}`);
   return Buffer.from(await res.arrayBuffer());
 }
 
-async function pinIfNeeded(url?: string, text?: string, pin?: boolean) {
-  if (!pin || !url) return url || "";
-  const buf = await fetchBytes(url);
+async function uploadImageToPinata(imgUrl: string): Promise<string> {
+  const buf = await fetchBytes(imgUrl);
   const file = new File([buf], "cover.png", { type: "image/png" });
-  const img = await pinata.upload.file(file);
-  const meta = await pinata.upload.json({
-    name: "Abraham Creation",
-    description: text || "",
-    image: `ipfs://${img.IpfsHash}`,
-  });
-  return `ipfs://${meta.IpfsHash}`;
+  const uploaded = await pinata.upload.file(file);
+  return `ipfs://${uploaded.IpfsHash}`;
 }
 
-/*──────────────── POST /api/creations/batch ──────────────
-  **Batch create sessions** across many sessions:
+function buildMessageJson(params: {
+  sessionId: string;
+  messageId: string;
+  author: string;
+  content?: string;
+  mediaSrc?: string;
+  kind?: "owner" | "blessing";
+}) {
+  const {
+    sessionId,
+    messageId,
+    author,
+    content,
+    mediaSrc,
+    kind = "owner",
+  } = params;
+  const json: any = {
+    version: 1,
+    sessionId,
+    messageId,
+    author,
+    kind,
+    createdAt: Math.floor(Date.now() / 1000),
+  };
+  if (typeof content === "string") json.content = content;
+  if (mediaSrc) {
+    json.media = [{ type: "image", src: mediaSrc, mime: "image/png" }];
+  } else {
+    json.media = [];
+  }
+  return json;
+}
+
+async function uploadMessageJsonToPinata(json: any): Promise<string> {
+  const res = await pinata.upload.json(json);
+  return res.IpfsHash; // bare CID
+}
+
+function toGatewayUrl(ipfsish: string): string {
+  const base =
+    (NEXT_PUBLIC_IPFS_GATEWAY || "https://gateway.pinata.cloud/ipfs/").replace(
+      /\/+$/,
+      ""
+    ) + "/";
+  const path = ipfsish.replace(/^ipfs:\/\//i, "");
+  return /^https?:\/\//i.test(ipfsish) ? ipfsish : base + path;
+}
+
+/*──────────────── POST /api/simulate/create/batch ──────────────
+  **Batch create sessions**
+
   Body:
     {
       items: Array<{
@@ -53,14 +97,14 @@ async function pinIfNeeded(url?: string, text?: string, pin?: boolean) {
         firstMessageId?: string,  // optional; generated if missing
         content?: string,         // may be ""
         imageUrl?: string,        // may be ""; pinned if pin=true
+        kind?: "owner" | "blessing"  // optional; default "owner"
       }>,
       pin?: boolean               // optional; default false
     }
 
-  Notes:
-  - Each item must have content or imageUrl (media).
-  - Emits SessionCreated + MessageAdded per item.
-──────────────────────────────────────────────────────────*/
+  Steps per item: (optional) pin image → build message JSON → pin message JSON → CID
+  Contract: abrahamBatchCreate([{ sessionId, firstMessageId, cid }])
+────────────────────────────────────────────────────────────────*/
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -71,53 +115,73 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No items" }, { status: 400 });
     }
 
-    // Normalize & (optionally) pin
-    const items = [];
+    const normalized = [];
     for (const raw of itemsIn) {
       const sessionId =
-        typeof raw?.sessionId === "string" && raw.sessionId.length
-          ? raw.sessionId
+        raw?.sessionId && String(raw.sessionId).length
+          ? String(raw.sessionId)
           : randomUUID();
       const firstMessageId =
-        typeof raw?.firstMessageId === "string" && raw.firstMessageId.length
-          ? raw.firstMessageId
+        raw?.firstMessageId && String(raw.firstMessageId).length
+          ? String(raw.firstMessageId)
           : randomUUID();
-
       const content = typeof raw?.content === "string" ? raw.content : "";
-      const mediaUri = await pinIfNeeded(raw?.imageUrl, content, pin); // may be ""
+      let mediaSrc = typeof raw?.imageUrl === "string" ? raw.imageUrl : "";
+      const kind = raw?.kind === "blessing" ? "blessing" : "owner";
 
-      if (!content && !mediaUri) {
+      if (pin && mediaSrc) {
+        mediaSrc = await uploadImageToPinata(mediaSrc);
+      }
+
+      if (!content && !mediaSrc) {
         return NextResponse.json(
           { error: "Each item must include `content` or `imageUrl`" },
           { status: 400 }
         );
       }
 
-      items.push({
+      const json = buildMessageJson({
+        sessionId,
+        messageId: firstMessageId,
+        author: wallet.address,
+        content,
+        mediaSrc,
+        kind,
+      });
+      const cid = await uploadMessageJsonToPinata(json);
+
+      normalized.push({
         sessionId,
         firstMessageId,
-        content,
-        media: mediaUri,
+        cid,
+        echo: { content, mediaSrc },
       });
     }
 
-    const tx = await abraham.abrahamBatchCreate(items);
+    const tx = await abraham.abrahamBatchCreate(
+      normalized.map((n) => ({
+        sessionId: n.sessionId,
+        firstMessageId: n.firstMessageId,
+        cid: n.cid,
+      }))
+    );
     const rcpt = await tx.wait();
 
     return NextResponse.json(
       {
         txHash: rcpt?.hash ?? rcpt?.transactionHash,
-        created: items.map((i) => ({
-          sessionId: i.sessionId,
-          firstMessageId: i.firstMessageId,
-          content: i.content,
-          media: i.media,
+        created: normalized.map((n) => ({
+          sessionId: n.sessionId,
+          firstMessageId: n.firstMessageId,
+          cid: n.cid,
+          content: n.echo.content,
+          imageUrl: n.echo.mediaSrc ? toGatewayUrl(n.echo.mediaSrc) : "",
         })),
       },
       { status: 200 }
     );
   } catch (e: any) {
-    console.error("/api/creations/batch POST:", e);
+    console.error("/api/simulate/create/batch POST:", e);
     return NextResponse.json(
       { error: e?.message || "internal error" },
       { status: 500 }
@@ -125,8 +189,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/*──────────────── PATCH /api/creations/batch ─────────────
-  **Batch update across sessions** (one message per session):
+/*──────────────── PATCH /api/simulate/create/batch ─────────────
+  **Batch update across sessions** (one owner message per session)
+
   Body:
     {
       items: Array<{
@@ -134,14 +199,14 @@ export async function POST(req: NextRequest) {
         messageId?: string,       // optional; generated if missing
         content?: string,         // may be ""
         imageUrl?: string,        // may be ""; pinned if pin=true
+        closed?: boolean          // optional; if omitted, we preserve current state
       }>,
       pin?: boolean               // optional; default false
     }
 
-  Notes:
-  - Does NOT toggle closed/open state. Use single /api/creations PATCH for that.
-  - Emits one MessageAdded per item.
-──────────────────────────────────────────────────────────*/
+  Steps per item: (optional) pin image → build message JSON → pin → CID
+  Contract: abrahamBatchUpdateAcrossSessions([{ sessionId, messageId, cid, closed }])
+────────────────────────────────────────────────────────────────*/
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
@@ -152,12 +217,25 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "No items" }, { status: 400 });
     }
 
-    const items = [];
+    // Determine current closed states for sessions we’ll touch (to preserve when closed is omitted)
+    const uniqueSessionIds = Array.from(
+      new Set(
+        itemsIn
+          .map((i) => (typeof i?.sessionId === "string" ? i.sessionId : ""))
+          .filter(Boolean)
+      )
+    );
+    const closedBySession = new Map<string, boolean>();
+    await Promise.all(
+      uniqueSessionIds.map(async (sid) => {
+        const isClosed: boolean = await abraham.isSessionClosed(sid);
+        closedBySession.set(sid, isClosed);
+      })
+    );
+
+    const normalized = [];
     for (const raw of itemsIn) {
-      const sessionId =
-        typeof raw?.sessionId === "string" && raw.sessionId.length
-          ? raw.sessionId
-          : "";
+      const sessionId = typeof raw?.sessionId === "string" ? raw.sessionId : "";
       if (!sessionId) {
         return NextResponse.json(
           { error: "Every item requires `sessionId`" },
@@ -171,40 +249,68 @@ export async function PATCH(req: NextRequest) {
           : randomUUID();
 
       const content = typeof raw?.content === "string" ? raw.content : "";
-      const mediaUri = await pinIfNeeded(raw?.imageUrl, content, pin);
+      let mediaSrc = typeof raw?.imageUrl === "string" ? raw.imageUrl : "";
+      const closed =
+        typeof raw?.closed === "boolean"
+          ? !!raw.closed
+          : closedBySession.get(sessionId) ?? false; // preserve existing state
 
-      if (!content && !mediaUri) {
+      if (pin && mediaSrc) {
+        mediaSrc = await uploadImageToPinata(mediaSrc);
+      }
+
+      if (!content && !mediaSrc) {
         return NextResponse.json(
           { error: "Each item must include `content` or `imageUrl`" },
           { status: 400 }
         );
       }
 
-      items.push({
+      const json = buildMessageJson({
         sessionId,
         messageId,
+        author: wallet.address,
         content,
-        media: mediaUri,
+        mediaSrc,
+        kind: "owner",
+      });
+      const cid = await uploadMessageJsonToPinata(json);
+
+      normalized.push({
+        sessionId,
+        messageId,
+        cid,
+        closed,
+        echo: { content, mediaSrc },
       });
     }
 
-    const tx = await abraham.abrahamBatchUpdateAcrossSessions(items);
+    const tx = await abraham.abrahamBatchUpdateAcrossSessions(
+      normalized.map((n) => ({
+        sessionId: n.sessionId,
+        messageId: n.messageId,
+        cid: n.cid,
+        closed: n.closed,
+      }))
+    );
     const rcpt = await tx.wait();
 
     return NextResponse.json(
       {
         txHash: rcpt?.hash ?? rcpt?.transactionHash,
-        updated: items.map((i) => ({
-          sessionId: i.sessionId,
-          messageId: i.messageId,
-          content: i.content,
-          media: i.media,
+        updated: normalized.map((n) => ({
+          sessionId: n.sessionId,
+          messageId: n.messageId,
+          cid: n.cid,
+          content: n.echo.content,
+          imageUrl: n.echo.mediaSrc ? toGatewayUrl(n.echo.mediaSrc) : "",
+          closed: n.closed,
         })),
       },
       { status: 200 }
     );
   } catch (e: any) {
-    console.error("/api/creations/batch PATCH:", e);
+    console.error("/api/simulate/create/batch PATCH:", e);
     return NextResponse.json(
       { error: e?.message || "internal error" },
       { status: 500 }

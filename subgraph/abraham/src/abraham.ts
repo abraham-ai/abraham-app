@@ -17,8 +17,9 @@ const PRAISE_PRICE = BigInt.fromI64(10_000_000_000_000);
 const BLESS_PRICE = BigInt.fromI64(20_000_000_000_000);
 
 /**
- * Abraham (owner) address used for ETH bookkeeping:
+ * Abraham (owner) address used for ETH bookkeeping.
  * If MessageAdded.author != ABRAHAM, treat as user "blessing" and add BLESS_PRICE to Creation.ethSpent.
+ * ⚠️ Update this to the actual owner address you deploy with.
  */
 const ABRAHAM = Address.fromString(
   "0x641f5ffC5F6239A0873Bd00F9975091FB035aAFC"
@@ -45,6 +46,8 @@ export function handleSessionCreated(e: SessionCreated): void {
     c.messageCount = 0;
     c.firstMessageAt = e.block.timestamp;
     c.ethSpent = BigInt.zero();
+    c.totalBlessings = 0;
+    c.totalPraises = 0;
   }
   c.lastActivityAt = e.block.timestamp;
   c.closed = false; // always open at creation
@@ -58,6 +61,8 @@ export function handleSessionClosed(e: SessionClosed): void {
     c.messageCount = 0;
     c.firstMessageAt = e.block.timestamp;
     c.ethSpent = BigInt.zero();
+    c.totalBlessings = 0;
+    c.totalPraises = 0;
   }
   c.closed = true;
   c.lastActivityAt = e.block.timestamp;
@@ -71,6 +76,8 @@ export function handleSessionReopened(e: SessionReopened): void {
     c.messageCount = 0;
     c.firstMessageAt = e.block.timestamp;
     c.ethSpent = BigInt.zero();
+    c.totalBlessings = 0;
+    c.totalPraises = 0;
   }
   c.closed = false;
   c.lastActivityAt = e.block.timestamp;
@@ -89,18 +96,19 @@ export function handleMessageAdded(e: MessageAdded): void {
     creation.messageCount = 0;
     creation.firstMessageAt = e.block.timestamp;
     creation.ethSpent = BigInt.zero();
+    creation.totalBlessings = 0;
+    creation.totalPraises = 0;
     creation.closed = false;
   }
 
-  // Create Message
+  // Create Message (no on-chain content/media; we only store CID)
   const m = new Message(msgEntityId);
   m.creation = sessionId;
   m.uuid = perSessionMsgId;
   m.author = e.params.author;
-  m.content = e.params.content; // may be ""
-  m.media = e.params.media.length > 0 ? e.params.media : null;
+  m.cid = e.params.cid; // IPFS JSON CID
   m.timestamp = e.block.timestamp;
-  m.praiseCount = 0;
+  m.praiseCount = 0; // will be incremented by Praised events
   m.save();
 
   // Ensure author in Users
@@ -110,9 +118,10 @@ export function handleMessageAdded(e: MessageAdded): void {
   creation.messageCount = creation.messageCount + 1;
   creation.lastActivityAt = e.block.timestamp;
 
-  // Blessings (user-authored messages) increase ethSpent
+  // Blessings (user-authored messages) increase ethSpent and totalBlessings
   if (!e.params.author.equals(ABRAHAM)) {
     creation.ethSpent = creation.ethSpent.plus(BLESS_PRICE);
+    creation.totalBlessings = creation.totalBlessings + 1;
   }
 
   creation.save();
@@ -142,7 +151,9 @@ export function handlePraised(e: Praised): void {
 
   let creation = Creation.load(sessionId);
   if (creation != null) {
+    // PRAISE costs are borne by users, add to ethSpent
     creation.ethSpent = creation.ethSpent.plus(PRAISE_PRICE);
+    creation.totalPraises = creation.totalPraises + 1;
     creation.lastActivityAt = e.block.timestamp;
     creation.save();
   }

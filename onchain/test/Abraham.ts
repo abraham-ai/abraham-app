@@ -1,3 +1,4 @@
+// test/Abraham.cid.spec.ts
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
@@ -26,7 +27,7 @@ async function deployFixture() {
   return { contract, abraham, user1, user2, PRAISE_PRICE, BLESS_PRICE };
 }
 
-/* helper uuids */
+/* helper ids */
 const S1 = "session-aaa";
 const M1 = "msg-0001";
 const M2 = "msg-0002";
@@ -47,10 +48,19 @@ const MC0 = "msg-C0";
 const MA1 = "msg-A1";
 const MB1 = "msg-B1";
 
+/* sample CIDs */
+const CID_A = "ipfs://cid-a";
+const CID_B = "ipfs://cid-b";
+const CID_C = "ipfs://cid-c";
+const CID_D = "ipfs://cid-d";
+const CID_E = "ipfs://cid-e";
+const CID_F = "ipfs://cid-f";
+const CID_G = "ipfs://cid-g";
+
 /* ---------------------------------------------------------- */
 /* TESTS                                                       */
 /* ---------------------------------------------------------- */
-describe("Abraham contract (overloads + user batches + owner single/cross-session batches)", () => {
+describe("Abraham (CID-only: content/media moved to IPFS JSON)", () => {
   /* ----------------------- deploy ------------------------ */
   it("sets deployer as owner", async () => {
     const { contract, abraham } = await loadFixture(deployFixture);
@@ -59,17 +69,10 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
   /* ------------------ session creation ------------------- */
   describe("createSession", () => {
-    it("owner can create a session with media (and optional content)", async () => {
+    it("owner can create a session with the first message CID", async () => {
       const { contract } = await loadFixture(deployFixture);
 
-      await expect(
-        contract["createSession(string,string,string,string)"](
-          S1,
-          M1,
-          "first image",
-          "ipfs://hashA"
-        )
-      )
+      await expect(contract.createSession(S1, M1, CID_A))
         .to.emit(contract, "SessionCreated")
         .withArgs(S1);
 
@@ -77,112 +80,30 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       expect(ids.length).to.equal(1);
       expect(ids[0]).to.equal(M1);
 
-      const [author, , media] = await contract.getMessage(S1, M1);
-      expect(media).to.equal("ipfs://hashA");
+      const [author, cid, praises] = await contract.getMessage(S1, M1);
+      expect(cid).to.equal(CID_A);
       expect(author).to.equal(await contract.owner());
+      expect(praises).to.equal(0);
       expect(await contract.isSessionClosed(S1)).to.equal(false);
+
+      const [mc, tb, tp, closed] = await contract.getSessionStats(S1);
+      expect(mc).to.equal(1);
+      expect(tb).to.equal(0);
+      expect(tp).to.equal(0);
+      expect(closed).to.equal(false);
     });
 
-    it("owner can create a session with content-only via 4-arg (media empty)", async () => {
+    it("reverts if CID is empty", async () => {
       const { contract } = await loadFixture(deployFixture);
-
       await expect(
-        contract["createSession(string,string,string,string)"](
-          "session-txt",
-          "msg-t1",
-          "hello world",
-          ""
-        )
-      )
-        .to.emit(contract, "SessionCreated")
-        .withArgs("session-txt");
-
-      const ids = await contract.getMessageIds("session-txt");
-      expect(ids.length).to.equal(1);
-
-      const [author, content, media, praises] = await contract.getMessage(
-        "session-txt",
-        "msg-t1"
-      );
-      expect(author).to.equal(await contract.owner());
-      expect(content).to.equal("hello world");
-      expect(media).to.equal("");
-      expect(praises).to.equal(0);
-    });
-
-    it("owner can create a session with media-only (content empty) via 4-arg", async () => {
-      const { contract } = await loadFixture(deployFixture);
-
-      await expect(
-        contract["createSession(string,string,string,string)"](
-          "session-media",
-          "msg-m1",
-          "",
-          "ipfs://only"
-        )
-      )
-        .to.emit(contract, "SessionCreated")
-        .withArgs("session-media");
-
-      const [author, content, media, praises] = await contract.getMessage(
-        "session-media",
-        "msg-m1"
-      );
-      expect(author).to.equal(await contract.owner());
-      expect(content).to.equal("");
-      expect(media).to.equal("ipfs://only");
-      expect(praises).to.equal(0);
-    });
-
-    it("owner can create a session with content-only using the 3-arg overload", async () => {
-      const { contract } = await loadFixture(deployFixture);
-
-      await expect(
-        contract["createSession(string,string,string)"](
-          "session-overload",
-          "msg-o1",
-          "just text"
-        )
-      )
-        .to.emit(contract, "SessionCreated")
-        .withArgs("session-overload");
-
-      const [author, content, media, praises] = await contract.getMessage(
-        "session-overload",
-        "msg-o1"
-      );
-      expect(author).to.equal(await contract.owner());
-      expect(content).to.equal("just text");
-      expect(media).to.equal("");
-      expect(praises).to.equal(0);
-    });
-
-    it("reverts if both content and media are empty (4-arg)", async () => {
-      const { contract } = await loadFixture(deployFixture);
-
-      await expect(
-        contract["createSession(string,string,string,string)"](
-          "empty-session",
-          "msg-empty",
-          "",
-          ""
-        )
-      ).to.be.revertedWith("Empty message");
+        contract.createSession("empty-session", "m0", "")
+      ).to.be.revertedWith("CID required");
     });
 
     it("reverts if non-owner calls", async () => {
       const { contract, user1 } = await loadFixture(deployFixture);
 
-      await expect(
-        contract
-          .connect(user1)
-          ["createSession(string,string,string,string)"](
-            S1,
-            M1,
-            "hack",
-            "ipfs://bad"
-          )
-      )
+      await expect(contract.connect(user1).createSession(S1, M1, CID_A))
         .to.be.revertedWithCustomError(contract, "OwnableUnauthorizedAccount")
         .withArgs(user1.address);
     });
@@ -190,103 +111,38 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
     it("reverts on duplicate session id", async () => {
       const { contract } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "ok",
-        "ipfs://y"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
       await expect(
-        contract["createSession(string,string,string,string)"](
-          S1,
-          "msg-dup",
-          "again",
-          "ipfs://z"
-        )
+        contract.createSession(S1, "msg-dup", CID_B)
       ).to.be.revertedWith("Session exists");
     });
   });
 
   /* ------------------ abrahamUpdate ---------------------- */
   describe("abrahamUpdate", () => {
-    it("owner can append an image update while keeping session open (4-arg + bool)", async () => {
+    it("owner can append a message (CID) while keeping session open", async () => {
       const { contract } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
-      await expect(
-        contract["abrahamUpdate(string,string,string,string,bool)"](
-          S1,
-          M2,
-          "v2",
-          "ipfs://b",
-          false
-        )
-      ).to.emit(contract, "MessageAdded");
+      await expect(contract.abrahamUpdate(S1, M2, CID_B, false)).to.emit(
+        contract,
+        "MessageAdded"
+      );
 
       const ids = await contract.getMessageIds(S1);
       expect(ids.length).to.equal(2);
 
-      const [, , media] = await contract.getMessage(S1, M2);
-      expect(media).to.equal("ipfs://b");
+      const [, cid] = await contract.getMessage(S1, M2);
+      expect(cid).to.equal(CID_B);
       expect(await contract.isSessionClosed(S1)).to.equal(false);
-    });
 
-    it("owner can append a content-only update using 4-arg (media empty)", async () => {
-      const { contract } = await loadFixture(deployFixture);
-
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
-
-      await expect(
-        contract["abrahamUpdate(string,string,string,string,bool)"](
-          S1,
-          M2,
-          "text-only v2",
-          "",
-          false
-        )
-      ).to.emit(contract, "MessageAdded");
-
-      const [author, content, media, pc] = await contract.getMessage(S1, M2);
-      expect(author).to.equal(await contract.owner());
-      expect(content).to.equal("text-only v2");
-      expect(media).to.equal("");
-      expect(pc).to.equal(0);
-    });
-
-    it("owner can append a content-only update using the 3-arg overload (+ bool)", async () => {
-      const { contract } = await loadFixture(deployFixture);
-
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
-
-      await expect(
-        contract["abrahamUpdate(string,string,string,bool)"](
-          S1,
-          M2,
-          "overloaded text",
-          false
-        )
-      ).to.emit(contract, "MessageAdded");
-
-      const [, content, media] = await contract.getMessage(S1, M2);
-      expect(content).to.equal("overloaded text");
-      expect(media).to.equal("");
+      const [mc, tb, tp, closed] = await contract.getSessionStats(S1);
+      expect(mc).to.equal(2);
+      expect(tb).to.equal(0);
+      expect(tp).to.equal(0);
+      expect(closed).to.equal(false);
     });
 
     it("owner can close and later reopen the session", async () => {
@@ -295,147 +151,119 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       );
 
       /* create and then CLOSE */
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
-      await expect(
-        contract["abrahamUpdate(string,string,string,string,bool)"](
-          S1,
-          M2,
-          "closing msg",
-          "ipfs://b",
-          true
-        )
-      ).to.emit(contract, "SessionClosed");
+      await expect(contract.abrahamUpdate(S1, M2, CID_B, true)).to.emit(
+        contract,
+        "SessionClosed"
+      );
       expect(await contract.isSessionClosed(S1)).to.equal(true);
 
       /* bless / praise should revert while closed */
       await expect(
-        contract.connect(user1).bless(S1, B1, "hi", { value: BLESS_PRICE })
+        contract.connect(user1).bless(S1, B1, CID_C, { value: BLESS_PRICE })
       ).to.be.revertedWith("Session closed");
       await expect(
         contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
       ).to.be.revertedWith("Session closed");
 
-      /* now REOPEN using 3-arg overload (content-only is fine) */
-      await expect(
-        contract["abrahamUpdate(string,string,string,bool)"](
-          S1,
-          M3,
-          "reopen msg",
-          false
-        )
-      ).to.emit(contract, "SessionReopened");
+      /* now REOPEN with another owner update */
+      await expect(contract.abrahamUpdate(S1, M3, CID_D, false)).to.emit(
+        contract,
+        "SessionReopened"
+      );
       expect(await contract.isSessionClosed(S1)).to.equal(false);
 
       /* bless / praise succeed again */
       await contract
         .connect(user1)
-        .bless(S1, B2, "thanks", { value: BLESS_PRICE });
+        .bless(S1, B2, CID_E, { value: BLESS_PRICE });
       await contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE });
+
+      const [mc, tb, tp, closed] = await contract.getSessionStats(S1);
+      expect(mc).to.equal(4); // M1, M2, M3, B2
+      expect(tb).to.equal(1); // one user blessing
+      expect(tp).to.equal(1); // one praise
+      expect(closed).to.equal(false);
     });
 
-    it("reverts when both content and media are empty (4-arg)", async () => {
+    it("reverts when CID is empty", async () => {
       const { contract } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
       await expect(
-        contract["abrahamUpdate(string,string,string,string,bool)"](
-          S1,
-          M2,
-          "",
-          "",
-          false
-        )
-      ).to.be.revertedWith("Empty message");
+        contract.abrahamUpdate(S1, M2, "", false)
+      ).to.be.revertedWith("CID required");
     });
   });
 
   /* ---------------------- bless -------------------------- */
   describe("bless", () => {
-    it("user can bless with exact fee", async () => {
+    it("user can bless with exact fee (CID required) and increments totalBlessings", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
       await expect(
-        contract
-          .connect(user1)
-          .bless(S1, B1, "make it purple", { value: BLESS_PRICE })
+        contract.connect(user1).bless(S1, B1, CID_B, { value: BLESS_PRICE })
       ).to.emit(contract, "MessageAdded");
 
       const ids = await contract.getMessageIds(S1);
       expect(ids.length).to.equal(2);
 
-      const [author, content, media] = await contract.getMessage(S1, B1);
+      const [author, cid] = await contract.getMessage(S1, B1);
       expect(author).to.equal(user1.address);
-      expect(content).to.equal("make it purple");
-      expect(media).to.equal("");
+      expect(cid).to.equal(CID_B);
+
+      const [mc, tb, tp] = await contract.getSessionStats(S1);
+      expect(mc).to.equal(2);
+      expect(tb).to.equal(1);
+      expect(tp).to.equal(0);
     });
 
-    it("fails with wrong fee or empty content", async () => {
+    it("fails with wrong fee or empty CID", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
       await expect(
-        contract.connect(user1).bless(S1, B1, "hi", { value: BLESS_PRICE - 1n })
+        contract
+          .connect(user1)
+          .bless(S1, B1, CID_B, { value: BLESS_PRICE - 1n })
       ).to.be.revertedWith("Incorrect ETH");
 
       await expect(
         contract.connect(user1).bless(S1, B1, "", { value: BLESS_PRICE })
-      ).to.be.revertedWith("Content required");
+      ).to.be.revertedWith("CID required");
     });
 
     it("fails for unknown session", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
 
       await expect(
-        contract.connect(user1).bless("ghost", B1, "hi", { value: BLESS_PRICE })
+        contract
+          .connect(user1)
+          .bless("ghost", B1, CID_B, { value: BLESS_PRICE })
       ).to.be.revertedWith("Session not found");
     });
   });
 
   /* ---------------------- praise ------------------------- */
   describe("praise", () => {
-    it("user can praise multiple times; each praise costs fee", async () => {
+    it("user can praise multiple times; each praise costs fee and increments totals", async () => {
       const { contract, user1, PRAISE_PRICE } = await loadFixture(
         deployFixture
       );
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
       /* first praise */
       await expect(
         contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
       ).to.emit(contract, "Praised");
 
-      let [, , , pc] = await contract.getMessage(S1, M1);
+      let [, , pc] = await contract.getMessage(S1, M1);
       expect(pc).to.equal(1);
 
       /* second praise by SAME user */
@@ -443,8 +271,11 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE })
       ).to.emit(contract, "Praised");
 
-      [, , , pc] = await contract.getMessage(S1, M1);
+      [, , pc] = await contract.getMessage(S1, M1);
       expect(pc).to.equal(2);
+
+      const [, , tp] = await contract.getSessionStats(S1);
+      expect(tp).to.equal(2);
     });
 
     it("fails with wrong fee or unknown message", async () => {
@@ -452,12 +283,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         deployFixture
       );
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
       await expect(
         contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE - 1n })
@@ -476,19 +302,8 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         deployFixture
       );
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
-      await contract["abrahamUpdate(string,string,string,string,bool)"](
-        S1,
-        M2,
-        "v2",
-        "ipfs://b",
-        false
-      );
+      await contract.createSession(S1, M1, CID_A);
+      await contract.abrahamUpdate(S1, M2, CID_B, false);
 
       await expect(
         contract.connect(user1).batchPraise(S1, [M1, M2], {
@@ -496,10 +311,13 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         })
       ).to.emit(contract, "Praised");
 
-      let [, , , pc1] = await contract.getMessage(S1, M1);
-      let [, , , pc2] = await contract.getMessage(S1, M2);
+      let [, , pc1] = await contract.getMessage(S1, M1);
+      let [, , pc2] = await contract.getMessage(S1, M2);
       expect(pc1).to.equal(1);
       expect(pc2).to.equal(1);
+
+      const [, , tp] = await contract.getSessionStats(S1);
+      expect(tp).to.equal(2);
     });
 
     it("reverts on incorrect ETH or closed session", async () => {
@@ -507,19 +325,8 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         deployFixture
       );
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "v1",
-        "ipfs://a"
-      );
-      await contract["abrahamUpdate(string,string,string,string,bool)"](
-        S1,
-        M2,
-        "v2",
-        "ipfs://b",
-        true
-      ); // close
+      await contract.createSession(S1, M1, CID_A);
+      await contract.abrahamUpdate(S1, M2, CID_B, true); // close
 
       await expect(
         contract.connect(user1).batchPraise(S1, [M1, M2], {
@@ -528,12 +335,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       ).to.be.revertedWith("Session closed");
 
       // reopen to test ETH mismatch
-      await contract["abrahamUpdate(string,string,string,bool)"](
-        S1,
-        M3,
-        "reopen",
-        false
-      );
+      await contract.abrahamUpdate(S1, M3, CID_C, false);
 
       await expect(
         contract.connect(user1).batchPraise(S1, [M1, M2], {
@@ -547,12 +349,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
         deployFixture
       );
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "hello",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
       await expect(
         contract.connect(user1).batchPraise(S1, [M1, "ghost"], {
@@ -561,25 +358,20 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       ).to.be.revertedWith("Message not found");
 
       // Verify no partial praise happened
-      let [, , , pc] = await contract.getMessage(S1, M1);
+      let [, , pc] = await contract.getMessage(S1, M1);
       expect(pc).to.equal(0);
     });
   });
 
   /* ---------------------- batchBless --------------------- */
   describe("batchBless", () => {
-    it("blesses multiple text messages atomically with exact total fee", async () => {
+    it("blesses multiple messages atomically with exact total fee", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "root",
-        "ipfs://a"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
       await expect(
-        contract.connect(user1).batchBless(S1, [B1, B2], ["alpha", "beta"], {
+        contract.connect(user1).batchBless(S1, [B1, B2], [CID_B, CID_C], {
           value: BLESS_PRICE * 2n,
         })
       ).to.emit(contract, "MessageAdded");
@@ -587,90 +379,73 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const ids = await contract.getMessageIds(S1);
       expect(ids.length).to.equal(3);
 
-      const [a1, c1, m1] = await contract.getMessage(S1, B1);
-      const [a2, c2, m2] = await contract.getMessage(S1, B2);
+      const [a1, cid1] = await contract.getMessage(S1, B1);
+      const [a2, cid2] = await contract.getMessage(S1, B2);
       expect(a1).to.equal(user1.address);
       expect(a2).to.equal(user1.address);
-      expect(c1).to.equal("alpha");
-      expect(c2).to.equal("beta");
-      expect(m1).to.equal("");
-      expect(m2).to.equal("");
+      expect(cid1).to.equal(CID_B);
+      expect(cid2).to.equal(CID_C);
+
+      const [mc, tb] = await contract.getSessionStats(S1);
+      expect(mc).to.equal(3);
+      expect(tb).to.equal(2);
     });
 
-    it("reverts on closed session, length mismatch, empty content, or duplicate id", async () => {
+    it("reverts on closed session, length mismatch, empty CID, or duplicate id", async () => {
       const { contract, user1, BLESS_PRICE } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "root",
-        "ipfs://a"
-      );
-      await contract["abrahamUpdate(string,string,string,string,bool)"](
-        S1,
-        M2,
-        "close it",
-        "ipfs://b",
-        true
-      );
+      await contract.createSession(S1, M1, CID_A);
+      await contract.abrahamUpdate(S1, M2, CID_B, true);
 
       await expect(
         contract
           .connect(user1)
-          .batchBless(S1, [B1], ["x"], { value: BLESS_PRICE })
+          .batchBless(S1, [B1], [CID_C], { value: BLESS_PRICE })
       ).to.be.revertedWith("Session closed");
 
       // reopen
-      await contract["abrahamUpdate(string,string,string,bool)"](
-        S1,
-        M3,
-        "reopen",
-        false
-      );
+      await contract.abrahamUpdate(S1, M3, CID_D, false);
 
       await expect(
         contract
           .connect(user1)
-          .batchBless(S1, [B1, B2], ["x"], { value: BLESS_PRICE * 2n })
+          .batchBless(S1, [B1, B2], [CID_E], { value: BLESS_PRICE * 2n })
       ).to.be.revertedWith("Length mismatch");
 
+      // empty CID
       await expect(
         contract
           .connect(user1)
           .batchBless(S1, [B1], [""], { value: BLESS_PRICE })
-      ).to.be.revertedWith("Content required");
+      ).to.be.revertedWith("CID required");
 
       // create B1 once, then attempt duplicate
       await contract
         .connect(user1)
-        .batchBless(S1, [B1], ["ok"], { value: BLESS_PRICE });
+        .batchBless(S1, [B1], [CID_E], { value: BLESS_PRICE });
 
       await expect(
         contract
           .connect(user1)
-          .batchBless(S1, [B1], ["dup"], { value: BLESS_PRICE })
+          .batchBless(S1, [B1], [CID_F], { value: BLESS_PRICE })
       ).to.be.revertedWith("Message exists");
     });
   });
 
   /* ------------- abrahamBatchUpdate (single session) ------------- */
   describe("abrahamBatchUpdate", () => {
-    it("owner posts multiple messages (content/media mix) and toggles closed state", async () => {
+    it("owner posts multiple messages (CIDs) and toggles closed state", async () => {
       const { contract } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string)"](
-        "s-batch",
-        "m0",
-        "seed"
-      );
+      await contract.createSession("s-batch", "m0", CID_A);
 
       await expect(
         contract.abrahamBatchUpdate(
           "s-batch",
           [
-            { messageId: "m1", content: "text-only", media: "" },
-            { messageId: "m2", content: "", media: "ipfs://x" },
-            { messageId: "m3", content: "both", media: "ipfs://y" },
+            { messageId: "m1", cid: CID_B },
+            { messageId: "m2", cid: CID_C },
+            { messageId: "m3", cid: CID_D },
           ],
           true
         )
@@ -680,74 +455,49 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       expect(ids).to.deep.equal(["m0", "m1", "m2", "m3"]);
       expect(await contract.isSessionClosed("s-batch")).to.equal(true);
 
-      const [, c1, m1] = await contract.getMessage("s-batch", "m1");
-      const [, c2, m2] = await contract.getMessage("s-batch", "m2");
-      const [, c3, m3] = await contract.getMessage("s-batch", "m3");
-
-      expect(c1).to.equal("text-only");
-      expect(m1).to.equal("");
-
-      expect(c2).to.equal("");
-      expect(m2).to.equal("ipfs://x");
-
-      expect(c3).to.equal("both");
-      expect(m3).to.equal("ipfs://y");
+      const [, cid1] = await contract.getMessage("s-batch", "m1");
+      const [, cid2] = await contract.getMessage("s-batch", "m2");
+      const [, cid3] = await contract.getMessage("s-batch", "m3");
+      expect(cid1).to.equal(CID_B);
+      expect(cid2).to.equal(CID_C);
+      expect(cid3).to.equal(CID_D);
     });
 
-    it("reverts on empty items, duplicate message id, or empty payload item", async () => {
+    it("reverts on empty items, duplicate message id, or empty CID", async () => {
       const { contract } = await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        "s2",
-        "m0",
-        "root",
-        "ipfs://r"
-      );
+      await contract.createSession("s2", "m0", CID_A);
 
       await expect(
         contract.abrahamBatchUpdate("s2", [], false)
       ).to.be.revertedWith("No items");
 
       // create one, then try duplicate in batch
-      await contract["abrahamUpdate(string,string,string,bool)"](
-        "s2",
-        "x1",
-        "ok",
-        false
-      );
+      await contract.abrahamUpdate("s2", "x1", CID_B, false);
 
       await expect(
         contract.abrahamBatchUpdate(
           "s2",
-          [{ messageId: "x1", content: "dup", media: "" }],
+          [{ messageId: "x1", cid: CID_C }],
           false
         )
       ).to.be.revertedWith("Message exists");
 
-      // empty payload item
+      // empty CID item
       await expect(
-        contract.abrahamBatchUpdate(
-          "s2",
-          [{ messageId: "x2", content: "", media: "" }],
-          false
-        )
-      ).to.be.revertedWith("Empty message");
+        contract.abrahamBatchUpdate("s2", [{ messageId: "x2", cid: "" }], false)
+      ).to.be.revertedWith("CID required");
     });
   });
 
   /* ----------------- abrahamBatchCreate (cross-session) ---------------- */
   describe("abrahamBatchCreate (cross-session)", () => {
-    it("creates multiple sessions at once (mixed content/media)", async () => {
+    it("creates multiple sessions at once (each with CID)", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "hello A", media: "" },
-        {
-          sessionId: SB,
-          firstMessageId: MB0,
-          content: "",
-          media: "ipfs://imgB",
-        },
+        { sessionId: SA, firstMessageId: MA0, cid: CID_A },
+        { sessionId: SB, firstMessageId: MB0, cid: CID_B },
       ]);
 
       expect(await contract.isSessionClosed(SA)).to.equal(false);
@@ -758,63 +508,56 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       expect(idsA).to.deep.equal([MA0]);
       expect(idsB).to.deep.equal([MB0]);
 
-      const [, cA, mA] = await contract.getMessage(SA, MA0);
-      const [, cB, mB] = await contract.getMessage(SB, MB0);
-      expect(cA).to.equal("hello A");
-      expect(mA).to.equal("");
-      expect(cB).to.equal("");
-      expect(mB).to.equal("ipfs://imgB");
+      const [, cidA] = await contract.getMessage(SA, MA0);
+      const [, cidB] = await contract.getMessage(SB, MB0);
+      expect(cidA).to.equal(CID_A);
+      expect(cidB).to.equal(CID_B);
 
       // sessionTotal should be 2
       const total = await contract.sessionTotal();
       expect(toBI(total)).to.equal(2n);
     });
 
-    it("reverts for duplicate session, per-session message uniqueness, and empty payload", async () => {
+    it("reverts for duplicate session, per-session message uniqueness, and empty CID", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       // create one valid session first
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "ok", media: "" },
+        { sessionId: SA, firstMessageId: MA0, cid: CID_A },
       ]);
 
       // duplicate sessionId
       await expect(
         contract.abrahamBatchCreate([
-          { sessionId: SA, firstMessageId: "new", content: "x", media: "" },
+          { sessionId: SA, firstMessageId: "new", cid: CID_B },
         ])
       ).to.be.revertedWith("Session exists");
 
       // duplicate messageId name reused in another session is fine (uniqueness is per-session)
       await expect(
         contract.abrahamBatchCreate([
-          { sessionId: SB, firstMessageId: MA0, content: "x", media: "" },
+          { sessionId: SB, firstMessageId: MA0, cid: CID_C },
         ])
       ).to.not.be.reverted;
 
-      // empty payload
+      // empty CID
       await expect(
         contract.abrahamBatchCreate([
-          { sessionId: SC, firstMessageId: MC0, content: "", media: "" },
+          { sessionId: SC, firstMessageId: MC0, cid: "" },
         ])
-      ).to.be.revertedWith("Empty message");
+      ).to.be.revertedWith("CID required");
     });
   });
 
   /* ------ abrahamBatchUpdateAcrossSessions (cross-session) ------ */
   describe("abrahamBatchUpdateAcrossSessions", () => {
-    it("adds one owner message to each target session and keeps closed state unchanged when closed=false is provided", async () => {
+    it("adds one owner message (CID) to each target session and keeps closed state unchanged when closed=false is provided", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       // prepare two sessions (both open)
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "seed A", media: "" },
-        {
-          sessionId: SB,
-          firstMessageId: MB0,
-          content: "",
-          media: "ipfs://seedB",
-        },
+        { sessionId: SA, firstMessageId: MA0, cid: CID_A },
+        { sessionId: SB, firstMessageId: MB0, cid: CID_B },
       ]);
 
       await expect(
@@ -822,15 +565,13 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
           {
             sessionId: SA,
             messageId: MA1,
-            content: "",
-            media: "ipfs://A1",
+            cid: CID_C,
             closed: false,
           },
           {
             sessionId: SB,
             messageId: MB1,
-            content: "hello B",
-            media: "",
+            cid: CID_D,
             closed: false,
           },
         ])
@@ -841,12 +582,10 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       expect(idsA).to.deep.equal([MA0, MA1]);
       expect(idsB).to.deep.equal([MB0, MB1]);
 
-      const [, cA1, mA1] = await contract.getMessage(SA, MA1);
-      const [, cB1, mB1] = await contract.getMessage(SB, MB1);
-      expect(cA1).to.equal("");
-      expect(mA1).to.equal("ipfs://A1");
-      expect(cB1).to.equal("hello B");
-      expect(mB1).to.equal("");
+      const [, cidA1] = await contract.getMessage(SA, MA1);
+      const [, cidB1] = await contract.getMessage(SB, MB1);
+      expect(cidA1).to.equal(CID_C);
+      expect(cidB1).to.equal(CID_D);
 
       // still open
       expect(await contract.isSessionClosed(SA)).to.equal(false);
@@ -858,8 +597,8 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
 
       // SA open, SB open
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "seed", media: "" },
-        { sessionId: SB, firstMessageId: MB0, content: "seed", media: "" },
+        { sessionId: SA, firstMessageId: MA0, cid: CID_A },
+        { sessionId: SB, firstMessageId: MB0, cid: CID_B },
       ]);
 
       // Close SA, keep SB open via cross-session batch
@@ -868,15 +607,13 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
           {
             sessionId: SA,
             messageId: "sa-close",
-            content: "closing",
-            media: "",
+            cid: CID_C,
             closed: true,
           },
           {
             sessionId: SB,
             messageId: "sb-open",
-            content: "still open",
-            media: "",
+            cid: CID_D,
             closed: false,
           },
         ])
@@ -891,8 +628,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
           {
             sessionId: SA,
             messageId: "sa-reopen",
-            content: "re-open",
-            media: "",
+            cid: CID_E,
             closed: false,
           },
         ])
@@ -901,12 +637,12 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       expect(await contract.isSessionClosed(SA)).to.equal(false);
     });
 
-    it("reverts on unknown session, duplicate message id in that session, or empty payload", async () => {
+    it("reverts on unknown session, duplicate message id in that session, or empty CID", async () => {
       const { contract } = await loadFixture(deployFixture);
 
       // prepare one session
       await contract.abrahamBatchCreate([
-        { sessionId: SA, firstMessageId: MA0, content: "seed", media: "" },
+        { sessionId: SA, firstMessageId: MA0, cid: CID_A },
       ]);
 
       // unknown session
@@ -915,8 +651,7 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
           {
             sessionId: "ghost",
             messageId: "m-x",
-            content: "x",
-            media: "",
+            cid: CID_B,
             closed: false,
           },
         ])
@@ -928,25 +663,23 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
           {
             sessionId: SA,
             messageId: MA0,
-            content: "dup",
-            media: "",
+            cid: CID_C,
             closed: false,
           },
         ])
       ).to.be.revertedWith("Message exists");
 
-      // empty payload
+      // empty CID
       await expect(
         contract.abrahamBatchUpdateAcrossSessions([
           {
             sessionId: SA,
             messageId: "new",
-            content: "",
-            media: "",
+            cid: "",
             closed: false,
           },
         ])
-      ).to.be.revertedWith("Empty message");
+      ).to.be.revertedWith("CID required");
     });
   });
 
@@ -956,15 +689,11 @@ describe("Abraham contract (overloads + user batches + owner single/cross-sessio
       const { contract, abraham, user1, PRAISE_PRICE, BLESS_PRICE } =
         await loadFixture(deployFixture);
 
-      await contract["createSession(string,string,string,string)"](
-        S1,
-        M1,
-        "art",
-        "ipfs://media"
-      );
+      await contract.createSession(S1, M1, CID_A);
 
-      await contract.connect(user1).bless(S1, B1, "hi", { value: BLESS_PRICE });
-
+      await contract
+        .connect(user1)
+        .bless(S1, B1, CID_B, { value: BLESS_PRICE });
       await contract.connect(user1).praise(S1, M1, { value: PRAISE_PRICE });
 
       const before = await ethers.provider.getBalance(abraham.address);

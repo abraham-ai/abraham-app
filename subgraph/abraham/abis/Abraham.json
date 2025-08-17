@@ -55,13 +55,7 @@
       {
         "indexed": false,
         "internalType": "string",
-        "name": "content",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "media",
+        "name": "cid",
         "type": "string"
       }
     ],
@@ -197,12 +191,7 @@
           },
           {
             "internalType": "string",
-            "name": "content",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "media",
+            "name": "cid",
             "type": "string"
           }
         ],
@@ -232,12 +221,7 @@
           },
           {
             "internalType": "string",
-            "name": "content",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "media",
+            "name": "cid",
             "type": "string"
           }
         ],
@@ -272,12 +256,7 @@
           },
           {
             "internalType": "string",
-            "name": "content",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "media",
+            "name": "cid",
             "type": "string"
           },
           {
@@ -310,40 +289,7 @@
       },
       {
         "internalType": "string",
-        "name": "content",
-        "type": "string"
-      },
-      {
-        "internalType": "bool",
-        "name": "closed",
-        "type": "bool"
-      }
-    ],
-    "name": "abrahamUpdate",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "sessionId",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "messageId",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "content",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "media",
+        "name": "cid",
         "type": "string"
       },
       {
@@ -371,7 +317,7 @@
       },
       {
         "internalType": "string[]",
-        "name": "contents",
+        "name": "cids",
         "type": "string[]"
       }
     ],
@@ -412,7 +358,7 @@
       },
       {
         "internalType": "string",
-        "name": "content",
+        "name": "cid",
         "type": "string"
       }
     ],
@@ -435,35 +381,7 @@
       },
       {
         "internalType": "string",
-        "name": "content",
-        "type": "string"
-      }
-    ],
-    "name": "createSession",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "sessionId",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "firstMessageId",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "content",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "media",
+        "name": "cid",
         "type": "string"
       }
     ],
@@ -494,12 +412,7 @@
       },
       {
         "internalType": "string",
-        "name": "content",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "media",
+        "name": "cid",
         "type": "string"
       },
       {
@@ -525,6 +438,40 @@
         "internalType": "string[]",
         "name": "",
         "type": "string[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "sessionId",
+        "type": "string"
+      }
+    ],
+    "name": "getSessionStats",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "messageCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalBlessings",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalPraises",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "closed",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",

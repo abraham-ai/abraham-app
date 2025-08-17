@@ -20,7 +20,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 /* ------------------------------------------------------------------ */
 export const CONTRACT_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS as `0x${string}`) ??
-  "0xfF0f14a7DEBc887af783997E77eAB9325f7F3DE8";
+  "0x318564b3C584CBc475CDAbC1E6087D7C6bEb1e94";
 
 export const PRAISE_PRICE_ETHER = 0.00001;
 export const BLESS_PRICE_ETHER = 0.00002;
@@ -31,11 +31,11 @@ const BLESS_PRICE_WEI = parseEther(BLESS_PRICE_ETHER.toString());
 /**
  * Read-/write helpers for the Abraham contract.
  * - Guards against wallet absence and insufficient balance.
- * - Includes single + batch actions for users (praise/bless).
- * - All txs will toast on success; rejections won’t spam errors.
+ * - Includes single actions for users (praise/bless).
+ * - All txs toast on success; rejections won’t spam errors.
  */
 export function useAbrahamContract() {
-  const { eip1193Provider } = useAuth();
+  const { eip1193Provider, authState } = useAuth();
 
   /* ---------- viem clients ---------- */
   const publicClient: PublicClient = useMemo(
@@ -128,7 +128,7 @@ export function useAbrahamContract() {
     }
   };
 
-  /** Bless (add a text-only message). Generates UUID client-side. */
+  /** Bless = create IPFS JSON (server pins) then send CID on-chain. */
   const bless = async (sessionUuid: string, content: string) => {
     const trimmed = (content ?? "").trim();
     if (!trimmed) {
@@ -143,13 +143,36 @@ export function useAbrahamContract() {
 
     const msgUuid = crypto.randomUUID();
 
+    // Ask server to pin the message JSON (content only; no media for blessings)
+    let cid: string;
+    try {
+      const res = await fetch("/api/ipfs/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionUuid,
+          messageId: msgUuid,
+          content: trimmed,
+          author: authState.walletAddress ?? sender,
+          kind: "blessing",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "IPFS pin failed");
+      cid = data.cid as string;
+      if (!cid) throw new Error("CID missing from server response");
+    } catch (e: any) {
+      showErrorToast(e, "Failed to pin blessing to IPFS");
+      throw e;
+    }
+
     try {
       const hash = await walletClient!.writeContract({
         account: sender,
         address: CONTRACT_ADDRESS,
         abi: AbrahamAbi,
         functionName: "bless",
-        args: [sessionUuid, msgUuid, trimmed],
+        args: [sessionUuid, msgUuid, cid],
         value: valueWei,
         chain: baseSepolia,
       });

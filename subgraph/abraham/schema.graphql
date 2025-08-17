@@ -4,7 +4,9 @@ type Creation @entity(immutable: false) {
   firstMessageAt: BigInt!
   lastActivityAt: BigInt!
   ethSpent: BigInt! # total Wei spent on blessings + praises (user costs)
-  closed: Boolean! # true ⇒ no blessings/praises allowed
+  closed: Boolean!
+  totalBlessings: Int! # matches contract Session.totalBlessings
+  totalPraises: Int! # matches contract Session.totalPraises
   messages: [Message!]! @derivedFrom(field: "creation")
 }
 
@@ -13,10 +15,9 @@ type Message @entity(immutable: false) {
   creation: Creation!
   uuid: String! # original per-session message UUID
   author: Bytes!
-  content: String! # may be an empty string for media-only owner posts
-  media: String # nullable; null ⇒ no media
+  cid: String! # IPFS CID for the JSON blob (content + media)
   timestamp: BigInt!
-  praiseCount: Int!
+  praiseCount: Int! # mirrors on-chain Message.praiseCount
   praises: [Praise!]! @derivedFrom(field: "message")
 }
 
