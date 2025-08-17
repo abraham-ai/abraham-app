@@ -68,7 +68,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         current.blessings.push(m);
       }
     });
-    
+
     return groups;
   }, [creation]);
 
@@ -140,48 +140,55 @@ export default function CreationPage({ params }: { params: { id: string } }) {
 
         {!loading && !error && creation && (
           <div className="flex flex-col items-center border-x">
-            {timeline.map((g) => (
-              <div key={g.abraham.uuid} className="w-full">
-                <CreationCard
-                  creation={{
-                    ...creation,
-                    image: g.abraham.media
-                      ? g.abraham.media.replace(
-                          /^ipfs:\/\//,
-                          "https://gateway.pinata.cloud/ipfs/"
-                        )
-                      : "",
-                    description: g.abraham.content,
-                    praiseCount: g.abraham.praiseCount,
-                    messageUuid: g.abraham.uuid,
-                    timestamp: g.abraham.timestamp,
-                  }}
-                />
-                <Blessings
-                  blessings={[...g.blessings]
-                    .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
-                    .map((b) => ({
-                      author: b.author,
-                      content: b.content,
-                      praiseCount: b.praiseCount,
-                      timestamp: b.timestamp,
-                      creationId: creation.id,
-                      messageUuid: b.uuid,
-                    }))}
-                  closed={creation.closed}
-                />
-              </div>
-            ))}
+            {timeline.map((g) => {
+              const image =
+                g.abraham.media && g.abraham.media.startsWith("ipfs://")
+                  ? g.abraham.media.replace(
+                      /^ipfs:\/\//,
+                      "https://gateway.pinata.cloud/ipfs/"
+                    )
+                  : g.abraham.media || "";
+
+              return (
+                <div key={g.abraham.uuid} className="w-full">
+                  <CreationCard
+                    creation={{
+                      ...creation,
+                      image,
+                      description: g.abraham.content,
+                      praiseCount: g.abraham.praiseCount,
+                      messageUuid: g.abraham.uuid,
+                      timestamp: g.abraham.timestamp,
+                    }}
+                  />
+                  <Blessings
+                    blessings={[...g.blessings]
+                      .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+                      .map((b) => ({
+                        author: b.author,
+                        content: b.content,
+                        praiseCount: b.praiseCount,
+                        timestamp: b.timestamp,
+                        creationId: creation.id,
+                        messageUuid: b.uuid,
+                      }))}
+                    closed={creation.closed}
+                  />
+                </div>
+              );
+            })}
 
             {/* bless box hidden if session closed */}
             {!creation.closed && (
               <BlessBox creation={creation} onNewBlessing={handleNewBlessing} />
             )}
-            
+
             {/* closed creation message */}
             {creation.closed && (
               <div className="w-full max-w-2xl px-4 py-6 text-center">
-                <p className="text-gray-500 italic">Abraham has closed this creation</p>
+                <p className="text-gray-500 italic">
+                  Abraham has closed this creation
+                </p>
               </div>
             )}
           </div>

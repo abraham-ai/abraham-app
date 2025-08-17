@@ -63,6 +63,7 @@ export default function BlessDialog({
 
     setLoading(true);
     try {
+      // Calls server to pin IPFS JSON, then on-chain bless(sessionId, msgUuid, cid)
       const { msgUuid } = await bless(creation.id, text.trim());
 
       /* optimistic UI */
@@ -78,7 +79,7 @@ export default function BlessDialog({
 
       setOpen(false);
       setText("");
-    } catch (e) {
+    } catch {
       /* toast handled in hook */
     } finally {
       setLoading(false);
@@ -126,7 +127,7 @@ export default function BlessDialog({
               maxLength={500}
             />
             <p className="text-sm text-gray-500 mt-3">
-              Cost: {BLESS_PRICE_ETHER} ETH
+              Cost: {BLESS_PRICE_ETHER} ETH
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>

@@ -7,7 +7,7 @@ dataSources:
     name: Abraham
     network: base-sepolia
     source:
-      address: "0xfF0f14a7DEBc887af783997E77eAB9325f7F3DE8"
+      address: "0x318564b3C584CBc475CDAbC1E6087D7C6bEb1e94"
       abi: Abraham
       startBlock: 29329131
     mapping:
@@ -29,7 +29,8 @@ dataSources:
           handler: handleSessionClosed
         - event: SessionReopened(string)
           handler: handleSessionReopened
-        - event: MessageAdded(string,string,address,string,string)
+        # UPDATED signature: content/media removed, 'cid' added
+        - event: MessageAdded(string,string,address,string)
           handler: handleMessageAdded
         - event: Praised(string,string,address)
           handler: handlePraised

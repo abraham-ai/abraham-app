@@ -11,10 +11,11 @@ const {
   PRIVATE_KEY,
   NEXT_PUBLIC_ABRAHAM_ADDRESS: CONTRACT,
   PINATA_JWT,
+  NEXT_PUBLIC_IPFS_GATEWAY,
 } = process.env as Record<string, string>;
 
 if (!RPC_URL || !PRIVATE_KEY || !CONTRACT || !PINATA_JWT) {
-  throw new Error("Missing env vars for /api/creations route");
+  throw new Error("Missing env vars for /api/simulate/create route");
 }
 
 /*────────────────── ETHERS SETUP ───────────────*/
@@ -22,52 +23,98 @@ const provider = new JsonRpcProvider(RPC_URL);
 const wallet = new Wallet(PRIVATE_KEY, provider);
 const abraham = new Contract(CONTRACT, AbrahamAbi, wallet);
 
-/*────────────────── PINATA (optional) ──────────*/
+/*────────────────── PINATA ─────────────────────*/
 const pinata = new PinataSDK({ pinataJwt: PINATA_JWT });
 
 async function fetchBytes(url: string): Promise<Buffer> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`fetch ${res.status}`);
+  if (!res.ok) throw new Error(`fetch ${res.status} ${url}`);
   return Buffer.from(await res.arrayBuffer());
 }
 
-/** Upload external PNG + minimal metadata → return ipfs URI */
-async function uploadToPinata(imgUrl: string, text: string) {
+/** Upload an image URL to Pinata (optional) → returns "ipfs://<imgCID>" */
+async function uploadImageToPinata(imgUrl: string): Promise<string> {
   const buf = await fetchBytes(imgUrl);
   const file = new File([buf], "cover.png", { type: "image/png" });
-  const img = await pinata.upload.file(file);
-  const meta = await pinata.upload.json({
-    name: "Abraham Creation",
-    description: text,
-    image: `ipfs://${img.IpfsHash}`,
-  });
-  return `ipfs://${meta.IpfsHash}`;
+  const uploaded = await pinata.upload.file(file);
+  return `ipfs://${uploaded.IpfsHash}`;
 }
 
-/*───────────────── POST /api/creations ─────────
-  Single **createSession**. Supports:
-  - content-only   → uses 3-arg overload
-  - media-only     → uses 4-arg (content = "")
-  - content+media  → uses 4-arg
-  Body:
+/** Build the canonical message JSON we store on IPFS */
+function buildMessageJson(params: {
+  sessionId: string;
+  messageId: string;
+  author: string;
+  content?: string;
+  mediaSrc?: string; // can be ipfs://... or https://...
+}): any {
+  const { sessionId, messageId, author, content, mediaSrc } = params;
+  const json: any = {
+    version: 1,
+    sessionId,
+    messageId,
+    author,
+    kind: "owner",
+    createdAt: Math.floor(Date.now() / 1000),
+  };
+  if (typeof content === "string") json.content = content;
+  if (mediaSrc) {
+    json.media = [
+      {
+        type: "image",
+        src: mediaSrc,
+        mime: "image/png",
+      },
+    ];
+  } else {
+    json.media = [];
+  }
+  return json;
+}
+
+/** Upload a message JSON to Pinata → returns bare CID (no ipfs:// prefix) */
+async function uploadMessageJsonToPinata(json: any): Promise<string> {
+  const res = await pinata.upload.json(json);
+  return res.IpfsHash; // bare CID
+}
+
+/** Normalize to gateway URL for convenience in response payloads */
+function toGatewayUrl(ipfsish: string): string {
+  const base =
+    (NEXT_PUBLIC_IPFS_GATEWAY || "https://gateway.pinata.cloud/ipfs/").replace(
+      /\/+$/,
+      ""
+    ) + "/";
+  const path = ipfsish.replace(/^ipfs:\/\//i, "");
+  return /^https?:\/\//i.test(ipfsish) ? ipfsish : base + path;
+}
+
+/*───────────────── POST /api/simulate/create ─────────
+  Create a new session:
     {
-      imageUrl?: string,      // optional; if present and pin=true we’ll pin to IPFS
-      content?: string,       // optional
-      pin?: boolean           // optional, default false
+      imageUrl?: string,  // optional; if pin=true we pin the image
+      content?: string,   // optional
+      pin?: boolean       // optional, default false
     }
-───────────────────────────────────────────────*/
+
+  Flow:
+   1) (optional) pin image to IPFS → ipfs://<imgCID>
+   2) build message JSON {content, media:[{src: ...}], ...} → pin → <CID>
+   3) call createSession(sessionId, firstMessageId, CID)
+──────────────────────────────────────────────────────*/
 export async function POST(req: NextRequest) {
   try {
     const { imageUrl, content, pin = false } = await req.json();
 
     const contentStr = typeof content === "string" ? content : "";
-    let mediaUri = typeof imageUrl === "string" ? imageUrl : "";
+    let mediaSrc = typeof imageUrl === "string" ? imageUrl : "";
 
-    if (pin && mediaUri) {
-      mediaUri = await uploadToPinata(mediaUri, contentStr || ""); // optional pin
+    // Optional: pin the image itself
+    if (pin && mediaSrc) {
+      mediaSrc = await uploadImageToPinata(mediaSrc);
     }
 
-    if (!contentStr && !mediaUri) {
+    if (!contentStr && !mediaSrc) {
       return NextResponse.json(
         { error: "At least one of `content` or `imageUrl` is required" },
         { status: 400 }
@@ -77,24 +124,18 @@ export async function POST(req: NextRequest) {
     const sessionId = randomUUID();
     const firstMessageId = randomUUID();
 
-    let tx;
-    if (mediaUri) {
-      // use 4-arg overload (content may be "")
-      tx = await abraham["createSession(string,string,string,string)"](
-        sessionId,
-        firstMessageId,
-        contentStr,
-        mediaUri
-      );
-    } else {
-      // content-only → 3-arg overload requires content non-empty
-      tx = await abraham["createSession(string,string,string)"](
-        sessionId,
-        firstMessageId,
-        contentStr
-      );
-    }
+    // Build and pin the message JSON
+    const messageJson = buildMessageJson({
+      sessionId,
+      messageId: firstMessageId,
+      author: wallet.address,
+      content: contentStr,
+      mediaSrc,
+    });
+    const cid = await uploadMessageJsonToPinata(messageJson);
 
+    // Contract: CID only (no ipfs://)
+    const tx = await abraham.createSession(sessionId, firstMessageId, cid);
     const rcpt = await tx.wait();
 
     return NextResponse.json(
@@ -102,14 +143,16 @@ export async function POST(req: NextRequest) {
         txHash: rcpt?.hash ?? rcpt?.transactionHash,
         sessionId,
         firstMessageId,
-        imageUrl: mediaUri,
+        cid,
+        // convenience echoes
         content: contentStr,
+        imageUrl: mediaSrc ? toGatewayUrl(mediaSrc) : "",
         closed: false, // sessions start OPEN by default
       },
       { status: 200 }
     );
   } catch (e: any) {
-    console.error("/api/creations POST:", e);
+    console.error("/api/simulate/create POST:", e);
     return NextResponse.json(
       { error: e?.message || "internal error" },
       { status: 500 }
@@ -117,20 +160,21 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/*──────────────── PATCH /api/creations ─────────
-  Single **abrahamUpdate**. Supports:
-  - content-only   → 3-arg overload (+ bool)
-  - media-only     → 4-arg (content = "") (+ bool)
-  - content+media  → 4-arg (+ bool)
-  Body:
+/*──────────────── PATCH /api/simulate/create ─────────
+  Append an owner message and optionally toggle closed:
     {
       sessionId: string,
       content?: string,
       imageUrl?: string,
-      closed?: boolean, // default true (close); pass false to reopen/keep open
+      closed?: boolean, // default true (close)
       pin?: boolean
     }
-───────────────────────────────────────────────*/
+
+  Flow:
+   1) (optional) pin image → ipfs://<imgCID>
+   2) build message JSON → pin → <CID>
+   3) abrahamUpdate(sessionId, messageId, CID, closed)
+──────────────────────────────────────────────────────*/
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
@@ -144,15 +188,15 @@ export async function PATCH(req: NextRequest) {
 
     const contentStr = typeof body?.content === "string" ? body.content : "";
     const closed: boolean =
-      typeof body?.closed === "boolean" ? body.closed : true; // default to close
-    let mediaUri = typeof body?.imageUrl === "string" ? body.imageUrl : "";
+      typeof body?.closed === "boolean" ? body.closed : true; // default: close
+    let mediaSrc = typeof body?.imageUrl === "string" ? body.imageUrl : "";
     const pin = !!body?.pin;
 
-    if (pin && mediaUri) {
-      mediaUri = await uploadToPinata(mediaUri, contentStr || "");
+    if (pin && mediaSrc) {
+      mediaSrc = await uploadImageToPinata(mediaSrc);
     }
 
-    if (!contentStr && !mediaUri) {
+    if (!contentStr && !mediaSrc) {
       return NextResponse.json(
         { error: "At least one of `content` or `imageUrl` is required" },
         { status: 400 }
@@ -161,26 +205,17 @@ export async function PATCH(req: NextRequest) {
 
     const messageId = randomUUID();
 
-    let tx;
-    if (mediaUri) {
-      // 5-arg update (content can be empty if media is present)
-      tx = await abraham["abrahamUpdate(string,string,string,string,bool)"](
-        sessionId,
-        messageId,
-        contentStr,
-        mediaUri,
-        closed
-      );
-    } else {
-      // content-only → 4-arg overload requires content non-empty
-      tx = await abraham["abrahamUpdate(string,string,string,bool)"](
-        sessionId,
-        messageId,
-        contentStr,
-        closed
-      );
-    }
+    // Build & pin JSON, then send CID
+    const messageJson = buildMessageJson({
+      sessionId,
+      messageId,
+      author: wallet.address,
+      content: contentStr,
+      mediaSrc,
+    });
+    const cid = await uploadMessageJsonToPinata(messageJson);
 
+    const tx = await abraham.abrahamUpdate(sessionId, messageId, cid, closed);
     const rcpt = await tx.wait();
 
     return NextResponse.json(
@@ -188,14 +223,16 @@ export async function PATCH(req: NextRequest) {
         txHash: rcpt?.hash ?? rcpt?.transactionHash,
         sessionId,
         messageId,
-        imageUrl: mediaUri,
+        cid,
+        // convenience echoes
         content: contentStr,
+        imageUrl: mediaSrc ? toGatewayUrl(mediaSrc) : "",
         closed,
       },
       { status: 200 }
     );
   } catch (e: any) {
-    console.error("/api/creations PATCH:", e);
+    console.error("/api/simulate/create PATCH:", e);
     return NextResponse.json(
       { error: e?.message ?? "internal error" },
       { status: 500 }
