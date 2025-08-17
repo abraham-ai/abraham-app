@@ -12,8 +12,11 @@ const ENDPOINT =
 
 /* paging & limits */
 const GRAPH_PAGE_SIZE = 500;
-const MSG_LIMIT = 100; // messages fetched per creation
-const PRAISE_SORT_LIMIT = 1_000; // safety cap for most-praised path
+const PRAISE_SORT_LIMIT = 2_000; // safety cap for most-praised scan
+
+// We only need a short "tail" of messages for the feed to compute attached blessings.
+// This keeps payload tiny while preserving accurate UI for the latest update.
+const MSG_TAIL = 32;
 
 export const revalidate = 0;
 
@@ -22,26 +25,26 @@ const OWNER = (process.env.NEXT_PUBLIC_OWNER_ADDRESS || "").toLowerCase();
 
 /* Preferred gateway (optional) */
 const PREFERRED_GATEWAY =
-  process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://gateway.pinata.cloud/ipfs/";
+  process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://cloudflare-ipfs.com/ipfs/";
 
-/* Gateways fallback chain */
+/* Gateways fallback chain (fastest first) */
 const IPFS_GATEWAYS = [
-  (base: string) => base, // preferred (already full base URL)
-  () => "https://cloudflare-ipfs.com/ipfs/",
-  () => "https://ipfs.io/ipfs/",
-].map((fn) => fn(PREFERRED_GATEWAY));
+  PREFERRED_GATEWAY,
+  "https://ipfs.io/ipfs/",
+  "https://gateway.pinata.cloud/ipfs/",
+];
 
 /* ------------- GraphQL ------------- */
 /**
- * Efficient list query:
- * 1) All messages (cid only) — cheap, for counts + metadata (no IPFS hits).
- * 2) Latest Abraham message per creation — 1 CID per creation to hydrate.
+ * Super-lean list query:
+ * - `abrahamLatest`: 1 latest owner message (for CID → image/desc hydration)
+ * - `messagesTail`: short recent window w/o CID (UI needs author/uuid/timestamp/praiseCount)
  */
 const LIST_QUERY = /* GraphQL */ `
   query AllCreations(
     $first: Int!
     $skip: Int!
-    $msgLimit: Int!
+    $msgTail: Int!
     $owner: Bytes!
   ) {
     creations(
@@ -55,13 +58,7 @@ const LIST_QUERY = /* GraphQL */ `
       ethSpent
       firstMessageAt
       lastActivityAt
-      messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
-        uuid
-        author
-        cid
-        praiseCount
-        timestamp
-      }
+      messageCount
       abrahamLatest: messages(
         first: 1
         orderBy: timestamp
@@ -71,6 +68,16 @@ const LIST_QUERY = /* GraphQL */ `
         uuid
         author
         cid
+        praiseCount
+        timestamp
+      }
+      messagesTail: messages(
+        first: $msgTail
+        orderBy: timestamp
+        orderDirection: desc
+      ) {
+        uuid
+        author
         praiseCount
         timestamp
       }
@@ -93,36 +100,68 @@ type IpfsMessageJSON = {
 };
 
 function normalizeCidToPath(cid: string): string {
-  // Accepts "ipfs://<cid>" or bare "<cid>" or already "bafy.."
   const clean = cid.replace(/^ipfs:\/\//i, "");
-  // If user passed a full gateway URL already, just return the path segment
-  const parts = clean.split("/"); // cid[/path]
+  const parts = clean.split("/");
   const root = parts[0];
   const rest = parts.slice(1).join("/");
   return rest ? `${root}/${rest}` : root;
 }
 
 function toGatewayUrl(cidOrSrc: string, gatewayBase: string): string {
-  // If it's already an http(s) URL, just return it
   if (/^https?:\/\//i.test(cidOrSrc)) return cidOrSrc;
-
-  // If it's an ipfs:// or bare cid path, rewrite
-  const path = normalizeCidToPath(cidOrSrc);
   const base = gatewayBase.endsWith("/") ? gatewayBase : gatewayBase + "/";
-  return `${base}${path}`;
+  return base + normalizeCidToPath(cidOrSrc);
 }
 
 async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
   const ctrl = new AbortController();
   const id = setTimeout(() => ctrl.abort(), ms);
   try {
-    return await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+    return await fetch(url, {
+      signal: ctrl.signal,
+      cache: "force-cache",
+      // immutable content — safe to cache long
+      next: { revalidate: 60 * 60 * 24 },
+      headers: { Accept: "application/json" },
+    });
   } finally {
     clearTimeout(id);
   }
 }
 
+/* ─── LRU + TTL (process-wide) for hydrated IPFS JSON ─── */
+type CacheEntry = { value: IpfsMessageJSON | null; expiresAt: number };
+const CID_LRU_MAX = 3000;
+const CID_TTL_MS = 1000 * 60 * 60 * 12; // 12h
+const cidLRU: Map<string, CacheEntry> =
+  (global as any).__ipfs_json_lru__ || new Map();
+(global as any).__ipfs_json_lru__ = cidLRU;
+
+function lruGet(key: string): IpfsMessageJSON | null | undefined {
+  const hit = cidLRU.get(key);
+  if (!hit) return undefined;
+  if (Date.now() > hit.expiresAt) {
+    cidLRU.delete(key);
+    return undefined;
+  }
+  // refresh recency
+  cidLRU.delete(key);
+  cidLRU.set(key, hit);
+  return hit.value;
+}
+function lruSet(key: string, value: IpfsMessageJSON | null) {
+  if (cidLRU.size >= CID_LRU_MAX) {
+    // evict oldest
+    const first = cidLRU.keys().next().value;
+    if (first) cidLRU.delete(first);
+  }
+  cidLRU.set(key, { value, expiresAt: Date.now() + CID_TTL_MS });
+}
+
 async function fetchIpfsJson(cid: string): Promise<IpfsMessageJSON | null> {
+  const cached = lruGet(cid);
+  if (cached !== undefined) return cached;
+
   const path = normalizeCidToPath(cid);
   for (const base of IPFS_GATEWAYS) {
     const url = toGatewayUrl(path, base);
@@ -130,15 +169,17 @@ async function fetchIpfsJson(cid: string): Promise<IpfsMessageJSON | null> {
       const r = await fetchWithTimeout(url);
       if (!r.ok) continue;
       const data = (await r.json()) as IpfsMessageJSON;
+      lruSet(cid, data);
       return data;
     } catch {
       // try next gateway
     }
   }
+  lruSet(cid, null);
   return null;
 }
 
-/* Concurrency-limited map to avoid hammering gateways */
+/* Concurrency-limited map */
 async function mapConcurrent<T, R>(
   items: T[],
   limit: number,
@@ -159,149 +200,107 @@ async function mapConcurrent<T, R>(
   return ret;
 }
 
-/* Cache CID → hydrated JSON for duration of the invocation */
-const cidCache = new Map<string, Promise<IpfsMessageJSON | null>>();
-
-function hydrateCid(cid: string) {
-  if (!cidCache.has(cid)) cidCache.set(cid, fetchIpfsJson(cid));
-  return cidCache.get(cid)!;
-}
-
-/* Resolve media src to a gateway URL (first media item) */
 function firstMediaUrlFromJson(json: IpfsMessageJSON | null): string | null {
   const src = json?.media?.[0]?.src;
   if (!src) return null;
   return toGatewayUrl(src, PREFERRED_GATEWAY);
 }
 
-/* Transform Graph message (cid) → SubgraphMessage (content/media hydrated or placeholders) */
-async function toSubgraphMessageHydrated(
-  m: {
-    uuid: string;
-    author: string;
-    cid: string;
-    praiseCount: number;
-    timestamp: string;
-  },
-  hydrate: boolean
-): Promise<SubgraphMessage> {
-  if (!hydrate) {
-    // placeholders for list view efficiency
-    return {
-      uuid: m.uuid,
-      author: m.author,
-      content: "",
-      media: null,
-      praiseCount: m.praiseCount,
-      timestamp: m.timestamp,
-    };
-  }
-
-  const json = await hydrateCid(m.cid);
-  return {
-    uuid: m.uuid,
-    author: m.author,
-    content: json?.content ?? "",
-    media: firstMediaUrlFromJson(json),
-    praiseCount: m.praiseCount,
-    timestamp: m.timestamp,
-  };
-}
-
 /* ───────────── shapers ───────────── */
 
-type GraphMsgCid = {
+type GraphMsgLatest = {
   uuid: string;
   author: string;
   cid: string;
   praiseCount: number;
   timestamp: string;
 };
-
+type GraphMsgTail = {
+  uuid: string;
+  author: string;
+  praiseCount: number;
+  timestamp: string;
+};
 type GraphCreation = Omit<SubgraphCreation, "messages"> & {
-  messages: GraphMsgCid[];
-  abrahamLatest: GraphMsgCid[];
+  messageCount: number;
+  abrahamLatest: GraphMsgLatest[];
+  messagesTail: GraphMsgTail[];
 };
 
 function asEthFloat(weiStr: string): number {
-  // Keep your prior logic: show with 4 dp ETH
   const bi = BigInt(weiStr);
-  // divide by 1e14 then /1e4 to keep float
   return Number((bi / BigInt(1e14)).toString()) / 1e4;
 }
 
 /**
- * Shapes raw creations to CreationItem, hydrating ONLY the latest Abraham message
- * for each creation (for image + description + top-level praiseCount/messageUuid).
- * Other messages are returned with placeholder content/media for efficiency.
+ * Shapes raw creations:
+ * - hydrate ONLY latest Abraham JSON per creation
+ * - set messages to the *ascending* order of the recent tail (no cid/content/media)
  */
 async function shapeCreationsList(
   raws: GraphCreation[]
-): Promise<(CreationItem & { totalPraises: number })[]> {
-  // Collect unique CIDs for the latest abraham messages per creation
-  const latestPairs = raws.map((c) => ({
-    creationId: c.id,
-    latest: c.abrahamLatest?.[0] || null,
-  }));
-
-  // Hydrate latest only (1 per creation)
+): Promise<(CreationItem & { tailPraiseSum: number })[]> {
+  // Warm up IPFS JSON for the latest owner message per creation
+  const latest = raws
+    .map((c) => c.abrahamLatest?.[0])
+    .filter(Boolean) as GraphMsgLatest[];
   await mapConcurrent(
-    latestPairs,
+    latest,
     24,
-    async ({ latest }) => latest && (await hydrateCid(latest.cid))
+    async (m) => m && (await fetchIpfsJson(m.cid))
   );
 
-  // Now shape per creation
   return Promise.all(
     raws.map(async (c) => {
-      const latest = c.abrahamLatest?.[0];
-
-      const latestJson = latest ? await hydrateCid(latest.cid) : null;
+      const latestOwner = c.abrahamLatest?.[0] || null;
+      const latestJson = latestOwner
+        ? await fetchIpfsJson(latestOwner.cid)
+        : null;
       const imageUrl = firstMediaUrlFromJson(latestJson) ?? "";
       const description = latestJson?.content ?? "(no description)";
 
-      // Blessings (we will NOT hydrate content/media in list for efficiency)
-      const blessingsRaw: Blessing[] = c.messages
+      // Tail is returned DESC; reverse to ASC for UI logic
+      const tailAsc = [...c.messagesTail].reverse();
+
+      // derive blessings list (placeholders; no IPFS hydration here)
+      const blessings: Blessing[] = tailAsc
         .filter((m) => m.author.toLowerCase() !== OWNER)
         .map((m) => ({
           author: m.author,
-          content: "", // placeholder (we avoid list hydration)
+          content: "", // placeholder
           praiseCount: m.praiseCount,
           timestamp: m.timestamp,
           messageUuid: m.uuid,
           creationId: c.id,
         }));
 
-      // Total praises across messages
-      const totalPraises = c.messages.reduce(
-        (sum, m) => sum + m.praiseCount,
-        0
-      );
-
-      // Messages with placeholders (we avoid list hydration)
-      const messages: SubgraphMessage[] = c.messages.map((m) => ({
+      // messages for UI computation (placeholders)
+      const messages: SubgraphMessage[] = tailAsc.map((m) => ({
         uuid: m.uuid,
         author: m.author,
-        content: "", // placeholder
-        media: null, // placeholder
+        content: "",
+        media: null,
         praiseCount: m.praiseCount,
         timestamp: m.timestamp,
       }));
+
+      // sum praises in tail (used for "most-praised" sorting; fast approximate)
+      const tailPraiseSum = tailAsc.reduce((sum, m) => sum + m.praiseCount, 0);
 
       return {
         id: c.id,
         closed: c.closed,
         image: imageUrl,
         description,
-        praiseCount: latest?.praiseCount ?? 0,
-        messageUuid: latest?.uuid ?? "",
+        praiseCount: latestOwner?.praiseCount ?? 0,
+        messageUuid: latestOwner?.uuid ?? "",
         ethTotal: asEthFloat(c.ethSpent),
-        blessingCnt: blessingsRaw.length,
+        blessingCnt: blessings.length,
         firstMessageAt: c.firstMessageAt,
         lastActivityAt: c.lastActivityAt,
-        blessings: blessingsRaw,
+        blessings,
         messages,
-        totalPraises,
+        tailPraiseSum,
       };
     })
   );
@@ -332,7 +331,7 @@ export async function GET(req: NextRequest) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: LIST_QUERY,
-          variables: { first, skip, msgLimit: MSG_LIMIT, owner: OWNER },
+          variables: { first, skip, msgTail: MSG_TAIL, owner: OWNER },
         }),
         next: { revalidate: 0 },
       }).then((r) => r.json());
@@ -343,18 +342,25 @@ export async function GET(req: NextRequest) {
         data.creations as GraphCreation[]
       );
       const creations: CreationItem[] = shaped.map(
-        ({ totalPraises, ...rest }) => rest as CreationItem
+        ({ tailPraiseSum, ...rest }) => rest as CreationItem
       );
 
       return NextResponse.json({ creations }, { status: 200 });
     }
 
-    /* ------ SLOW PATH: global most-praised ordering ------ */
+    /* ------ SLOWER PATH: global most-praised ordering (parallel pages) ------ */
     const neededRows = skip + first;
-    const acc: GraphCreation[] = [];
-    let graphSkip = 0;
 
-    while (acc.length < neededRows && acc.length < PRAISE_SORT_LIMIT) {
+    // compute how many pages we likely need, then fetch in parallel (bounded)
+    const pages: number[] = [];
+    for (let i = 0; i < Math.ceil(neededRows / GRAPH_PAGE_SIZE); i++) {
+      pages.push(i);
+    }
+    // always fetch at least one page
+    if (pages.length === 0) pages.push(0);
+
+    const parallelFetch = async (pageIdx: number) => {
+      const graphSkip = pageIdx * GRAPH_PAGE_SIZE;
       const { data, errors } = await fetch(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -363,31 +369,36 @@ export async function GET(req: NextRequest) {
           variables: {
             first: GRAPH_PAGE_SIZE,
             skip: graphSkip,
-            msgLimit: MSG_LIMIT,
+            msgTail: MSG_TAIL,
             owner: OWNER,
           },
         }),
         next: { revalidate: 0 },
       }).then((r) => r.json());
-
       if (errors) throw new Error(errors.map((e: any) => e.message).join(", "));
+      return (data.creations || []) as GraphCreation[];
+    };
 
-      const batch: GraphCreation[] = data.creations;
-      if (!batch || batch.length === 0) break;
+    // Fetch initial pages in parallel
+    const firstBatch = await Promise.all(pages.map((p) => parallelFetch(p)));
+    const acc = firstBatch.flat();
 
-      acc.push(...batch);
-      graphSkip += GRAPH_PAGE_SIZE;
+    // If still not enough (rare), continue sequentially up to PRAISE_SORT_LIMIT
+    let page = pages.length;
+    while (acc.length < neededRows && acc.length < PRAISE_SORT_LIMIT) {
+      const more = await parallelFetch(page++);
+      if (!more.length) break;
+      acc.push(...more);
     }
 
-    /* shape + global sort */
     const shaped = await shapeCreationsList(acc);
-    shaped.sort((a, b) => b.totalPraises - a.totalPraises);
+    shaped.sort((a, b) => b.tailPraiseSum - a.tailPraiseSum);
 
-    const page: CreationItem[] = shaped
+    const pageOut: CreationItem[] = shaped
       .slice(skip, skip + first)
-      .map(({ totalPraises, ...rest }) => rest as CreationItem);
+      .map(({ tailPraiseSum, ...rest }) => rest as CreationItem);
 
-    return NextResponse.json({ creations: page }, { status: 200 });
+    return NextResponse.json({ creations: pageOut }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json(
       { error: e.message || String(e) },

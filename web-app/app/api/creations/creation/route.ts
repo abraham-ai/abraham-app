@@ -6,7 +6,7 @@ import {
   Blessing,
 } from "@/types/abraham";
 
-export const revalidate = 0;
+export const revalidate = 45;
 
 const ENDPOINT =
   "https://api.studio.thegraph.com/query/102152/abraham/version/latest";
@@ -54,7 +54,7 @@ const DETAIL_QUERY = /* GraphQL */ `
   }
 `;
 
-/* -------- IPFS helpers (same as list route) -------- */
+/* -------- IPFS helpers -------- */
 type IpfsMediaItem = { src: string; type?: string; mime?: string };
 type IpfsMessageJSON = {
   version?: number;
@@ -166,16 +166,23 @@ export async function GET(req: NextRequest) {
   try {
     if (!OWNER) {
       throw new Error(
-        "Missing NEXT_PUBLIC_OWNER_ADDRESS env var (required for subgraph query filtering)."
+        "Missing NEXT_PUBLIC_OWNER_ADDRESS env var (required for subgraph filtering)."
       );
     }
+
+    // Respect optional msgLimit param but clamp to The Graph’s max (1000)
+    const rawLimit = Number(req.nextUrl.searchParams.get("msgLimit") || "500");
+    const MSG_LIMIT = Math.max(
+      0,
+      Math.min(isFinite(rawLimit) ? rawLimit : 500, 1000)
+    );
 
     const { data, errors } = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query: DETAIL_QUERY,
-        variables: { id, msgLimit: 1000, owner: OWNER },
+        variables: { id, msgLimit: MSG_LIMIT, owner: OWNER },
       }),
       next: { revalidate: 0 },
     }).then((r) => r.json());
@@ -186,13 +193,13 @@ export async function GET(req: NextRequest) {
 
     const c: GraphCreationDetail = data.creation;
 
-    // Dedup all CIDs and hydrate with concurrency limit
+    // Dedup CIDs and hydrate
     const allCids = Array.from(
       new Set(c.messages.map((m) => m.cid).filter(Boolean))
     );
     await mapConcurrent(allCids, 24, async (cid) => await hydrateCid(cid));
 
-    // Build full hydrated messages
+    // Build hydrated messages
     const messages: SubgraphMessage[] = await mapConcurrent(
       c.messages,
       24,
@@ -209,10 +216,7 @@ export async function GET(req: NextRequest) {
       }
     );
 
-    // Split blessings vs owner
-    const abrahamMsgs = messages.filter(
-      (m) => m.author.toLowerCase() === OWNER
-    );
+    // Blessings vs owner
     const blessingsRaw: Blessing[] = messages
       .filter((m) => m.author.toLowerCase() !== OWNER)
       .map((m) => ({
@@ -220,14 +224,15 @@ export async function GET(req: NextRequest) {
         content: m.content,
         praiseCount: m.praiseCount,
         timestamp: m.timestamp,
-        messageUuid: m.uuid,
         creationId: c.id,
+        messageUuid: m.uuid,
       }));
 
-    // Latest abraham for hero image/desc
-    const latest = c.abrahamLatest?.[0]
-      ? messages.find((m) => m.uuid === c.abrahamLatest[0].uuid)
-      : abrahamMsgs[abrahamMsgs.length - 1];
+    // Latest owner (for hero)
+    const latestOwnerUuid = c.abrahamLatest?.[0]?.uuid;
+    const latest =
+      (latestOwnerUuid && messages.find((m) => m.uuid === latestOwnerUuid)) ||
+      messages.filter((m) => m.author.toLowerCase() === OWNER).slice(-1)[0];
 
     const creation: CreationItem = {
       id: c.id,
