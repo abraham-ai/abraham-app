@@ -1,6 +1,7 @@
+// app/creation/[id]/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2Icon, CircleXIcon } from "lucide-react";
 import axios from "axios";
 
@@ -14,22 +15,22 @@ import { useAuth } from "@/context/auth-context";
 
 const OWNER = process.env.NEXT_PUBLIC_OWNER_ADDRESS!.toLowerCase();
 
-/* ───────────────────────────────────────── page */
 export default function CreationPage({ params }: { params: { id: string } }) {
   const { loggedIn, authState } = useAuth();
   const userAddr = authState.walletAddress?.toLowerCase();
   const [creation, setCreation] = useState<CreationItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fullFetchedRef = useRef(false);
 
-  /* fetch single creation */
+  /* fetch lite first */
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
         const { data } = await axios.get<CreationItem>(
-          `/api/creations/creation?creationId=${params.id}`
+          `/api/creations/creation?creationId=${params.id}` // lite is default
         );
         if (!cancelled) {
           setCreation(data);
@@ -46,7 +47,74 @@ export default function CreationPage({ params }: { params: { id: string } }) {
     };
   }, [params.id, loggedIn, userAddr]);
 
-  /* scroll to bottom when loaded */
+  /* background fetch FULL after first paint / idle, then merge */
+  useEffect(() => {
+    if (!creation || fullFetchedRef.current) return;
+
+    let cancelled = false;
+    const fetchFull = async () => {
+      try {
+        const res = await fetch(
+          `/api/creations/creation?creationId=${params.id}&mode=full`,
+          { cache: "no-store" }
+        );
+        if (!res.ok) return;
+        const full = (await res.json()) as CreationItem;
+        if (cancelled) return;
+
+        // Only merge if full actually has more messages
+        setCreation((prev) => {
+          if (!prev) return full;
+
+          // Dedupe by uuid, prefer optimistic messages (prev) for identical uuid
+          const map = new Map<string, SubgraphMessage>();
+          for (const m of full.messages) map.set(m.uuid, m);
+          for (const m of prev.messages)
+            map.set(m.uuid, { ...map.get(m.uuid), ...m });
+
+          const mergedMessages = Array.from(map.values()).sort(
+            (a, b) => Number(a.timestamp) - Number(b.timestamp)
+          );
+
+          // Rebuild blessings from merged messages
+          const mergedBlessings = mergedMessages
+            .filter((m) => m.author.toLowerCase() !== OWNER)
+            .map((m) => ({
+              author: m.author,
+              content: m.content,
+              praiseCount: m.praiseCount,
+              timestamp: m.timestamp,
+              creationId: prev.id,
+              messageUuid: m.uuid,
+            }));
+
+          return {
+            ...full,
+            messages: mergedMessages,
+            blessings: mergedBlessings,
+            blessingCnt: mergedBlessings.length,
+          };
+        });
+
+        fullFetchedRef.current = true;
+      } catch {
+        // ignore background errors
+      }
+    };
+
+    // schedule after paint / idle for best TTI
+    if (typeof (window as any).requestIdleCallback === "function") {
+      (window as any).requestIdleCallback(fetchFull, { timeout: 1500 });
+    } else {
+      setTimeout(fetchFull, 250);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [creation, params.id]);
+
+  /* scroll to bottom when loaded lite/full */
   useEffect(() => {
     if (!loading && creation) {
       setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
@@ -82,7 +150,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
   }) =>
     setCreation((prev) => {
       if (!prev) return prev;
-      if (prev.closed) return prev; // extra safety
+      if (prev.closed) return prev;
 
       const msgs = [...prev.messages];
       const lastAbrahamIdx = msgs
@@ -102,6 +170,9 @@ export default function CreationPage({ params }: { params: { id: string } }) {
         timestamp: ts,
       };
 
+      // Dedup if already merged by full
+      if (msgs.some((m) => m.uuid === newMsg.uuid)) return prev;
+
       msgs.splice(lastAbrahamIdx + 1, 0, newMsg);
 
       return {
@@ -119,7 +190,6 @@ export default function CreationPage({ params }: { params: { id: string } }) {
       };
     });
 
-  /* ───────────── render ───────────── */
   return (
     <>
       <AppBar />
@@ -140,50 +210,43 @@ export default function CreationPage({ params }: { params: { id: string } }) {
 
         {!loading && !error && creation && (
           <div className="flex flex-col items-center border-x">
-            {timeline.map((g) => {
-              const image =
-                g.abraham.media && g.abraham.media.startsWith("ipfs://")
-                  ? g.abraham.media.replace(
-                      /^ipfs:\/\//,
-                      "https://gateway.pinata.cloud/ipfs/"
-                    )
-                  : g.abraham.media || "";
+            {timeline.map((g) => (
+              <div key={g.abraham.uuid} className="w-full">
+                <CreationCard
+                  creation={{
+                    ...creation,
+                    image: g.abraham.media
+                      ? g.abraham.media.replace(
+                          /^ipfs:\/\//,
+                          "https://gateway.pinata.cloud/ipfs/"
+                        )
+                      : "",
+                    description: g.abraham.content,
+                    praiseCount: g.abraham.praiseCount,
+                    messageUuid: g.abraham.uuid,
+                    timestamp: g.abraham.timestamp,
+                  }}
+                />
+                <Blessings
+                  blessings={[...g.blessings]
+                    .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+                    .map((b) => ({
+                      author: b.author,
+                      content: b.content,
+                      praiseCount: b.praiseCount,
+                      timestamp: b.timestamp,
+                      creationId: creation.id,
+                      messageUuid: b.uuid,
+                    }))}
+                  closed={creation.closed}
+                />
+              </div>
+            ))}
 
-              return (
-                <div key={g.abraham.uuid} className="w-full">
-                  <CreationCard
-                    creation={{
-                      ...creation,
-                      image,
-                      description: g.abraham.content,
-                      praiseCount: g.abraham.praiseCount,
-                      messageUuid: g.abraham.uuid,
-                      timestamp: g.abraham.timestamp,
-                    }}
-                  />
-                  <Blessings
-                    blessings={[...g.blessings]
-                      .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
-                      .map((b) => ({
-                        author: b.author,
-                        content: b.content,
-                        praiseCount: b.praiseCount,
-                        timestamp: b.timestamp,
-                        creationId: creation.id,
-                        messageUuid: b.uuid,
-                      }))}
-                    closed={creation.closed}
-                  />
-                </div>
-              );
-            })}
-
-            {/* bless box hidden if session closed */}
             {!creation.closed && (
               <BlessBox creation={creation} onNewBlessing={handleNewBlessing} />
             )}
 
-            {/* closed creation message */}
             {creation.closed && (
               <div className="w-full max-w-2xl px-4 py-6 text-center">
                 <p className="text-gray-500 italic">
