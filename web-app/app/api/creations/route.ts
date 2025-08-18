@@ -14,8 +14,7 @@ const ENDPOINT =
 const GRAPH_PAGE_SIZE = 500;
 const PRAISE_SORT_LIMIT = 2_000; // safety cap for most-praised scan
 
-// We only need a short "tail" of messages for the feed to compute attached blessings.
-// This keeps payload tiny while preserving accurate UI for the latest update.
+// Short tail so feed can compute attached blessings fast
 const MSG_TAIL = 32;
 
 export const revalidate = 0;
@@ -36,9 +35,9 @@ const IPFS_GATEWAYS = [
 
 /* ------------- GraphQL ------------- */
 /**
- * Super-lean list query:
- * - `abrahamLatest`: 1 latest owner message (for CID → image/desc hydration)
- * - `messagesTail`: short recent window w/o CID (UI needs author/uuid/timestamp/praiseCount)
+ * We fetch:
+ * - `abrahamLatest`: newest owner message (has CID)
+ * - `messagesTail`: short tail (DESC) with **cid** so we can hydrate owner candidates
  */
 const LIST_QUERY = /* GraphQL */ `
   query AllCreations(
@@ -78,6 +77,7 @@ const LIST_QUERY = /* GraphQL */ `
       ) {
         uuid
         author
+        cid
         praiseCount
         timestamp
       }
@@ -120,7 +120,6 @@ async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
     return await fetch(url, {
       signal: ctrl.signal,
       cache: "force-cache",
-      // immutable content — safe to cache long
       next: { revalidate: 60 * 60 * 24 },
       headers: { Accept: "application/json" },
     });
@@ -218,6 +217,7 @@ type GraphMsgLatest = {
 type GraphMsgTail = {
   uuid: string;
   author: string;
+  cid: string;
   praiseCount: number;
   timestamp: string;
 };
@@ -234,35 +234,59 @@ function asEthFloat(weiStr: string): number {
 
 /**
  * Shapes raw creations:
- * - hydrate ONLY latest Abraham JSON per creation
- * - set messages to the *ascending* order of the recent tail (no cid/content/media)
+ * - Hydrate **candidate owner messages** (latest + owner msgs in tail) until we find the
+ *   most recent one **with media** → hero image/description.
+ * - Keep tail for UI blessing math (no extra hydration for non-owners).
  */
 async function shapeCreationsList(
   raws: GraphCreation[]
 ): Promise<(CreationItem & { tailPraiseSum: number })[]> {
-  // Warm up IPFS JSON for the latest owner message per creation
-  const latest = raws
-    .map((c) => c.abrahamLatest?.[0])
-    .filter(Boolean) as GraphMsgLatest[];
-  await mapConcurrent(
-    latest,
-    24,
-    async (m) => m && (await fetchIpfsJson(m.cid))
-  );
-
   return Promise.all(
     raws.map(async (c) => {
       const latestOwner = c.abrahamLatest?.[0] || null;
-      const latestJson = latestOwner
-        ? await fetchIpfsJson(latestOwner.cid)
-        : null;
-      const imageUrl = firstMediaUrlFromJson(latestJson) ?? "";
-      const description = latestJson?.content ?? "(no description)";
 
-      // Tail is returned DESC; reverse to ASC for UI logic
+      // Owner candidates = latest + any owner msgs found in tail (DESC → keep timestamp ordering)
+      const ownerCandidatesDesc = [
+        ...(latestOwner ? [latestOwner] : []),
+        ...c.messagesTail.filter((m) => m.author.toLowerCase() === OWNER),
+      ];
+
+      // Dedup by uuid, keep descending order (most recent first)
+      const seen = new Set<string>();
+      const ownerCandidates = ownerCandidatesDesc.filter((m) => {
+        if (seen.has(m.uuid)) return false;
+        seen.add(m.uuid);
+        return true;
+      });
+
+      // Hydrate up to 6 candidates, stop at the first that has media
+      let heroImage = "";
+      let heroDescription = "(no description)";
+      let heroPraise = latestOwner?.praiseCount ?? 0;
+      let heroUuid = latestOwner?.uuid ?? "";
+
+      const maxToHydrate = Math.min(ownerCandidates.length, 6);
+      for (let i = 0; i < maxToHydrate; i++) {
+        const m = ownerCandidates[i]!;
+        const json = await fetchIpfsJson(m.cid);
+        const mediaUrl = firstMediaUrlFromJson(json);
+        // set hero to FIRST candidate with media; if none have media, fall back to latestOwner's content
+        if (mediaUrl) {
+          heroImage = mediaUrl;
+          heroDescription = json?.content ?? "(no description)";
+          heroPraise = m.praiseCount;
+          heroUuid = m.uuid;
+          break;
+        }
+        // if first candidate is the true latest and has only text, keep its text as description
+        if (i === 0 && json?.content) {
+          heroDescription = json.content;
+        }
+      }
+
+      // Tail is DESC; reverse to ASC for UI logic
       const tailAsc = [...c.messagesTail].reverse();
 
-      // derive blessings list (placeholders; no IPFS hydration here)
       const blessings: Blessing[] = tailAsc
         .filter((m) => m.author.toLowerCase() !== OWNER)
         .map((m) => ({
@@ -274,7 +298,6 @@ async function shapeCreationsList(
           creationId: c.id,
         }));
 
-      // messages for UI computation (placeholders)
       const messages: SubgraphMessage[] = tailAsc.map((m) => ({
         uuid: m.uuid,
         author: m.author,
@@ -284,16 +307,15 @@ async function shapeCreationsList(
         timestamp: m.timestamp,
       }));
 
-      // sum praises in tail (used for "most-praised" sorting; fast approximate)
       const tailPraiseSum = tailAsc.reduce((sum, m) => sum + m.praiseCount, 0);
 
       return {
         id: c.id,
         closed: c.closed,
-        image: imageUrl,
-        description,
-        praiseCount: latestOwner?.praiseCount ?? 0,
-        messageUuid: latestOwner?.uuid ?? "",
+        image: heroImage, // ← most recent owner msg with media
+        description: heroDescription,
+        praiseCount: heroPraise,
+        messageUuid: heroUuid,
         ethTotal: asEthFloat(c.ethSpent),
         blessingCnt: blessings.length,
         firstMessageAt: c.firstMessageAt,
@@ -351,12 +373,10 @@ export async function GET(req: NextRequest) {
     /* ------ SLOWER PATH: global most-praised ordering (parallel pages) ------ */
     const neededRows = skip + first;
 
-    // compute how many pages we likely need, then fetch in parallel (bounded)
     const pages: number[] = [];
     for (let i = 0; i < Math.ceil(neededRows / GRAPH_PAGE_SIZE); i++) {
       pages.push(i);
     }
-    // always fetch at least one page
     if (pages.length === 0) pages.push(0);
 
     const parallelFetch = async (pageIdx: number) => {
@@ -379,11 +399,9 @@ export async function GET(req: NextRequest) {
       return (data.creations || []) as GraphCreation[];
     };
 
-    // Fetch initial pages in parallel
     const firstBatch = await Promise.all(pages.map((p) => parallelFetch(p)));
     const acc = firstBatch.flat();
 
-    // If still not enough (rare), continue sequentially up to PRAISE_SORT_LIMIT
     let page = pages.length;
     while (acc.length < neededRows && acc.length < PRAISE_SORT_LIMIT) {
       const more = await parallelFetch(page++);
