@@ -21,8 +21,7 @@ const IPFS_GATEWAYS = [
   "https://gateway.pinata.cloud/ipfs/",
 ] as const;
 
-// For first load: fetch a small recent window and hydrate only
-// the latest Abraham + its attached blessings.
+// For first load: short tail
 const TAIL_FIRST_LOAD = 48;
 
 /* -------- GraphQL -------- */
@@ -34,7 +33,6 @@ const DETAIL_QUERY_LITE = /* GraphQL */ `
       ethSpent
       firstMessageAt
       lastActivityAt
-      # latest Abraham message (has CID)
       abrahamLatest: messages(
         first: 1
         orderBy: timestamp
@@ -47,7 +45,6 @@ const DETAIL_QUERY_LITE = /* GraphQL */ `
         praiseCount
         timestamp
       }
-      # short recent tail (DESC) with CIDs so we can hydrate just what we need
       tail: messages(first: $tail, orderBy: timestamp, orderDirection: desc) {
         uuid
         author
@@ -210,8 +207,7 @@ function asEthFloat(weiStr: string): number {
   return Number((bi / BigInt(1e14)).toString()) / 1e4;
 }
 
-/* -------- Lite shaping: hydrate only what’s needed for first render -------- */
-
+/* -------- Lite shaping: include ALL owner msgs in tail; attach blessings to latest -------- */
 type GraphMsgLite = {
   uuid: string;
   author: string;
@@ -221,71 +217,100 @@ type GraphMsgLite = {
 };
 type GraphCreationLite = Omit<SubgraphCreation, "messages"> & {
   abrahamLatest: GraphMsgLite[];
-  tail: GraphMsgLite[]; // DESC order
+  tail: GraphMsgLite[]; // DESC
 };
 
-/**
- * Build a minimal CreationItem for first load:
- *  - Hydrate latest Abraham JSON (image/description)
- *  - Find blessings attached to it (contiguous non-owner msgs after it)
- *  - Hydrate only those blessings (content)
- *  - Return messages array containing [latestAbraham, ...attachedBlessings]
- */
 async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
-  const latest = c.abrahamLatest?.[0];
-  if (!latest) {
-    // Fallback (shouldn't happen, sessions start with an owner msg)
-    return {
-      id: c.id,
-      closed: c.closed,
-      image: "",
-      description: "(no description)",
-      praiseCount: 0,
-      messageUuid: "",
-      ethTotal: asEthFloat(c.ethSpent),
-      blessingCnt: 0,
-      blessings: [],
-      messages: [],
-      firstMessageAt: c.firstMessageAt,
-      lastActivityAt: c.lastActivityAt,
-    };
-  }
+  const latest = c.abrahamLatest?.[0] || null;
 
-  // Tail is DESC; flip to ASC for scanning
+  // Tail to ASC for scanning
   const tailAsc = [...(c.tail || [])].reverse();
 
-  // Ensure latest Abraham is included (it might be older than TAIL_FIRST_LOAD)
-  // If not in tail, we still include it explicitly.
-  const idxLatestInTail = tailAsc.findIndex((m) => m.uuid === latest.uuid);
+  // Owner msgs in tail (ASC). Ensure latest is included even if older than tail
+  const ownerInTail = tailAsc.filter((m) => m.author.toLowerCase() === OWNER);
+  const ownerAll: GraphMsgLite[] = (() => {
+    const list =
+      latest && !ownerInTail.some((o) => o.uuid === latest.uuid)
+        ? [...ownerInTail, latest]
+        : ownerInTail;
+    // sort ascending by timestamp (as strings)
+    return [...list].sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+  })();
+
+  // Blessings attached to the latest owner (contiguous non-owner after it)
   const blessingsForLatest: GraphMsgLite[] = [];
-  if (idxLatestInTail !== -1) {
-    for (let i = idxLatestInTail + 1; i < tailAsc.length; i++) {
-      const m = tailAsc[i];
-      const isOwner = m.author.toLowerCase() === OWNER;
-      if (isOwner) break; // next Abraham update starts
-      blessingsForLatest.push(m);
+  if (latest) {
+    // find idx of latest among ASC union: prefer tailAsc index
+    const idxLatest =
+      tailAsc.findIndex((m) => m.uuid === latest.uuid) !== -1
+        ? tailAsc.findIndex((m) => m.uuid === latest.uuid)
+        : -1;
+
+    if (idxLatest !== -1) {
+      for (let i = idxLatest + 1; i < tailAsc.length; i++) {
+        const m = tailAsc[i];
+        if (m.author.toLowerCase() === OWNER) break;
+        blessingsForLatest.push(m);
+      }
     }
   }
 
-  // Hydrate just latest Abraham + its attached blessings
-  const hydrateCids = [latest, ...blessingsForLatest].map((m) => m.cid);
-  const dedupCids = Array.from(new Set(hydrateCids));
-  await mapConcurrent(dedupCids, 24, (cid) => fetchIpfsJson(cid));
+  // Hydrate: all owner messages in tail + latest (if added),
+  // and blessings attached to latest only
+  const hydrateCids = [
+    ...ownerAll.map((m) => m.cid),
+    ...blessingsForLatest.map((m) => m.cid),
+  ];
+  const dedup = Array.from(new Set(hydrateCids));
+  await mapConcurrent(dedup, 24, (cid) => fetchIpfsJson(cid));
 
-  const latestJson = await fetchIpfsJson(latest.cid);
-  const heroImage = firstMediaUrlFromJson(latestJson) ?? "";
-  const heroDescription = latestJson?.content ?? "(no description)";
+  // Hero image = most recent owner message **with media** (fall back to latest content)
+  let heroImage = "";
+  let heroDescription = "(no description)";
+  let heroPraise = latest?.praiseCount ?? 0;
+  let heroUuid = latest?.uuid ?? "";
 
-  const messages: SubgraphMessage[] = [
-    {
-      uuid: latest.uuid,
-      author: latest.author,
-      content: heroDescription,
-      media: heroImage,
-      praiseCount: latest.praiseCount,
-      timestamp: latest.timestamp,
-    },
-    ...(await mapConcurrent(blessingsForLatest, 24, async (m) => {
+  const ownerDesc = [...ownerAll].sort(
+    (a, b) => Number(b.timestamp) - Number(a.timestamp)
+  );
+  for (const m of ownerDesc) {
+    const json = await fetchIpfsJson(m.cid);
+    const media = firstMediaUrlFromJson(json);
+    if (media) {
+      heroImage = media;
+      heroDescription = json?.content ?? "(no description)";
+      heroPraise = m.praiseCount;
+      heroUuid = m.uuid;
+      break;
+    }
+    if (m.uuid === latest?.uuid && json?.content) {
+      heroDescription = json.content;
+    }
+  }
+
+  // Build messages for first paint:
+  // - All owner messages (hydrated)
+  // - Plus attached blessings for latest owner only (hydrated)
+  const ownerMessagesHydrated: SubgraphMessage[] = await mapConcurrent(
+    ownerAll,
+    24,
+    async (m) => {
+      const json = await fetchIpfsJson(m.cid);
+      return {
+        uuid: m.uuid,
+        author: m.author,
+        content: json?.content ?? "",
+        media: firstMediaUrlFromJson(json),
+        praiseCount: m.praiseCount,
+        timestamp: m.timestamp,
+      };
+    }
+  );
+
+  const latestBlessingsHydrated: SubgraphMessage[] = await mapConcurrent(
+    blessingsForLatest,
+    24,
+    async (m) => {
       const json = await fetchIpfsJson(m.cid);
       return {
         uuid: m.uuid,
@@ -294,11 +319,24 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
         media: null,
         praiseCount: m.praiseCount,
         timestamp: m.timestamp,
-      } as SubgraphMessage;
-    })),
-  ];
+      };
+    }
+  );
 
-  const blessings: Blessing[] = messages.slice(1).map((m) => ({
+  // Interleave: put latest blessings right after the latest owner msg
+  let messages: SubgraphMessage[] = [];
+  if (latest) {
+    for (const m of ownerMessagesHydrated) {
+      messages.push(m);
+      if (m.uuid === latest.uuid) {
+        messages.push(...latestBlessingsHydrated);
+      }
+    }
+  } else {
+    messages = ownerMessagesHydrated;
+  }
+
+  const blessings: Blessing[] = latestBlessingsHydrated.map((m) => ({
     author: m.author,
     content: m.content,
     praiseCount: m.praiseCount,
@@ -312,8 +350,8 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
     closed: c.closed,
     image: heroImage,
     description: heroDescription,
-    praiseCount: latest.praiseCount,
-    messageUuid: latest.uuid,
+    praiseCount: heroPraise,
+    messageUuid: heroUuid,
     ethTotal: asEthFloat(c.ethSpent),
     blessingCnt: blessings.length,
     blessings,
@@ -323,8 +361,7 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
   };
 }
 
-/* -------- Full shaping (unchanged behaviour) -------- */
-
+/* -------- Full shaping (unchanged) -------- */
 type GraphMsgFull = {
   uuid: string;
   author: string;
@@ -338,7 +375,6 @@ type GraphCreationFull = Omit<SubgraphCreation, "messages"> & {
 };
 
 async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
-  // Dedup CIDs & hydrate
   const allCids = Array.from(new Set(c.messages.map((m) => m.cid)));
   await mapConcurrent(allCids, 32, (cid) => fetchIpfsJson(cid));
 
@@ -363,6 +399,26 @@ async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
     (latestId && messages.find((m) => m.uuid === latestId)) ||
     [...messages].reverse().find((m) => m.author.toLowerCase() === OWNER);
 
+  // Hero = most recent owner WITH media (fallback to latest content)
+  const ownerDesc = [...messages]
+    .filter((m) => m.author.toLowerCase() === OWNER)
+    .sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+
+  let heroImage = latest?.media ?? "";
+  let heroDescription = latest?.content ?? "(no description)";
+  let heroPraise = latest?.praiseCount ?? 0;
+  let heroUuid = latest?.uuid ?? "";
+
+  for (const m of ownerDesc) {
+    if (m.media) {
+      heroImage = m.media;
+      heroDescription = m.content;
+      heroPraise = m.praiseCount;
+      heroUuid = m.uuid;
+      break;
+    }
+  }
+
   const blessings: Blessing[] = messages
     .filter((m) => m.author.toLowerCase() !== OWNER)
     .map((m) => ({
@@ -377,10 +433,10 @@ async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
   return {
     id: c.id,
     closed: c.closed,
-    image: latest?.media ?? "",
-    description: latest?.content ?? "(no description)",
-    praiseCount: latest?.praiseCount ?? 0,
-    messageUuid: latest?.uuid ?? "",
+    image: heroImage,
+    description: heroDescription,
+    praiseCount: heroPraise,
+    messageUuid: heroUuid,
     ethTotal: asEthFloat(c.ethSpent),
     blessingCnt: blessings.length,
     blessings,
@@ -391,7 +447,6 @@ async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
 }
 
 /* -------- Route -------- */
-
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("creationId");
   if (!id) return NextResponse.json({ error: "missing id" }, { status: 400 });
@@ -406,7 +461,6 @@ export async function GET(req: NextRequest) {
     }
 
     if (mode === "full") {
-      // Full (hydrated) detail — heavier
       const { data, errors } = await fetch(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -425,7 +479,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(creation, { status: 200 });
     }
 
-    // Lite (default) — super fast for first render
+    // LITE
     const { data, errors } = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
