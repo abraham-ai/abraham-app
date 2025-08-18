@@ -21,7 +21,7 @@ const IPFS_GATEWAYS = [
   "https://gateway.pinata.cloud/ipfs/",
 ] as const;
 
-// For first load: short tail
+// Keep tail small for speed; hydrate all messages within it
 const TAIL_FIRST_LOAD = 48;
 
 /* -------- GraphQL -------- */
@@ -33,6 +33,7 @@ const DETAIL_QUERY_LITE = /* GraphQL */ `
       ethSpent
       firstMessageAt
       lastActivityAt
+      # newest Abraham message (for fallback + hero selection)
       abrahamLatest: messages(
         first: 1
         orderBy: timestamp
@@ -45,6 +46,7 @@ const DETAIL_QUERY_LITE = /* GraphQL */ `
         praiseCount
         timestamp
       }
+      # short recent tail (DESC) with cid so we can hydrate all items in the tail
       tail: messages(first: $tail, orderBy: timestamp, orderDirection: desc) {
         uuid
         author
@@ -207,7 +209,7 @@ function asEthFloat(weiStr: string): number {
   return Number((bi / BigInt(1e14)).toString()) / 1e4;
 }
 
-/* -------- Lite shaping: include ALL owner msgs in tail; attach blessings to latest -------- */
+/* -------- Lite shaping: hydrate the ENTIRE tail (owners + blessings) -------- */
 type GraphMsgLite = {
   uuid: string;
   author: string;
@@ -221,129 +223,85 @@ type GraphCreationLite = Omit<SubgraphCreation, "messages"> & {
 };
 
 async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
-  const latest = c.abrahamLatest?.[0] || null;
+  const latestOwner = c.abrahamLatest?.[0] || null;
 
-  // Tail to ASC for scanning
+  // Tail to ASC for timeline grouping
   const tailAsc = [...(c.tail || [])].reverse();
 
-  // Owner msgs in tail (ASC). Ensure latest is included even if older than tail
-  const ownerInTail = tailAsc.filter((m) => m.author.toLowerCase() === OWNER);
-  const ownerAll: GraphMsgLite[] = (() => {
-    const list =
-      latest && !ownerInTail.some((o) => o.uuid === latest.uuid)
-        ? [...ownerInTail, latest]
-        : ownerInTail;
-    // sort ascending by timestamp (as strings)
-    return [...list].sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
-  })();
+  // If the latest owner is outside the tail (rare), include it explicitly
+  const hasLatestInTail =
+    !!latestOwner && tailAsc.some((m) => m.uuid === latestOwner.uuid);
+  const unionAsc: GraphMsgLite[] = hasLatestInTail
+    ? tailAsc
+    : latestOwner
+    ? [...tailAsc, latestOwner].sort(
+        (a, b) => Number(a.timestamp) - Number(b.timestamp)
+      )
+    : tailAsc;
 
-  // Blessings attached to the latest owner (contiguous non-owner after it)
-  const blessingsForLatest: GraphMsgLite[] = [];
-  if (latest) {
-    // find idx of latest among ASC union: prefer tailAsc index
-    const idxLatest =
-      tailAsc.findIndex((m) => m.uuid === latest.uuid) !== -1
-        ? tailAsc.findIndex((m) => m.uuid === latest.uuid)
-        : -1;
+  // Hydrate ALL messages in unionAsc (owners & blessings)
+  const dedupCids = Array.from(new Set(unionAsc.map((m) => m.cid)));
+  await mapConcurrent(dedupCids, 24, (cid) => fetchIpfsJson(cid));
 
-    if (idxLatest !== -1) {
-      for (let i = idxLatest + 1; i < tailAsc.length; i++) {
-        const m = tailAsc[i];
-        if (m.author.toLowerCase() === OWNER) break;
-        blessingsForLatest.push(m);
-      }
+  // Build hydrated messages in ASC order
+  const hydratedAsc: SubgraphMessage[] = await mapConcurrent(
+    unionAsc,
+    24,
+    async (m) => {
+      const json = await fetchIpfsJson(m.cid);
+      const isOwner = m.author.toLowerCase() === OWNER;
+      return {
+        uuid: m.uuid,
+        author: m.author,
+        content: json?.content ?? "",
+        media: isOwner ? firstMediaUrlFromJson(json) : null,
+        praiseCount: m.praiseCount,
+        timestamp: m.timestamp,
+      };
+    }
+  );
+
+  // Choose hero = most recent owner WITH media; fallback to latest owner's content
+  const ownerDesc = [...hydratedAsc]
+    .filter((m) => m.author.toLowerCase() === OWNER)
+    .sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+
+  // Start with latest (if present)
+  let heroImage = latestOwner ? "" : "";
+  let heroDescription = latestOwner ? "(no description)" : "(no description)";
+  let heroPraise = latestOwner?.praiseCount ?? 0;
+  let heroUuid = latestOwner?.uuid ?? "";
+
+  // fallback to latest owner's hydrated content if found
+  if (latestOwner) {
+    const latestHydrated = hydratedAsc.find((m) => m.uuid === latestOwner.uuid);
+    if (latestHydrated) {
+      heroDescription = latestHydrated.content || "(no description)";
+      heroImage = latestHydrated.media || "";
     }
   }
 
-  // Hydrate: all owner messages in tail + latest (if added),
-  // and blessings attached to latest only
-  const hydrateCids = [
-    ...ownerAll.map((m) => m.cid),
-    ...blessingsForLatest.map((m) => m.cid),
-  ];
-  const dedup = Array.from(new Set(hydrateCids));
-  await mapConcurrent(dedup, 24, (cid) => fetchIpfsJson(cid));
-
-  // Hero image = most recent owner message **with media** (fall back to latest content)
-  let heroImage = "";
-  let heroDescription = "(no description)";
-  let heroPraise = latest?.praiseCount ?? 0;
-  let heroUuid = latest?.uuid ?? "";
-
-  const ownerDesc = [...ownerAll].sort(
-    (a, b) => Number(b.timestamp) - Number(a.timestamp)
-  );
   for (const m of ownerDesc) {
-    const json = await fetchIpfsJson(m.cid);
-    const media = firstMediaUrlFromJson(json);
-    if (media) {
-      heroImage = media;
-      heroDescription = json?.content ?? "(no description)";
+    if (m.media) {
+      heroImage = m.media;
+      heroDescription = m.content;
       heroPraise = m.praiseCount;
       heroUuid = m.uuid;
       break;
     }
-    if (m.uuid === latest?.uuid && json?.content) {
-      heroDescription = json.content;
-    }
   }
 
-  // Build messages for first paint:
-  // - All owner messages (hydrated)
-  // - Plus attached blessings for latest owner only (hydrated)
-  const ownerMessagesHydrated: SubgraphMessage[] = await mapConcurrent(
-    ownerAll,
-    24,
-    async (m) => {
-      const json = await fetchIpfsJson(m.cid);
-      return {
-        uuid: m.uuid,
-        author: m.author,
-        content: json?.content ?? "",
-        media: firstMediaUrlFromJson(json),
-        praiseCount: m.praiseCount,
-        timestamp: m.timestamp,
-      };
-    }
-  );
-
-  const latestBlessingsHydrated: SubgraphMessage[] = await mapConcurrent(
-    blessingsForLatest,
-    24,
-    async (m) => {
-      const json = await fetchIpfsJson(m.cid);
-      return {
-        uuid: m.uuid,
-        author: m.author,
-        content: json?.content ?? "",
-        media: null,
-        praiseCount: m.praiseCount,
-        timestamp: m.timestamp,
-      };
-    }
-  );
-
-  // Interleave: put latest blessings right after the latest owner msg
-  let messages: SubgraphMessage[] = [];
-  if (latest) {
-    for (const m of ownerMessagesHydrated) {
-      messages.push(m);
-      if (m.uuid === latest.uuid) {
-        messages.push(...latestBlessingsHydrated);
-      }
-    }
-  } else {
-    messages = ownerMessagesHydrated;
-  }
-
-  const blessings: Blessing[] = latestBlessingsHydrated.map((m) => ({
-    author: m.author,
-    content: m.content,
-    praiseCount: m.praiseCount,
-    timestamp: m.timestamp,
-    creationId: c.id,
-    messageUuid: m.uuid,
-  }));
+  // Blessings array = all non-owner messages in hydrated tail
+  const blessings: Blessing[] = hydratedAsc
+    .filter((m) => m.author.toLowerCase() !== OWNER)
+    .map((m) => ({
+      author: m.author,
+      content: m.content,
+      praiseCount: m.praiseCount,
+      timestamp: m.timestamp,
+      creationId: c.id,
+      messageUuid: m.uuid,
+    }));
 
   return {
     id: c.id,
@@ -355,7 +313,7 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
     ethTotal: asEthFloat(c.ethSpent),
     blessingCnt: blessings.length,
     blessings,
-    messages,
+    messages: hydratedAsc, // ← contains all owner + blessing messages (ASC) from the tail
     firstMessageAt: c.firstMessageAt,
     lastActivityAt: c.lastActivityAt,
   };
@@ -387,22 +345,19 @@ async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
         uuid: m.uuid,
         author: m.author,
         content: json?.content ?? "",
-        media: firstMediaUrlFromJson(json),
+        media:
+          m.author.toLowerCase() === OWNER ? firstMediaUrlFromJson(json) : null,
         praiseCount: m.praiseCount,
         timestamp: m.timestamp,
       };
     }
   );
 
-  const latestId = c.abrahamLatest?.[0]?.uuid;
-  const latest =
-    (latestId && messages.find((m) => m.uuid === latestId)) ||
-    [...messages].reverse().find((m) => m.author.toLowerCase() === OWNER);
-
-  // Hero = most recent owner WITH media (fallback to latest content)
   const ownerDesc = [...messages]
     .filter((m) => m.author.toLowerCase() === OWNER)
     .sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+
+  const latest = ownerDesc[0];
 
   let heroImage = latest?.media ?? "";
   let heroDescription = latest?.content ?? "(no description)";
@@ -479,7 +434,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(creation, { status: 200 });
     }
 
-    // LITE
+    // LITE: hydrate entire tail (owners + blessings) so messages between Abraham updates are visible
     const { data, errors } = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
