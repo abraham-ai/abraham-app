@@ -226,7 +226,7 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
   const latestOwner = c.abrahamLatest?.[0] || null;
 
   // Tail to ASC for timeline grouping
-  let tailAsc = [...(c.tail || [])].reverse();
+  const tailAsc = [...(c.tail || [])].reverse();
 
   // If the latest owner is outside the tail (rare), include it explicitly
   const hasLatestInTail =
