@@ -1,0 +1,9 @@
+{
+  "extends": "@edenlabs/tsconfig/api.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts", "global.d.ts"],
+  "exclude": ["node_modules", ".turbo", "coverage", "dist", "tests"]
+}
