@@ -1,9 +1,4 @@
 {
-  "private": true,
-  "workspaces": [
-    "web-app",
-    "web-app/packages/*"
-  ],
   "devDependencies": {
     "@nomicfoundation/hardhat-verify": "^2.0.14"
   },
