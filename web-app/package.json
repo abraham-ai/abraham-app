@@ -11,6 +11,7 @@
   "dependencies": {
     "@apollo/client": "^3.12.4",
     "@coinbase/onchainkit": "latest",
+    "@edenlabs/eden-sdk": "workspace:*",
     "@hookform/resolvers": "^3.9.0",
     "@privy-io/react-auth": "^2.18.2",
     "@radix-ui/react-avatar": "^1.1.0",
