@@ -219,7 +219,7 @@ import {
   tasksCreateRequestConfig,
   tasksGetRequestConfig,
   tasksListRequestConfig,
-} from './models'
+} from "./models";
 import {
   AgentsCreateTriggerArguments,
   AgentsCreateTriggerResponse,
@@ -408,27 +408,24 @@ import {
   threadsUnpinMessageRequestConfig,
   toolsGetRequestConfigV2,
   toolsListRequestConfigV2,
-} from './models/v2'
-import { WebAPICallOptions, WebAPICallResult } from './types'
-import { AxiosRequestConfig } from 'axios'
+} from "./models/v2";
+import { WebAPICallOptions, WebAPICallResult } from "./types";
+import { AxiosRequestConfig } from "axios";
 
 export default interface Method<
-  MethodArguments extends WebAPICallOptions,
-  MethodResult extends WebAPICallResult = WebAPICallResult,
+  MethodArguments = unknown,
+  MethodResult = unknown
 > {
-  (options?: MethodArguments): Promise<MethodResult>
+  (options?: MethodArguments): Promise<MethodResult>;
 }
 
-function bindApiCall<
-  Arguments extends WebAPICallOptions,
-  Result extends WebAPICallResult,
->(
+function bindApiCall<Arguments, Result>(
   self: Methods,
-  configFn: (options) => AxiosRequestConfig,
+  configFn: (options: Arguments) => AxiosRequestConfig
 ): Method<Arguments, Result> {
-  // We have to "assert" that the bound method does indeed return the more specific `Result` type instead of just
-  // `WebAPICallResult`
-  return self.apiCall.bind(self, configFn) as Method<Arguments, Result>
+  const adapted = (options: WebAPICallOptions) =>
+    configFn(options as Arguments);
+  return self.apiCall.bind(self, adapted) as Method<Arguments, Result>;
 }
 
 // function bindApiCallAsync<
@@ -446,14 +443,14 @@ function bindApiCall<
 export abstract class Methods {
   public abstract apiCall(
     configFn: (options: WebAPICallOptions) => AxiosRequestConfig,
-    options?: WebAPICallOptions,
-  ): Promise<WebAPICallResult>
+    options?: WebAPICallOptions
+  ): Promise<WebAPICallResult>;
 
   public readonly admin = {
     manna: {
       modify: bindApiCall<AdminMannaModifyArguments, AdminMannaModifyResponse>(
         this,
-        adminMannaModifyRequestConfig,
+        adminMannaModifyRequestConfig
       ),
       vouchers: {
         create: bindApiCall<
@@ -471,7 +468,7 @@ export abstract class Methods {
     media: {
       upload: bindApiCall<AdminMediaUploadArguments, AdminMediaUploadResponse>(
         this,
-        adminMediaUploadRequestConfig,
+        adminMediaUploadRequestConfig
       ),
     },
     concepts: {
@@ -491,65 +488,65 @@ export abstract class Methods {
     apikeys: {
       list: bindApiCall<AdminApiKeysListArguments, AdminApiKeysListResponse>(
         this,
-        adminApiKeysListRequestConfig,
+        adminApiKeysListRequestConfig
       ),
     },
-  }
+  };
 
   public readonly apiKeys = {
     list: bindApiCall<ApiKeysListArguments, ApiKeysListResponse>(
       this,
-      apiKeysListRequestConfig,
+      apiKeysListRequestConfig
     ),
     create: bindApiCall<ApiKeysCreateArguments, ApiKeysCreateResponse>(
       this,
-      apiKeysCreateRequestConfig,
+      apiKeysCreateRequestConfig
     ),
     delete: bindApiCall<ApiKeysDeleteArguments, ApiKeysDeleteResponse>(
       this,
-      apiKeysDeleteRequestConfig,
+      apiKeysDeleteRequestConfig
     ),
-  }
+  };
 
   public readonly characters = {
     create: bindApiCall<CharactersCreateArguments, CharactersCreateResponse>(
       this,
-      charactersCreateRequestConfig,
+      charactersCreateRequestConfig
     ),
     update: bindApiCall<CharactersUpdateArguments, CharactersUpdateResponse>(
       this,
-      charactersUpdateRequestConfig,
+      charactersUpdateRequestConfig
     ),
     delete: bindApiCall<CharactersDeleteArguments, CharactersDeleteResponse>(
       this,
-      charactersDeleteRequestConfig,
+      charactersDeleteRequestConfig
     ),
     list: bindApiCall<CharactersListArguments, CharactersListResponse>(
       this,
-      charactersListRequestConfig,
+      charactersListRequestConfig
     ),
     get: bindApiCall<CharactersGetArguments, CharactersGetResponse>(
       this,
-      charactersGetRequestConfig,
+      charactersGetRequestConfig
     ),
     test: bindApiCall<CharactersTestArguments, CharactersTestResponse>(
       this,
-      charactersTestRequestConfig,
+      charactersTestRequestConfig
     ),
-  }
+  };
 
   public readonly collections = {
     list: bindApiCall<CollectionsListArguments, CollectionsListResponse>(
       this,
-      collectionsListRequestConfig,
+      collectionsListRequestConfig
     ),
     get: bindApiCall<CollectionsGetArguments, CollectionsGetResponse>(
       this,
-      collectionsGetRequestConfig,
+      collectionsGetRequestConfig
     ),
     getV2: bindApiCall<CollectionsV2GetArguments, CollectionsV2GetResponse>(
       this,
-      collectionsV2GetRequestConfig,
+      collectionsV2GetRequestConfig
     ),
     getCreationsV2: bindApiCall<
       CollectionsV2GetCreationsArguments,
@@ -561,7 +558,7 @@ export abstract class Methods {
     >(this, collectionsV2GetLightRequestConfig),
     create: bindApiCall<CollectionsCreateArguments, CollectionsCreateResponse>(
       this,
-      collectionsCreateRequestConfig,
+      collectionsCreateRequestConfig
     ),
     createV2: bindApiCall<
       CollectionsV2CreateArguments,
@@ -569,11 +566,11 @@ export abstract class Methods {
     >(this, collectionsV2CreateRequestConfig),
     update: bindApiCall<CollectionsUpdateArguments, CollectionsUpdateResponse>(
       this,
-      collectionsUpdateRequestConfig,
+      collectionsUpdateRequestConfig
     ),
     delete: bindApiCall<CollectionsDeleteArguments, CollectionsDeleteResponse>(
       this,
-      collectionsDeleteRequestConfig,
+      collectionsDeleteRequestConfig
     ),
     creations: {
       add: bindApiCall<
@@ -601,55 +598,55 @@ export abstract class Methods {
       CollectionsV2DeleteArguments,
       CollectionsV2DeleteResponse
     >(this, collectionsV2DeleteRequestConfig),
-  }
+  };
 
   public readonly concepts = {
     list: bindApiCall<ConceptsListArguments, ConceptsListResponse>(
       this,
-      conceptsListRequestConfig,
+      conceptsListRequestConfig
     ),
     get: bindApiCall<ConceptsGetArguments, ConceptsGetResponse>(
       this,
-      conceptsGetRequestConfig,
+      conceptsGetRequestConfig
     ),
     update: bindApiCall<ConceptsUpdateArguments, ConceptsUpdateResponse>(
       this,
-      conceptsUpdateRequestConfig,
+      conceptsUpdateRequestConfig
     ),
     delete: bindApiCall<ConceptsDeleteArguments, ConceptsDeleteResponse>(
       this,
-      conceptsDeleteRequestConfig,
+      conceptsDeleteRequestConfig
     ),
     react: bindApiCall<ConceptsReactArguments, ConceptsReactResponse>(
       this,
-      conceptsReactRequestConfig,
+      conceptsReactRequestConfig
     ),
     unreact: bindApiCall<ConceptsUnreactArguments, ConceptsUnreactResponse>(
       this,
-      conceptsUnreactRequestConfig,
+      conceptsUnreactRequestConfig
     ),
-  }
+  };
 
   public readonly models = {
     list: bindApiCall<ModelsV2ListArguments, ModelsV2ListResponse>(
       this,
-      modelsV2ListRequestConfig,
+      modelsV2ListRequestConfig
     ),
     get: bindApiCall<ModelsV2GetArguments, ModelsV2GetResponse>(
       this,
-      modelsV2GetRequestConfig,
+      modelsV2GetRequestConfig
     ),
     update: bindApiCall<ModelsV2PatchArguments, ModelsV2PatchResponse>(
       this,
-      modelsV2PatchRequestConfig,
+      modelsV2PatchRequestConfig
     ),
     like: bindApiCall<ModelsV2LikeArguments, ModelsV2LikeResponse>(
       this,
-      modelsV2LikeRequestConfig,
+      modelsV2LikeRequestConfig
     ),
     unlike: bindApiCall<ModelsV2UnlikeArguments, ModelsV2UnlikeResponse>(
       this,
-      modelsV2UnlikeRequestConfig,
+      modelsV2UnlikeRequestConfig
     ),
     // delete: bindApiCall<ConceptsDeleteArguments, ConceptsDeleteResponse>(
     //   this,
@@ -663,7 +660,7 @@ export abstract class Methods {
     //   this,
     //   conceptsUnreactRequestConfig,
     // ),
-  }
+  };
 
   public readonly notifications = {
     create: bindApiCall<
@@ -672,7 +669,7 @@ export abstract class Methods {
     >(this, notificationsCreateRequestConfig),
     list: bindApiCall<NotificationsListArguments, NotificationsListResponse>(
       this,
-      notificationsListRequestConfig,
+      notificationsListRequestConfig
     ),
     markRead: bindApiCall<
       NotificationsMarkReadArguments,
@@ -680,34 +677,34 @@ export abstract class Methods {
     >(this, notificationsMarkReadRequestConfig),
     count: bindApiCall<NotificationsCountArguments, NotificationsCountResponse>(
       this,
-      notificationsCountRequestConfig,
+      notificationsCountRequestConfig
     ),
     archive: bindApiCall<
       NotificationsArchiveArguments,
       NotificationsArchiveResponse
     >(this, notificationsArchiveRequestConfig),
-  }
+  };
 
   public readonly agents = {
     get: bindApiCall<AgentGetArguments, AgentGetResponse>(
       this,
-      agentGetRequestConfig,
+      agentGetRequestConfig
     ),
     create: bindApiCall<AgentsCreateArguments, AgentsCreateResponse>(
       this,
-      agentsCreateRequestConfig,
+      agentsCreateRequestConfig
     ),
     update: bindApiCall<AgentsUpdateArguments, AgentsUpdateResponse>(
       this,
-      agentsUpdateRequestConfig,
+      agentsUpdateRequestConfig
     ),
     like: bindApiCall<AgentsLikeArguments, AgentsLikeResponse>(
       this,
-      agentsLikeRequestConfig,
+      agentsLikeRequestConfig
     ),
     unlike: bindApiCall<AgentsUnlikeArguments, AgentsUnlikeResponse>(
       this,
-      agentsUnlikeRequestConfig,
+      agentsUnlikeRequestConfig
     ),
     getDeployments: bindApiCall<
       AgentsGetDeploymentsArguments,
@@ -723,7 +720,7 @@ export abstract class Methods {
     >(this, agentsStopDeploymentRequestConfig),
     deploy: bindApiCall<AgentsDeployArguments, AgentsDeployResponse>(
       this,
-      agentsDeployRequestConfig,
+      agentsDeployRequestConfig
     ),
     deleteDeployment: bindApiCall<
       AgentsDeleteDeploymentArguments,
@@ -731,7 +728,7 @@ export abstract class Methods {
     >(this, agentsDeleteDeploymentRequestConfig),
     delete: bindApiCall<AgentsDeleteArguments, AgentsDeleteResponse>(
       this,
-      agentsDeleteRequestConfig,
+      agentsDeleteRequestConfig
     ),
     getPermissions: bindApiCall<
       AgentsGetPermissionsArguments,
@@ -741,10 +738,10 @@ export abstract class Methods {
       AgentsUpdatePermissionsArguments,
       AgentsUpdatePermissionsResponse
     >(this, agentsUpdatePermissionsRequestConfig),
-    getShared: bindApiCall<
-      AgentsGetSharedArguments,
-      AgentsGetSharedResponse
-    >(this, agentsGetSharedRequestConfig),
+    getShared: bindApiCall<AgentsGetSharedArguments, AgentsGetSharedResponse>(
+      this,
+      agentsGetSharedRequestConfig
+    ),
     triggers: {
       getAll: bindApiCall<
         AgentsGetTriggersArguments,
@@ -773,36 +770,36 @@ export abstract class Methods {
         AgentsGetAllDeploymentsResponse
       >(this, agentsGetAllDeploymentsRequestConfig),
     },
-  }
+  };
 
   public readonly creations = {
     list: bindApiCall<CreationsListArguments, CreationsListResponse>(
       this,
-      creationsListRequestConfig,
+      creationsListRequestConfig
     ),
     get: bindApiCall<CreationsGetArguments, CreationsGetResponse>(
       this,
-      creationsGetRequestConfig,
+      creationsGetRequestConfig
     ),
     getV2: bindApiCall<CreationsV2GetArguments, CreationsV2GetResponse>(
       this,
-      creationsV2GetRequestConfig,
+      creationsV2GetRequestConfig
     ),
     react: bindApiCall<CreationsReactArguments, CreationsReactResponse>(
       this,
-      creationsReactRequestConfig,
+      creationsReactRequestConfig
     ),
     unreact: bindApiCall<CreationsUnreactArguments, CreationsUnreactResponse>(
       this,
-      creationsUnreactRequestConfig,
+      creationsUnreactRequestConfig
     ),
     update: bindApiCall<CreationsUpdateArguments, CreationsUpdateResponse>(
       this,
-      creationsUpdateRequestConfig,
+      creationsUpdateRequestConfig
     ),
     updateV2: bindApiCall<CreationsV2PatchArguments, CreationsV2PatchResponse>(
       this,
-      creationsV2PatchRequestConfig,
+      creationsV2PatchRequestConfig
     ),
     bulkUpdateV2: bindApiCall<
       CreationsV2BulkPatchArguments,
@@ -810,56 +807,56 @@ export abstract class Methods {
     >(this, creationsV2BulkPatchRequestConfig),
     delete: bindApiCall<CreationsDeleteArguments, CreationsDeleteResponse>(
       this,
-      creationsDeleteRequestConfig,
+      creationsDeleteRequestConfig
     ),
     likeV2: bindApiCall<CreationsV2LikeArguments, CreationsV2LikeResponse>(
       this,
-      creationsV2LikeRequestConfig,
+      creationsV2LikeRequestConfig
     ),
     unlikeV2: bindApiCall<
       CreationsV2UnlikeArguments,
       CreationsV2UnlikeResponse
     >(this, creationsV2UnlikeRequestConfig),
-  }
+  };
 
   public readonly creators = {
     follow: bindApiCall<CreatorsFollowArguments, CreatorsFollowResponse>(
       this,
-      creatorsFollowRequestConfig,
+      creatorsFollowRequestConfig
     ),
     unfollow: bindApiCall<CreatorsUnfollowArguments, CreatorsUnfollowResponse>(
       this,
-      creatorsUnfollowRequestConfig,
+      creatorsUnfollowRequestConfig
     ),
     list: bindApiCall<CreatorsListArguments, CreatorsListResponse>(
       this,
-      creatorsListRequestConfig,
+      creatorsListRequestConfig
     ),
     get: bindApiCall<CreatorsGetArguments, CreatorsGetResponse>(
       this,
-      creatorsGetRequestConfig,
+      creatorsGetRequestConfig
     ),
     getV2: bindApiCall<CreatorsGetArguments, CreatorsGetResponse>(
       this,
-      creatorsGetV2RequestConfig,
+      creatorsGetV2RequestConfig
     ),
     update: bindApiCall<CreatorsUpdateArguments, CreatorsUpdateResponse>(
       this,
-      creatorsUpdateRequestConfig,
+      creatorsUpdateRequestConfig
     ),
     updateV2: bindApiCall<CreatorsUpdateArguments, CreatorsUpdateResponse>(
       this,
-      creatorsUpdateV2RequestConfig,
+      creatorsUpdateV2RequestConfig
     ),
     me: bindApiCall<WebAPICallOptions, CreatorsGetMeResponse>(
       this,
-      creatorsGetMeRequestConfig,
+      creatorsGetMeRequestConfig
     ),
     meV2: bindApiCall<WebAPICallOptions, CreatorsGetMeResponse>(
       this,
-      creatorsGetMeV2RequestConfig,
+      creatorsGetMeV2RequestConfig
     ),
-  }
+  };
 
   public readonly creator = {
     followers: bindApiCall<
@@ -871,59 +868,59 @@ export abstract class Methods {
       CreatorFollowersListArguments,
       CreatorFollowingListResponse
     >(this, creatorFollowingListRequestConfig),
-  }
+  };
 
   public readonly feed = {
     creations: bindApiCall<FeedCreationsArguments, FeedCreationsResponse>(
       this,
-      feedCreationsRequestConfig,
+      feedCreationsRequestConfig
     ),
     concepts: bindApiCall<FeedConceptsArguments, FeedConceptsResponse>(
       this,
-      feedConceptsRequestConfig,
+      feedConceptsRequestConfig
     ),
-  }
+  };
 
   public readonly feed_cursor = {
     creations: bindApiCall<
       FeedCreationsCursorArguments,
       FeedCreationsCursorResponse
     >(this, feedCursorCreationsRequestConfig),
-  }
+  };
 
   public readonly feed_cursorV2 = {
     creations: bindApiCall<
       FeedCreationsV2CursorArguments,
       FeedCreationsV2CursorResponse
     >(this, feedCursorCreationsV2RequestConfig),
-  }
+  };
 
   public readonly generators = {
     list: bindApiCall<GeneratorsListArguments, GeneratorsListResponse>(
       this,
-      generatorsListRequestConfig,
+      generatorsListRequestConfig
     ),
     get: bindApiCall<GeneratorsGetArguments, GeneratorsGetResponse>(
       this,
-      generatorsGetRequestConfig,
+      generatorsGetRequestConfig
     ),
-  }
+  };
 
   public readonly tools = {
     list: bindApiCall<ToolsListArgumentsV2, ToolsListResponseV2>(
       this,
-      toolsListRequestConfigV2,
+      toolsListRequestConfigV2
     ),
     get: bindApiCall<ToolsGetArgumentsV2, ToolsGetResponseV2>(
       this,
-      toolsGetRequestConfigV2,
+      toolsGetRequestConfigV2
     ),
-  }
+  };
 
   public readonly manna = {
     balance: bindApiCall<MannaBalanceGetArguments, MannaBalanceGetResponse>(
       this,
-      mannaBalanceGetRequestConfig,
+      mannaBalanceGetRequestConfig
     ),
     vouchers: {
       redeem: bindApiCall<
@@ -931,59 +928,59 @@ export abstract class Methods {
         MannaVoucherRedeemResponse
       >(this, mannaVouchersRedeemRequestConfig),
     },
-  }
+  };
 
   public readonly media = {
     upload: bindApiCall<MediaUploadArguments, MediaUploadResponse>(
       this,
-      mediaUploadRequestConfig,
+      mediaUploadRequestConfig
     ),
     bulkDownload: bindApiCall<
       MediaBulkDownloadArguments,
       MediaBulkDownloadResponse
     >(this, mediaBulkDownloadRequestConfig),
-  }
+  };
 
   public readonly payments = {
     create: bindApiCall<PaymentsCreateArguments, PaymentsCreateResponse>(
       this,
-      paymentsCreateRequestConfig,
+      paymentsCreateRequestConfig
     ),
     products: bindApiCall<WebAPICallOptions, PaymentsProductsResponse>(
       this,
-      paymentsProductsRequestConfig,
+      paymentsProductsRequestConfig
     ),
     subscription: bindApiCall<
       PaymentsSubscriptionArguments,
       PaymentsSubscriptionResponse
     >(this, paymentsSubscriptionRequestConfig),
-  }
+  };
 
   public readonly sessions = {
     create: bindApiCall<WebAPICallOptions, SessionsCreateResponse>(
       this,
-      sessionsCreateRequestConfig,
+      sessionsCreateRequestConfig
     ),
     delete: bindApiCall<SessionsDeleteArguments, SessionsDeleteResponse>(
       this,
-      sessionsDeleteRequestConfig,
+      sessionsDeleteRequestConfig
     ),
     list: bindApiCall<SessionsListArguments, SessionsListResponse>(
       this,
-      sessionsListRequestConfig,
+      sessionsListRequestConfig
     ),
     get: bindApiCall<SessionsGetArguments, SessionsGetResponse>(
       this,
-      sessionsGetRequestConfig,
+      sessionsGetRequestConfig
     ),
     interact: bindApiCall<SessionsInteractArguments, SessionsInteractResponse>(
       this,
-      sessionsInteractRequestConfig,
+      sessionsInteractRequestConfig
     ),
     users: {
       add: bindApiCall<SessionsAddUsersArguments, SessionsAddUsersResponse>(
         this,
-        sessionsAddUsersRequestConfig,
+        sessionsAddUsersRequestConfig
       ),
     },
     characters: {
@@ -995,11 +992,11 @@ export abstract class Methods {
     v2: {
       list: bindApiCall<SessionsV2ListArguments, SessionsV2ListResponse>(
         this,
-        sessionsListRequestConfigV2,
+        sessionsListRequestConfigV2
       ),
       get: bindApiCall<SessionsV2GetArguments, SessionsV2GetResponse>(
         this,
-        sessionsGetRequestConfigV2,
+        sessionsGetRequestConfigV2
       ),
       react: bindApiCall<
         SessionsV2MessageReactArguments,
@@ -1011,19 +1008,19 @@ export abstract class Methods {
       >(this, sessionsMessageRequestConfigV2),
       rename: bindApiCall<SessionsV2RenameArguments, SessionsV2RenameResponse>(
         this,
-        sessionsRenameRequestConfigV2,
+        sessionsRenameRequestConfigV2
       ),
       delete: bindApiCall<SessionsV2DeleteArguments, SessionsV2DeleteResponse>(
         this,
-        sessionsDeleteRequestConfigV2,
+        sessionsDeleteRequestConfigV2
       ),
       create: bindApiCall<SessionsV2CreateArguments, SessionsV2CreateResponse>(
         this,
-        sessionsCreateRequestConfigV2,
+        sessionsCreateRequestConfigV2
       ),
       cancel: bindApiCall<SessionsV2CancelArguments, SessionsV2CancelResponse>(
         this,
-        sessionsCancelRequestConfigV2,
+        sessionsCancelRequestConfigV2
       ),
       share: {
         create: bindApiCall<
@@ -1040,33 +1037,33 @@ export abstract class Methods {
         >(this, sessionsShareGetRequestConfigV2),
       },
     },
-  }
+  };
 
   public readonly session = {
     events: {
       list: bindApiCall<SessionEventsListArguments, SessionEventsListResponse>(
         this,
-        sessionEventsListRequestConfig,
+        sessionEventsListRequestConfig
       ),
     },
-  }
+  };
 
   public readonly threads = {
     create: bindApiCall<ThreadsCreateArguments, ThreadsCreateResponse>(
       this,
-      threadsCreateRequestConfig,
+      threadsCreateRequestConfig
     ),
     get: bindApiCall<ThreadsGetArguments, ThreadsGetResponse>(
       this,
-      threadsGetRequestConfig,
+      threadsGetRequestConfig
     ),
     list: bindApiCall<ThreadsListArguments, ThreadsListResponse>(
       this,
-      threadsListRequestConfig,
+      threadsListRequestConfig
     ),
     message: bindApiCall<ThreadsMessageArguments, ThreadsMessageResponse>(
       this,
-      threadsMessageRequestConfig,
+      threadsMessageRequestConfig
     ),
     react: bindApiCall<
       ThreadsMessageReactArguments,
@@ -1082,50 +1079,50 @@ export abstract class Methods {
     >(this, threadsUnpinMessageRequestConfig),
     delete: bindApiCall<ThreadsDeleteArguments, ThreadsDeleteResponse>(
       this,
-      threadsDeleteRequestConfig,
+      threadsDeleteRequestConfig
     ),
     rename: bindApiCall<ThreadsRenameArguments, ThreadsRenameResponse>(
       this,
-      threadsRenameRequestConfig,
+      threadsRenameRequestConfig
     ),
-  }
+  };
 
   public readonly tasks = {
     create: bindApiCall<TasksCreateArguments, TasksCreateResponse>(
       this,
-      tasksCreateRequestConfig,
+      tasksCreateRequestConfig
     ),
     createV2: bindApiCall<TasksV2CreateArguments, TasksV2CreateResponse>(
       this,
-      tasksV2CreateRequestConfig,
+      tasksV2CreateRequestConfig
     ),
     cost: bindApiCall<TasksCreateArguments, TasksCreateResponse>(
       this,
-      tasksCostRequestConfig,
+      tasksCostRequestConfig
     ),
     costV2: bindApiCall<TasksV2CreateArguments, TasksV2CreateResponse>(
       this,
-      tasksV2CostRequestConfig,
+      tasksV2CostRequestConfig
     ),
     get: bindApiCall<TasksGetArguments, TasksGetResponse>(
       this,
-      tasksGetRequestConfig,
+      tasksGetRequestConfig
     ),
     getV2: bindApiCall<TasksV2GetArguments, TasksV2GetResponse>(
       this,
-      tasksV2GetRequestConfig,
+      tasksV2GetRequestConfig
     ),
     list: bindApiCall<TasksListArguments, TasksListResponse>(
       this,
-      tasksListRequestConfig,
+      tasksListRequestConfig
     ),
     listV2: bindApiCall<TasksV2ListArguments, TasksV2ListResponse>(
       this,
-      tasksV2ListRequestConfig,
+      tasksV2ListRequestConfig
     ),
     cancelV2: bindApiCall<TasksV2CancelArguments, TasksV2CancelResponse>(
       this,
-      tasksV2CancelRequestConfig,
+      tasksV2CancelRequestConfig
     ),
-  }
+  };
 }

@@ -10,6 +10,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && microbundle --tsconfig tsconfig.json --no-sourcemap",
+    "postinstall": "npm run build || echo 'eden-sdk build skipped'",
     "dev": "microbundle watch --tsconfig tsconfig.json --no-sourcemap",
     "dev:eden": "yarn dev",
     "dev:dummy": "yarn dev",
