@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 function getEdenClient() {
   return new EdenClient({
     edenApiUrl: process.env.NEXT_PUBLIC_EDEN_API_URL,
-    apiKey: "9fc5730a33b43584e58f932851a1f06961264a2808825345",
+    apiKey: process.env.EDEN_ADMIN_API_KEY,
   });
 }
 

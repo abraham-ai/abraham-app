@@ -23,7 +23,12 @@ export enum MediaType {
 // Arguments
 
 export interface MediaUploadArguments extends WebAPICallOptions {
-  media: Buffer
+  /**
+   * Binary payload to upload. Supports browser (Blob/File) and Node (Buffer/ArrayBuffer/Uint8Array).
+   */
+  media: Blob | File | Buffer | Uint8Array | ArrayBuffer
+  /** Optional filename hint (mainly for Node.js usage) */
+  filename?: string
 }
 
 export interface MediaBulkDownloadArguments extends WebAPICallOptions {
@@ -37,9 +42,24 @@ export interface MediaBulkDownloadArguments extends WebAPICallOptions {
 // Requests
 
 export const mediaUploadRequestConfig = (args: MediaUploadArguments) => {
-  const blob = new Blob([args.media])
   const form = new FormData()
-  form.append('file', blob)
+  const media: any = args.media
+  const filename = args.filename || 'upload.bin'
+
+  if (typeof Blob !== 'undefined' && media instanceof Blob) {
+    form.append('file', media, (media as any).name || filename)
+  } else if (typeof File !== 'undefined' && media instanceof File) {
+    form.append('file', media, media.name)
+  } else if (typeof Buffer !== 'undefined' && media instanceof Buffer) {
+    form.append('file', media as any, filename)
+  } else if (media instanceof Uint8Array) {
+    form.append('file', media as any, filename)
+  } else if (media instanceof ArrayBuffer) {
+    form.append('file', new Uint8Array(media) as any, filename)
+  } else {
+    throw new Error('Unsupported media type supplied to mediaUploadRequestConfig')
+  }
+
   return {
     method: 'POST',
     url: '/media/upload',
