@@ -115,7 +115,7 @@ export class EdenClient extends Methods {
           }
         });
 
-        eventSource.onerror = (error) => {
+        eventSource.onerror = (error: any) => {
           console.error("EventSource error:", error);
           eventSource.close();
           if (resolver) {
