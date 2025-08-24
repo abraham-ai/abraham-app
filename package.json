@@ -1,8 +1,8 @@
 {
   "private": true,
   "workspaces": [
-    "packages/*",
-    "web-app"
+    "web-app",
+    "web-app/packages/*"
   ],
   "devDependencies": {
     "@nomicfoundation/hardhat-verify": "^2.0.14"

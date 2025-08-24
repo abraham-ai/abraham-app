@@ -2,21 +2,16 @@
   "name": "abraham-app",
   "version": "0.1.0",
   "private": true,
-  "workspaces": {
-    "packages": [
-      "packages/*"
-    ]
-  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm --prefix packages/eden-sdk run build && next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
     "@apollo/client": "^3.12.4",
     "@coinbase/onchainkit": "latest",
-    "@edenlabs/eden-sdk": "*",
+    "@edenlabs/eden-sdk": "file:packages/eden-sdk",
     "@hookform/resolvers": "^3.9.0",
     "@privy-io/react-auth": "^2.18.2",
     "@radix-ui/react-avatar": "^1.1.0",
