@@ -239,18 +239,16 @@ export const createCursorPaginationRoute = (
     params.sort = query.sort;
   }
 
-  let queryStringArray: string[] = [];
+  const queryStringArray: string[] = [];
 
-  for (let key in params) {
-    // @ts-ignore
-    if (Array.isArray(params[key])) {
-      // @ts-ignore
-      params[key].forEach((value: string | number) => {
-        queryStringArray.push(`${key}=${value}`);
-      });
-    } else {
-      // @ts-ignore
-      queryStringArray.push(`${key}=${params[key]}`);
+  for (const key of Object.keys(params) as Array<
+    keyof CursorPaginatedFeedQuery
+  >) {
+    const value = params[key];
+    if (Array.isArray(value)) {
+      value.forEach((v) => queryStringArray.push(`${String(key)}=${v}`));
+    } else if (typeof value !== "undefined" && value !== null) {
+      queryStringArray.push(`${String(key)}=${value}`);
     }
   }
 

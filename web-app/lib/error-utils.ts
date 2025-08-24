@@ -78,8 +78,24 @@ export const CONTRACT_ERRORS: Record<string, ContractError> = {
   },
 };
 
-export function parseContractError(error: any): ContractError {
-  const errorMessage = error?.message || error?.reason || String(error);
+type UnknownError =
+  | { message?: string; reason?: string }
+  | string
+  | Error
+  | unknown;
+
+export function parseContractError(error: UnknownError): ContractError {
+  const errObj = error as
+    | { message?: string; reason?: string }
+    | Error
+    | string
+    | null
+    | undefined;
+  const errorMessage =
+    (typeof errObj === "string"
+      ? errObj
+      : (errObj as Error)?.message || (errObj as any)?.reason) ||
+    String(errObj);
   const lowerMessage = errorMessage.toLowerCase();
 
   // Check for specific contract errors
@@ -109,7 +125,7 @@ export function parseContractError(error: any): ContractError {
   };
 }
 
-export function showErrorToast(error: any, customTitle?: string) {
+export function showErrorToast(error: UnknownError, customTitle?: string) {
   const contractError = parseContractError(error);
 
   toast({

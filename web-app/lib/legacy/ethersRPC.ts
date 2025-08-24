@@ -93,10 +93,12 @@ const signMessage = async (provider: IProvider): Promise<any> => {
   }
 };
 
-export default {
+const ethersRPC = {
   getChainId,
   getAccounts,
   getBalance,
   sendTransaction,
   signMessage,
 };
+
+export default ethersRPC;
