@@ -81,7 +81,7 @@ export class EdenClient extends Methods {
         const queue: TaskUpdateEvent[] = [];
         let resolver: ((value: AsyncIteratorResult) => void) | null;
 
-        eventSource.addEventListener("task-update", (event) => {
+        eventSource.addEventListener("task-update", (event: any) => {
           // console.log(
           //   'eventSource event handler',
           //   'task-update',
