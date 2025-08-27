@@ -5,6 +5,11 @@ import {
   SubgraphMessage,
   Blessing,
 } from "@/types/abraham";
+import {
+  fetchIpfsJson,
+  firstResolvedMediaUrlFromJson,
+  IpfsMessageJSON,
+} from "@/lib/ipfs";
 
 /* ───────── Graph endpoint ───────── */
 const ENDPOINT =
@@ -85,100 +90,7 @@ const LIST_QUERY = /* GraphQL */ `
   }
 `;
 
-/* ------------- IPFS helpers ------------- */
-
-type IpfsMediaItem = { src: string; type?: string; mime?: string };
-type IpfsMessageJSON = {
-  version?: number;
-  sessionId?: string;
-  messageId?: string;
-  author?: string;
-  kind?: "owner" | "blessing" | string;
-  content?: string;
-  media?: IpfsMediaItem[];
-  createdAt?: number;
-};
-
-function normalizeCidToPath(cid: string): string {
-  const clean = cid.replace(/^ipfs:\/\//i, "");
-  const parts = clean.split("/");
-  const root = parts[0];
-  const rest = parts.slice(1).join("/");
-  return rest ? `${root}/${rest}` : root;
-}
-
-function toGatewayUrl(cidOrSrc: string, gatewayBase: string): string {
-  if (/^https?:\/\//i.test(cidOrSrc)) return cidOrSrc;
-  const base = gatewayBase.endsWith("/") ? gatewayBase : gatewayBase + "/";
-  return base + normalizeCidToPath(cidOrSrc);
-}
-
-async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
-  const ctrl = new AbortController();
-  const id = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, {
-      signal: ctrl.signal,
-      cache: "force-cache",
-      next: { revalidate: 60 * 60 * 24 },
-      headers: { Accept: "application/json" },
-    });
-  } finally {
-    clearTimeout(id);
-  }
-}
-
-/* ─── LRU + TTL (process-wide) for hydrated IPFS JSON ─── */
-type CacheEntry = { value: IpfsMessageJSON | null; expiresAt: number };
-const CID_LRU_MAX = 3000;
-const CID_TTL_MS = 1000 * 60 * 60 * 12; // 12h
-const cidLRU: Map<string, CacheEntry> =
-  (global as any).__ipfs_json_lru__ || new Map();
-(global as any).__ipfs_json_lru__ = cidLRU;
-
-function lruGet(key: string): IpfsMessageJSON | null | undefined {
-  const hit = cidLRU.get(key);
-  if (!hit) return undefined;
-  if (Date.now() > hit.expiresAt) {
-    cidLRU.delete(key);
-    return undefined;
-  }
-  // refresh recency
-  cidLRU.delete(key);
-  cidLRU.set(key, hit);
-  return hit.value;
-}
-function lruSet(key: string, value: IpfsMessageJSON | null) {
-  if (cidLRU.size >= CID_LRU_MAX) {
-    // evict oldest
-    const first = cidLRU.keys().next().value;
-    if (first) cidLRU.delete(first);
-  }
-  cidLRU.set(key, { value, expiresAt: Date.now() + CID_TTL_MS });
-}
-
-async function fetchIpfsJson(cid: string): Promise<IpfsMessageJSON | null> {
-  const cached = lruGet(cid);
-  if (cached !== undefined) return cached;
-
-  const path = normalizeCidToPath(cid);
-  for (const base of IPFS_GATEWAYS) {
-    const url = toGatewayUrl(path, base);
-    try {
-      const r = await fetchWithTimeout(url);
-      if (!r.ok) continue;
-      const data = (await r.json()) as IpfsMessageJSON;
-      lruSet(cid, data);
-      return data;
-    } catch {
-      // try next gateway
-    }
-  }
-  lruSet(cid, null);
-  return null;
-}
-
-/* Concurrency-limited map */
+// Concurrency-limited map (unchanged)
 async function mapConcurrent<T, R>(
   items: T[],
   limit: number,
@@ -197,12 +109,6 @@ async function mapConcurrent<T, R>(
     });
   await Promise.all(workers);
   return ret;
-}
-
-function firstMediaUrlFromJson(json: IpfsMessageJSON | null): string | null {
-  const src = json?.media?.[0]?.src;
-  if (!src) return null;
-  return toGatewayUrl(src, PREFERRED_GATEWAY);
 }
 
 /* ───────────── shapers ───────────── */
@@ -268,8 +174,11 @@ async function shapeCreationsList(
       const maxToHydrate = Math.min(ownerCandidates.length, 6);
       for (let i = 0; i < maxToHydrate; i++) {
         const m = ownerCandidates[i]!;
-        const json = await fetchIpfsJson(m.cid);
-        const mediaUrl = firstMediaUrlFromJson(json);
+        const json = await fetchIpfsJson(m.cid, IPFS_GATEWAYS);
+        const mediaUrl = await firstResolvedMediaUrlFromJson(
+          json,
+          IPFS_GATEWAYS
+        );
         // set hero to FIRST candidate with media; if none have media, fall back to latestOwner's content
         if (mediaUrl) {
           heroImage = mediaUrl;

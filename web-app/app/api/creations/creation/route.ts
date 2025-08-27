@@ -5,6 +5,11 @@ import {
   SubgraphMessage,
   Blessing,
 } from "@/types/abraham";
+import {
+  fetchIpfsJson,
+  firstResolvedMediaUrlFromJson,
+  IpfsMessageJSON,
+} from "@/lib/ipfs";
 
 export const revalidate = 0;
 
@@ -89,100 +94,6 @@ const DETAIL_QUERY_FULL = /* GraphQL */ `
   }
 `;
 
-/* -------- IPFS helpers + LRU -------- */
-type IpfsMediaItem = { src: string; type?: string; mime?: string };
-type IpfsMessageJSON = {
-  version?: number;
-  sessionId?: string;
-  messageId?: string;
-  author?: string;
-  kind?: "owner" | "blessing" | string;
-  content?: string;
-  media?: IpfsMediaItem[];
-  createdAt?: number;
-};
-
-function normalizeCidToPath(cid: string): string {
-  const clean = cid.replace(/^ipfs:\/\//i, "");
-  const parts = clean.split("/");
-  const root = parts[0];
-  const rest = parts.slice(1).join("/");
-  return rest ? `${root}/${rest}` : root;
-}
-function toGatewayUrl(cidOrSrc: string, base: string): string {
-  if (/^https?:\/\//i.test(cidOrSrc)) return cidOrSrc;
-  const b = base.endsWith("/") ? base : base + "/";
-  return b + normalizeCidToPath(cidOrSrc);
-}
-async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
-  const ctrl = new AbortController();
-  const id = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, {
-      signal: ctrl.signal,
-      cache: "force-cache", // immutable by CID
-      next: { revalidate: 60 * 60 * 24 },
-      headers: { Accept: "application/json" },
-    });
-  } finally {
-    clearTimeout(id);
-  }
-}
-
-type CacheEntry = { value: IpfsMessageJSON | null; expiresAt: number };
-const CID_LRU_MAX = 5000;
-const CID_TTL_MS = 1000 * 60 * 60 * 12; // 12h
-const cidLRU: Map<string, CacheEntry> =
-  (global as any).__ipfs_json_lru_detail_fast__ || new Map();
-(global as any).__ipfs_json_lru_detail_fast__ = cidLRU;
-
-function lruGet(key: string): IpfsMessageJSON | null | undefined {
-  const hit = cidLRU.get(key);
-  if (!hit) return undefined;
-  if (Date.now() > hit.expiresAt) {
-    cidLRU.delete(key);
-    return undefined;
-  }
-  // refresh recency
-  cidLRU.delete(key);
-  cidLRU.set(key, hit);
-  return hit.value;
-}
-function lruSet(key: string, value: IpfsMessageJSON | null) {
-  if (cidLRU.size >= CID_LRU_MAX) {
-    const first = cidLRU.keys().next().value;
-    if (first) cidLRU.delete(first);
-  }
-  cidLRU.set(key, { value, expiresAt: Date.now() + CID_TTL_MS });
-}
-
-async function fetchIpfsJson(cid: string): Promise<IpfsMessageJSON | null> {
-  const cached = lruGet(cid);
-  if (cached !== undefined) return cached;
-
-  const path = normalizeCidToPath(cid);
-  for (const base of IPFS_GATEWAYS) {
-    const url = toGatewayUrl(path, base);
-    try {
-      const r = await fetchWithTimeout(url);
-      if (!r.ok) continue;
-      const data = (await r.json()) as IpfsMessageJSON;
-      lruSet(cid, data);
-      return data;
-    } catch {
-      // try next gateway
-    }
-  }
-  lruSet(cid, null);
-  return null;
-}
-
-function firstMediaUrlFromJson(json: IpfsMessageJSON | null): string | null {
-  const src = json?.media?.[0]?.src;
-  if (!src) return null;
-  return toGatewayUrl(src, PREFERRED_GATEWAY);
-}
-
 /* Concurrency-limited map */
 async function mapConcurrent<T, R>(
   items: T[],
@@ -248,13 +159,15 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
     unionAsc,
     24,
     async (m) => {
-      const json = await fetchIpfsJson(m.cid);
+      const json = await fetchIpfsJson(m.cid, IPFS_GATEWAYS);
       const isOwner = m.author.toLowerCase() === OWNER;
       return {
         uuid: m.uuid,
         author: m.author,
         content: json?.content ?? "",
-        media: isOwner ? firstMediaUrlFromJson(json) : null,
+        media: isOwner
+          ? await firstResolvedMediaUrlFromJson(json, IPFS_GATEWAYS)
+          : null,
         praiseCount: m.praiseCount,
         timestamp: m.timestamp,
       };
@@ -340,13 +253,15 @@ async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
     c.messages,
     32,
     async (m) => {
-      const json = await fetchIpfsJson(m.cid);
+      const json = await fetchIpfsJson(m.cid, IPFS_GATEWAYS);
       return {
         uuid: m.uuid,
         author: m.author,
         content: json?.content ?? "",
         media:
-          m.author.toLowerCase() === OWNER ? firstMediaUrlFromJson(json) : null,
+          m.author.toLowerCase() === OWNER
+            ? await firstResolvedMediaUrlFromJson(json, IPFS_GATEWAYS)
+            : null,
         praiseCount: m.praiseCount,
         timestamp: m.timestamp,
       };
