@@ -12,6 +12,21 @@ yarn install
 pnpm install
 ```
 
+### Tiered Auth & Server-Signed (CDP) Tier‑A
+
+This app integrates Privy for login (user vault) and Coinbase Developer Platform v2 server wallets for Tier‑A actions (tiny payable writes like praise/bless).
+
+Server API routes under `/api/abraham/*` verify Privy Bearer tokens and submit transactions via CDP on behalf of a per-user Activity account. The UI tries server Tier‑A first, then falls back to direct wallet signing if the server path is unavailable.
+
+Environment (see `.env.example`):
+
+- NEXT_PUBLIC_PRIVY_APP_ID
+- NEXT_PUBLIC_ABRAHAM_ADDRESS, NEXT_PUBLIC_PAYPATCH_ADDRESS, NEXT_PUBLIC_CHAIN_ID
+- CDP_BASE_URL, CDP_API_KEY, CDP_API_SECRET
+- CDP_ACTIVITY_SENDER (optional if you dynamically provision per-user accounts)
+
+Security: keep Activity accounts minimally funded; enforce allowlists and per‑tx/day caps on your signer and/or on-chain permissions module.
+
 Ensure you have all the required environment variables as specified in the **.env.example** file in your **.env.local**
 
 Then run the development server:

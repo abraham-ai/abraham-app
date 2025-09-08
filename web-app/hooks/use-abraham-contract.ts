@@ -106,10 +106,33 @@ export function useAbrahamContract() {
 
   /** Praise any message (unlimited). */
   const praise = async (sessionUuid: string, messageUuid: string) => {
+    // Try Tier-A server path first (CDP Activity wallet)
+    try {
+      const res = await fetch("/api/abraham/praise", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authState.idToken ? `Bearer ${authState.idToken}` : "",
+        },
+        body: JSON.stringify({
+          sessionId: sessionUuid,
+          messageId: messageUuid,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.hash) {
+        await waitAndToast(data.hash, "Praise sent! 🙌");
+        return data.hash as `0x${string}`;
+      }
+      // If policy denied or server not configured, fall back to direct wallet
+    } catch (e) {
+      // ignore and fallback
+    }
+
+    // Fallback: direct wallet signature (old path)
     const sender = await requireWallet();
     const valueWei = PRAISE_PRICE_WEI;
     await ensureBalance(sender, valueWei);
-
     try {
       const hash = await walletClient!.writeContract({
         account: sender,
@@ -137,6 +160,46 @@ export function useAbrahamContract() {
       throw err;
     }
 
+    // Try Tier-A server path first
+    try {
+      const msgUuid = crypto.randomUUID();
+      // First ask server to pin
+      const pinRes = await fetch("/api/ipfs/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionUuid,
+          messageId: msgUuid,
+          content: trimmed,
+          author: authState.walletAddress ?? undefined,
+          kind: "blessing",
+        }),
+      });
+      const pin = await pinRes.json();
+      if (!pinRes.ok) throw new Error(pin?.error || "IPFS pin failed");
+
+      const res = await fetch("/api/abraham/bless", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authState.idToken ? `Bearer ${authState.idToken}` : "",
+        },
+        body: JSON.stringify({
+          sessionId: sessionUuid,
+          messageId: msgUuid,
+          cid: pin.cid,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.hash) {
+        await waitAndToast(data.hash, "Blessing sent! 🙏");
+        return { hash: data.hash as `0x${string}`, msgUuid };
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+
+    // Fallback to direct wallet path
     const sender = await requireWallet();
     const valueWei = BLESS_PRICE_WEI;
     await ensureBalance(sender, valueWei);
