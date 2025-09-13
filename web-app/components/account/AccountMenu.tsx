@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
+import { ServerWalletPanel } from "@/components/account/ServerWalletPanel";
 
 import { useAuth } from "@/context/auth-context";
 //import { useManna } from "@/context/MannaContext";
@@ -26,6 +27,7 @@ function AccountMenu() {
   const { login, logout, loggedIn, loadingAuth, authState } = useAuth();
   const { wallets } = useWallets();
   //const { balance, getMannaBalance } = useManna();
+  const [showFunding, setShowFunding] = React.useState(false);
 
   useEffect(() => {
     const wallet = wallets[0];
@@ -67,27 +69,29 @@ function AccountMenu() {
             </div>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuContent align="end" className="w-80">
             <DropdownMenuLabel>
               <p className="truncate">{authState.username}</p>
             </DropdownMenuLabel>
-
             <DropdownMenuSeparator />
-
-            {/* <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              <CoinsIcon className="w-5 h-5" />
-              <p className="ml-2">{balance} Manna</p>
-              <GetMannaDialog />
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator /> */}
-
             <DropdownMenuItem asChild>
               <Link href="/profile">Profile</Link>
             </DropdownMenuItem>
-
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setShowFunding((v) => !v);
+              }}
+            >
+              <CoinsIcon className="w-5 h-5" />
+              <span className="ml-2">Server Wallet Funding</span>
+            </DropdownMenuItem>
+            {showFunding && (
+              <div className="mt-2 border rounded-md bg-white/50 dark:bg-neutral-900/50">
+                <ServerWalletPanel />
+              </div>
+            )}
             <DropdownMenuSeparator />
-
             <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
