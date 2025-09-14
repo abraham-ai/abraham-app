@@ -1,8 +1,8 @@
 "use client";
 import React from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
-//import { baseSepolia } from "@/lib/base-sepolia";
 import { baseSepolia } from "viem/chains";
+import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 
 type Props = {
   children: React.ReactNode;
@@ -13,25 +13,28 @@ export default function Providers({ children }: Props) {
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID as string}
       config={{
-        // (Optional) Customize the login methods displayed to users upfront:
+        // Login methods you want visible in the Privy modal
         loginMethods: ["email", "wallet", "google"],
         defaultChain: baseSepolia,
         supportedChains: [baseSepolia],
-        appearance: {
-          theme: "light",
-          // Additional appearance customizations, e.g. brand color:
-          accentColor: "#676FFF",
-          // ...
+
+        // Embedded wallet behavior + UI control
+        embeddedWallets: {
+          // Ensure an embedded EOA exists (required to control a smart wallet)
+          // Per docs: config.embeddedWallets.ethereum.createOnLogin
+          ethereum: { createOnLogin: "users-without-wallets" },
+          // Hide Privy’s confirm modals globally (you can still override per call)
+          showWalletUIs: false,
         },
 
-        // (Optional) Embedded wallet creation. If you want to auto-create
-        // embedded wallets for new users, set createOnLogin: 'users-without-wallets'
-        embeddedWallets: {
-          createOnLogin: "users-without-wallets",
+        appearance: {
+          theme: "light",
+          accentColor: "#676FFF",
         },
       }}
     >
-      {children}
+      {/* Enable Privy Smart Wallets in your React tree */}
+      <SmartWalletsProvider>{children}</SmartWalletsProvider>
     </PrivyProvider>
   );
 }

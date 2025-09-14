@@ -16,19 +16,16 @@ import { getRelativeTime } from "@/lib/time-utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamContract,
+  useAbrahamSmartWallet,
   PRAISE_PRICE_ETHER,
-} from "@/hooks/use-abraham-contract";
+} from "@/hooks/use-abraham-smartwallet";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { showErrorToast, showWarningToast } from "@/lib/error-utils";
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { showWarningToast } from "@/lib/error-utils";
 import { HIDDEN_SESSION_IDS } from "@/config/hidden-sessions";
 
 type SortOption = "most-praised" | "latest";
@@ -37,7 +34,7 @@ const PAGE_SIZE = 18;
 /* ───────────────────────────────────── component */
 export default function CreationsGrid() {
   const { loggedIn } = useAuth();
-  const { praise } = useAbrahamContract();
+  const { praise } = useAbrahamSmartWallet();
 
   const [creations, setCreations] = useState<CreationItem[]>([]);
   const [loadingInit, setLoadingInit] = useState(true);
@@ -89,9 +86,14 @@ export default function CreationsGrid() {
         /* initialise praise counts = SUM(praiseCount) + 2 * blessings */
         const cnt: Record<string, number> = {};
         filteredBatch.forEach((c) => {
-          const totalPraises = c.messages.reduce((s, m) => s + m.praiseCount, 0);
-          const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
-          cnt[c.id] = totalPraises + (2 * blessingCount);
+          const totalPraises = c.messages.reduce(
+            (s, m) => s + m.praiseCount,
+            0
+          );
+          const blessingCount = c.messages.filter(
+            (m) => m.author.toLowerCase() !== OWNER
+          ).length;
+          cnt[c.id] = totalPraises + 2 * blessingCount;
         });
         setPraiseCounts(cnt);
       } catch (err: any) {
@@ -103,7 +105,7 @@ export default function CreationsGrid() {
     return () => {
       cancelled = true;
     };
-  }, [sortBy, fetchPage]);
+  }, [sortBy, fetchPage, OWNER]);
 
   /* -------- infinite scroll -------- */
   useEffect(() => {
@@ -117,7 +119,7 @@ export default function CreationsGrid() {
           try {
             const next = page + 1;
             const batch = await fetchPage(next, sortBy);
-            
+
             // Filter out hidden sessions at the root level
             const filteredBatch = batch.filter(
               (c) => !HIDDEN_SESSION_IDS.includes(c.id)
@@ -128,9 +130,14 @@ export default function CreationsGrid() {
 
             const cnt: Record<string, number> = {};
             filteredBatch.forEach((c) => {
-              const totalPraises = c.messages.reduce((s, m) => s + m.praiseCount, 0);
-              const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
-              cnt[c.id] = totalPraises + (2 * blessingCount);
+              const totalPraises = c.messages.reduce(
+                (s, m) => s + m.praiseCount,
+                0
+              );
+              const blessingCount = c.messages.filter(
+                (m) => m.author.toLowerCase() !== OWNER
+              ).length;
+              cnt[c.id] = totalPraises + 2 * blessingCount;
             });
             setPraiseCounts((prev) => ({ ...prev, ...cnt }));
           } catch (err: any) {
@@ -144,7 +151,7 @@ export default function CreationsGrid() {
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loadingMore, hasMore, page, sortBy, fetchPage]);
+  }, [loadingMore, hasMore, page, sortBy, fetchPage, OWNER]);
 
   /* -------- derive latest image + praise totals -------- */
   const creationsWithComputed = useMemo(() => {
@@ -152,9 +159,14 @@ export default function CreationsGrid() {
       const total =
         praiseCounts[c.id] ??
         (() => {
-          const totalPraises = c.messages.reduce((sum, msg) => sum + msg.praiseCount, 0);
-          const blessingCount = c.messages.filter(m => m.author.toLowerCase() !== OWNER).length;
-          return totalPraises + (2 * blessingCount);
+          const totalPraises = c.messages.reduce(
+            (sum, msg) => sum + msg.praiseCount,
+            0
+          );
+          const blessingCount = c.messages.filter(
+            (m) => m.author.toLowerCase() !== OWNER
+          ).length;
+          return totalPraises + 2 * blessingCount;
         })();
 
       const abrahamMsgs = c.messages.filter(
@@ -183,7 +195,7 @@ export default function CreationsGrid() {
       if (a.closed !== b.closed) {
         return a.closed ? 1 : -1;
       }
-      
+
       // Secondary sort based on selected option
       if (sortBy === "most-praised") {
         // By praise count
@@ -209,6 +221,7 @@ export default function CreationsGrid() {
     if (loadingPraise) return;
     setLoadingPraise(c.id);
     try {
+      // Queued; auto-batches to one approval for bursts
       await praise(c.id, c.lastMessageUuid);
       setPraiseCounts((prev) => ({
         ...prev,
@@ -271,90 +284,90 @@ export default function CreationsGrid() {
 
         {/* grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {sorted.filter(c => !HIDDEN_SESSION_IDS.includes(c.id)).map((c) => (
-            <div
-              key={c.id}
-              className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow relative"
-            >
-              {/* image link */}
-              <Link href={`/creation/${c.id}`} className="block">
-                <div className="aspect-square relative bg-gray-100">
-                  {c.lastImage ? (
-                    <Image
-                      src={c.lastImage}
-                      alt={c.description}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover"
-                      quality={75}
-                      onError={() => console.error("image error")}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <span className="text-6xl">🎨</span>
-                    </div>
-                  )}
-                  {/* White overlay for closed creations */}
-                  {c.closed && (
-                    <div className="absolute inset-0 bg-white/60 pointer-events-none" />
-                  )}
-                </div>
-              </Link>
-
-              {/* info */}
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <button
-                        className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50"
-                        disabled={c.closed || loadingPraise === c.id}
-                      >
-                        <span className="text-2xl relative">
-                          🙌
-                          <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
-                            {c.closed ? "Closed" : "Praise"}
-                          </span>
-                        </span>
-                        {c.totalPraises > 0 && (
-                          <span className="text-lg font-medium">
-                            {c.totalPraises}
-                          </span>
-                        )}
-                      </button>
-                    </DialogTrigger>
-                    {!c.closed && (
-                      <DialogContent className="bg-white">
-                        <DialogHeader>
-                          <DialogTitle>Praise Creation</DialogTitle>
-                          <DialogDescription>
-                            {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
-                          </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter>
-                          <Button
-                            onClick={() => handlePraise(c)}
-                            disabled={loadingPraise === c.id}
-                          >
-                            {loadingPraise === c.id && (
-                              <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
-                            )}
-                            {loadingPraise === c.id ? "Praising…" : "Praise"}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
+          {sorted
+            .filter((c) => !HIDDEN_SESSION_IDS.includes(c.id))
+            .map((c) => (
+              <div
+                key={c.id}
+                className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow relative"
+              >
+                {/* image link */}
+                <Link href={`/creation/${c.id}`} className="block">
+                  <div className="aspect-square relative bg-gray-100">
+                    {c.lastImage ? (
+                      <Image
+                        src={c.lastImage}
+                        alt={c.description}
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        className="object-cover"
+                        quality={75}
+                        onError={() => console.error("image error")}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <span className="text-6xl">🎨</span>
+                      </div>
                     )}
-                  </Dialog>
+                    {/* White overlay for closed creations */}
+                    {c.closed && (
+                      <div className="absolute inset-0 bg-white/60 pointer-events-none" />
+                    )}
+                  </div>
+                </Link>
 
-                  <Link href={`/creation/${c.id}`}>
-                    <span className="text-sm text-gray-500 hover:text-gray-700">
-                      {getRelativeTime(Number(c.lastActivityAt) * 1000)}
-                    </span>
-                  </Link>
+                {/* info */}
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-colors disabled:opacity-50"
+                            disabled={c.closed || loadingPraise === c.id}
+                            onClick={
+                              !c.closed ? () => handlePraise(c) : undefined
+                            }
+                          >
+                            {loadingPraise === c.id ? (
+                              <Loader2Icon className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <span className="text-2xl">🙌</span>
+                            )}
+                            {c.totalPraises > 0 && (
+                              <span className="text-lg font-medium">
+                                {c.totalPraises}
+                              </span>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="bg-gray-800 text-white border-gray-700"
+                        >
+                          {c.closed ? (
+                            <div>Closed</div>
+                          ) : (
+                            <div>
+                              <div className="font-medium">Praise Creation</div>
+                              <div className="text-xs">
+                                {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                              </div>
+                            </div>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <Link href={`/creation/${c.id}`}>
+                      <span className="text-sm text-gray-500 hover:text-gray-700">
+                        {getRelativeTime(Number(c.lastActivityAt) * 1000)}
+                      </span>
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
 
         {/* infinite-scroll sentinel */}
@@ -367,12 +380,17 @@ export default function CreationsGrid() {
         {sorted.length === 0 && !loadingMore && (
           <p className="text-center py-12 text-gray-500">No creations yet</p>
         )}
-        
+
         {/* Display visible session IDs */}
-        {sorted.filter(c => !HIDDEN_SESSION_IDS.includes(c.id)).length > 0 && (
+        {sorted.filter((c) => !HIDDEN_SESSION_IDS.includes(c.id)).length >
+          0 && (
           <div className="mt-8 mb-4 text-center">
             <p className="text-sm text-gray-500">
-              Visible session IDs: {sorted.filter(c => !HIDDEN_SESSION_IDS.includes(c.id)).map(c => `"${c.id}"`).join(", ")}
+              Visible session IDs:{" "}
+              {sorted
+                .filter((c) => !HIDDEN_SESSION_IDS.includes(c.id))
+                .map((c) => `"${c.id}"`)
+                .join(", ")}
             </p>
           </div>
         )}

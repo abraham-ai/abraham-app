@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,12 +15,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamContract,
+  useAbrahamSmartWallet,
   BLESS_PRICE_ETHER,
-} from "@/hooks/use-abraham-contract";
+} from "@/hooks/use-abraham-smartwallet";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
+import { usePrivy } from "@privy-io/react-auth";
 
 interface Props {
   creation: CreationItem;
@@ -44,8 +45,19 @@ export default function BlessDialog({
   onNewBlessing,
 }: Props) {
   const { loggedIn, login, loadingAuth, authState } = useAuth();
-  const { bless } = useAbrahamContract();
-  const userAddress = authState.walletAddress?.toLowerCase() ?? "";
+  const { bless } = useAbrahamSmartWallet();
+  const { user } = usePrivy();
+
+  const smartAddr = useMemo(
+    () =>
+      (user?.linkedAccounts as any[])
+        ?.find((a) => a?.type === "smart_wallet")
+        ?.address?.toLowerCase?.(),
+    [user]
+  );
+  const eoaAddr = authState.walletAddress?.toLowerCase();
+  const userAddress = smartAddr || eoaAddr || "";
+
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -63,7 +75,7 @@ export default function BlessDialog({
 
     setLoading(true);
     try {
-      // Calls server to pin IPFS JSON, then on-chain bless(sessionId, msgUuid, cid)
+      // Queued; pins to IPFS then enqueues on-chain bless()
       const { msgUuid } = await bless(creation.id, text.trim());
 
       /* optimistic UI */
@@ -79,8 +91,9 @@ export default function BlessDialog({
 
       setOpen(false);
       setText("");
-    } catch {
-      /* toast handled in hook */
+    } catch (e) {
+      // toast handled in hook
+      console.error(e);
     } finally {
       setLoading(false);
     }

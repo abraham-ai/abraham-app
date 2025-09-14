@@ -13,11 +13,9 @@ declare module "@privy-io/react-auth" {
   interface Google {
     picture?: string;
   }
-
   interface Discord {
     picture?: string;
   }
-
   interface Twitter {
     picture?: string;
   }
@@ -41,7 +39,7 @@ interface AuthContextType {
 
   /* data */
   authState: AuthState;
-  /** EIP‑1193 provider for the user’s primary wallet (if any) */
+  /** EIP-1193 provider for the user’s primary wallet (if any) */
   eip1193Provider: any | null;
 }
 
@@ -114,7 +112,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setAuthState(state);
       localStorage.setItem("idToken", token ?? "");
     })().catch(console.error);
-    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [privyReady, authenticated, user, wallets]);
 
   /* ---------- auth actions ---------- */
