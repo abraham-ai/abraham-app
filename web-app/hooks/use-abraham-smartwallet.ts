@@ -78,7 +78,9 @@ export function useAbrahamSmartWallet() {
       if (swClient) return swClient;
       await new Promise((r) => setTimeout(r, 150));
       if (Date.now() - start > timeoutMs) {
-        throw new Error("Smart wallet still initializing");
+        const err = new Error("Smart wallet still initializing");
+        showErrorToast(err, "Wallet Not Ready");
+        throw err;
       }
     }
   };
@@ -139,44 +141,75 @@ export function useAbrahamSmartWallet() {
       }
     );
 
-    const rcpt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-    if (rcpt.status === "success") {
-      // Create detailed success message
-      let actionDescription = "";
-      if (praiseCount && blessCount) {
-        actionDescription = `${praiseCount} praise${
-          praiseCount > 1 ? "s" : ""
-        } and ${blessCount} blessing${blessCount > 1 ? "s" : ""}`;
-      } else if (praiseCount) {
-        actionDescription = `${praiseCount} praise${
-          praiseCount > 1 ? "s" : ""
-        }`;
-      } else if (blessCount) {
-        actionDescription = `${blessCount} blessing${
-          blessCount > 1 ? "s" : ""
-        }`;
-      } else {
-        actionDescription = `${calls.length} action${
-          calls.length > 1 ? "s" : ""
-        }`;
-      }
+    try {
+      const rcpt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+      if (rcpt.status === "success") {
+        // Create detailed success message
+        let actionDescription = "";
+        if (praiseCount && blessCount) {
+          actionDescription = `${praiseCount} praise${
+            praiseCount > 1 ? "s" : ""
+          } and ${blessCount} blessing${blessCount > 1 ? "s" : ""}`;
+        } else if (praiseCount) {
+          actionDescription = `${praiseCount} praise${
+            praiseCount > 1 ? "s" : ""
+          }`;
+        } else if (blessCount) {
+          actionDescription = `${blessCount} blessing${
+            blessCount > 1 ? "s" : ""
+          }`;
+        } else {
+          actionDescription = `${calls.length} action${
+            calls.length > 1 ? "s" : ""
+          }`;
+        }
 
-      showSuccessToast(
-        `Sent ${actionDescription}`,
-        `Transaction confirmed on-chain (${totalCost.toFixed(5)} ETH spent)`
-      );
-    } else {
-      throw new Error("Transaction failed");
+        showSuccessToast(
+          `Sent ${actionDescription}`,
+          `Transaction confirmed on-chain (${totalCost.toFixed(5)} ETH spent)`
+        );
+      } else {
+        const err = new Error("Transaction failed on-chain");
+        showErrorToast(
+          err,
+          `Transaction Failed (${totalCost.toFixed(5)} ETH attempted)`
+        );
+        throw err;
+      }
+      return txHash;
+    } catch (e: any) {
+      // Handle any errors that occur during transaction confirmation
+      if (!isUserReject(e)) {
+        showErrorToast(e, "Transaction Failed");
+      }
+      throw e;
     }
-    return txHash;
   };
 
   const enqueue = (call: BatchedCall, { immediate = false } = {}) => {
     queueRef.current.push(call);
-    if (immediate) return flush();
+    if (immediate) {
+      return flush().catch((e) => {
+        // Make sure we catch flush errors here to prevent unhandled rejections
+        if (!isUserReject(e)) {
+          console.error("Error in immediate flush:", e);
+          // The showErrorToast is already handled in flush() so no need to duplicate
+        }
+        throw e;
+      });
+    }
     if (!timerRef.current) {
       // coalesce bursts to really batch (single user op)
-      timerRef.current = setTimeout(() => void flush(), 1200);
+      timerRef.current = setTimeout(() => {
+        flush().catch((e) => {
+          if (!isUserReject(e)) {
+            console.error("Error in delayed flush:", e);
+            // Error toast already shown in flush()
+          }
+        });
+      }, 1200);
     }
   };
 
