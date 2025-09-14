@@ -10,8 +10,9 @@ import {
   ArrowDownToLineIcon,
   CopyIcon,
   ExternalLinkIcon,
+  PlusIcon,
 } from "lucide-react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy, useWallets, useCreateWallet } from "@privy-io/react-auth";
 import {
   createPublicClient,
   createWalletClient,
@@ -49,11 +50,6 @@ const publicClient = createPublicClient({
   transport: http(baseSepolia.rpcUrls.default.http[0]),
 });
 
-function short(addr?: string) {
-  if (!addr) return "";
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
-
 async function copy(text: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -67,6 +63,7 @@ export default function AccountMenu() {
   const { login, logout, loggedIn, loadingAuth, authState } = useAuth();
   const { user } = usePrivy();
   const { wallets } = useWallets();
+  const { createWallet } = useCreateWallet();
 
   const eoaWallet = wallets[0]; // primary signer (embedded or external)
   const eoaAddress = useMemo(
@@ -165,7 +162,7 @@ export default function AccountMenu() {
       });
 
       if (!eoaAddress) {
-        throw new Error("EOA address is not available");
+        throw new Error("EOA address is undefined");
       }
 
       const hash = await walletClient.sendTransaction({
@@ -185,6 +182,25 @@ export default function AccountMenu() {
       showErrorToast(e as Error, "Funding failed");
     } finally {
       setFunding(false);
+    }
+  };
+
+  // One-click create for users who don't have a smart wallet yet
+  const [creatingSmart, setCreatingSmart] = useState(false);
+  const createSmartWalletNow = async () => {
+    setCreatingSmart(true);
+    try {
+      await createWallet({});
+      // Smart wallet is provisioned shortly after embedded wallet exists
+      showSuccessToast(
+        "Embedded wallet created",
+        "Smart wallet will initialize shortly."
+      );
+      setTimeout(refreshBalances, 1500);
+    } catch (e) {
+      showErrorToast(e as Error, "Failed to create embedded wallet");
+    } finally {
+      setCreatingSmart(false);
     }
   };
 
@@ -248,7 +264,29 @@ export default function AccountMenu() {
                       </button>
                     </>
                   ) : (
-                    <span>Not provisioned yet</span>
+                    <div className="rounded-md border p-3 bg-gray-50">
+                      <p className="text-xs text-gray-700 mb-2">
+                        Not provisioned yet — create an embedded signer to
+                        enable your smart wallet.
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={createSmartWalletNow}
+                        disabled={creatingSmart}
+                      >
+                        {creatingSmart && (
+                          <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                        )}
+                        {creatingSmart ? (
+                          "Creating…"
+                        ) : (
+                          <>
+                            <PlusIcon className="w-4 h-4 mr-1" /> Create smart
+                            wallet
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   )}
                 </div>
                 <div className="mt-2 flex items-center justify-between">
@@ -339,8 +377,7 @@ export default function AccountMenu() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Chainlink faucet (0.5 ETH){" "}
-                    <ExternalLinkIcon className="w-3 h-3" />
+                    Chainlink faucet <ExternalLinkIcon className="w-3 h-3" />
                   </a>
                   <a
                     className="inline-flex items-center gap-1 hover:underline"
