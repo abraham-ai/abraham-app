@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamContract,
+  useAbrahamSmartWallet,
   BLESS_PRICE_ETHER,
-} from "@/hooks/use-abraham-contract";
+} from "@/hooks/use-abraham-smartwallet";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
+import { usePrivy } from "@privy-io/react-auth";
 
 interface Props {
   creation: CreationItem;
@@ -26,9 +27,20 @@ interface Props {
 
 export default function BlessBox({ creation, onNewBlessing }: Props) {
   const { loggedIn, login, loadingAuth, authState } = useAuth();
-  const { bless } = useAbrahamContract();
+  const { bless } = useAbrahamSmartWallet();
+  const { user } = usePrivy();
 
-  const userAddr = authState.walletAddress?.toLowerCase() ?? "";
+  // Prefer smart wallet address for UI + attribution; fallback to EOA if any
+  const smartAddr = useMemo(
+    () =>
+      (user?.linkedAccounts as any[])
+        ?.find((a) => a?.type === "smart_wallet")
+        ?.address?.toLowerCase?.(),
+    [user]
+  );
+  const eoaAddr = authState.walletAddress?.toLowerCase();
+  const userAddr = smartAddr || eoaAddr || "";
+
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -52,6 +64,7 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
 
     setLoading(true);
     try {
+      // Queued; the hook pins to IPFS and enqueues the on-chain bless()
       const { msgUuid } = await bless(creation.id, text.trim());
 
       onNewBlessing?.({
@@ -62,8 +75,9 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
         messageUuid: msgUuid,
       });
       setText("");
-    } catch (_) {
-      /* toast handled in hook */
+    } catch (e) {
+      // toast handled in hook for non-reject errors
+      console.error(e);
     } finally {
       setLoading(false);
     }

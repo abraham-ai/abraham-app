@@ -6,27 +6,24 @@ import { Loader2Icon } from "lucide-react";
 import { CreationItem } from "@/types/abraham";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamContract,
+  useAbrahamSmartWallet,
   PRAISE_PRICE_ETHER,
-} from "@/hooks/use-abraham-contract";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+} from "@/hooks/use-abraham-smartwallet";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import { getRelativeTime } from "@/lib/time-utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const OWNER = (process.env.NEXT_PUBLIC_OWNER_ADDRESS || "").toLowerCase();
 
 export default function Creation({ creation }: { creation: CreationItem }) {
   const { loggedIn } = useAuth();
-  const { praise } = useAbrahamContract();
+  const { praise } = useAbrahamSmartWallet();
 
   // keep praises in sync with props in case the page re-fetches
   const [praises, setPraises] = useState(creation.praiseCount);
@@ -43,8 +40,12 @@ export default function Creation({ creation }: { creation: CreationItem }) {
 
     setLoading(true);
     try {
+      // Queues into a batched user operation (single approval for many actions)
       await praise(creation.id, creation.messageUuid);
       setPraises((p) => p + 1);
+    } catch (e) {
+      // toast handled inside the hook for non-reject errors
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -125,44 +126,43 @@ export default function Creation({ creation }: { creation: CreationItem }) {
       {/* actions */}
       {(!creation.closed || displayReactions > 0) && (
         <div className="flex items-center mt-3 pl-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <button
-                className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50"
-                disabled={loading || creation.closed}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50"
+                  disabled={loading || creation.closed}
+                  onClick={!creation.closed ? handlePraise : undefined}
+                >
+                  {loading ? (
+                    <Loader2Icon className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <span className="text-3xl relative">🙌</span>
+                  )}
+                  {displayReactions > 0 && (
+                    <span className="text-lg font-medium">
+                      {displayReactions}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="bg-gray-800 text-white border-gray-700"
               >
-                <span className="text-3xl relative">
-                  🙌
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
-                    {creation.closed ? "Closed" : "Praise"}
-                  </span>
-                </span>
-                {displayReactions > 0 && (
-                  <span className="text-lg font-medium">
-                    {displayReactions}
-                  </span>
+                {creation.closed ? (
+                  <div>Closed</div>
+                ) : (
+                  <div>
+                    <div className="font-medium">Praise Creation</div>
+                    <div className="text-xs">
+                      {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                    </div>
+                  </div>
                 )}
-              </button>
-            </DialogTrigger>
-            {!creation.closed && (
-              <DialogContent className="bg-white">
-                <DialogHeader>
-                  <DialogTitle>Praise Creation</DialogTitle>
-                  <DialogDescription>
-                    {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <Button onClick={handlePraise} disabled={loading}>
-                    {loading && (
-                      <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
-                    )}
-                    {loading ? "Praising…" : "Praise"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            )}
-          </Dialog>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
     </div>
