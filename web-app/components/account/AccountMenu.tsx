@@ -59,17 +59,38 @@ async function copy(text: string) {
   }
 }
 
+// Nicely label a wallet type
+function labelForWalletType(t?: string) {
+  if (!t) return "Wallet";
+  if (t === "privy") return "Embedded Wallet";
+  return t.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()); // e.g. metamask -> Metamask
+}
+
 export default function AccountMenu() {
   const { login, logout, loggedIn, loadingAuth, authState } = useAuth();
   const { user } = usePrivy();
   const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
 
-  const eoaWallet = wallets[0]; // primary signer (embedded or external)
-  const eoaAddress = useMemo(
-    () => eoaWallet?.address as `0x${string}` | undefined,
-    [eoaWallet]
-  );
+  // Partition wallets into external vs. embedded
+  const { externalWallets, embeddedWallets } = useMemo(() => {
+    const ext = wallets.filter((w: any) => w.walletClientType !== "privy");
+    const emb = wallets.filter((w: any) => w.walletClientType === "privy");
+    return { externalWallets: ext, embeddedWallets: emb };
+  }, [wallets]);
+
+  // Choose a funding wallet: external first (MetaMask, Coinbase, etc.), else fallback to embedded
+  const fundingWallet = externalWallets[0] ?? wallets[0] ?? null;
+  const fundingWalletAddress = fundingWallet?.address as
+    | `0x${string}`
+    | undefined;
+
+  // Explicit primary external & embedded addresses for balance display
+  const externalEOA = externalWallets[0] ?? null;
+  const externalAddress = externalEOA?.address as `0x${string}` | undefined;
+
+  const embeddedEOA = embeddedWallets[0] ?? null;
+  const embeddedAddress = embeddedEOA?.address as `0x${string}` | undefined;
 
   // Smart wallet address from Privy linked accounts
   const smartWalletAddress = useMemo(
@@ -79,24 +100,25 @@ export default function AccountMenu() {
     [user]
   );
 
-  // Make sure we’re on Base Sepolia for wallet UIs
+  // Ensure the funding wallet is on Base Sepolia (don’t spam chain switches)
   useEffect(() => {
     const ensureChain = async () => {
-      if (!eoaWallet) return;
+      if (!fundingWallet) return;
       try {
-        if (eoaWallet.chainId !== `eip155:${baseSepolia.id}`) {
-          await eoaWallet.switchChain(baseSepolia.id);
+        if (fundingWallet.chainId !== `eip155:${baseSepolia.id}`) {
+          await fundingWallet.switchChain(baseSepolia.id);
         }
       } catch (err) {
         console.warn("Chain switch rejected/failed", err);
       }
     };
     ensureChain();
-  }, [eoaWallet]);
+  }, [fundingWallet]);
 
   // Balances
   const [smartEth, setSmartEth] = useState<string | null>(null);
-  const [eoaEth, setEoaEth] = useState<string | null>(null);
+  const [externalEth, setExternalEth] = useState<string | null>(null);
+  const [embeddedEth, setEmbeddedEth] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const refreshBalances = useCallback(async () => {
@@ -110,34 +132,42 @@ export default function AccountMenu() {
       } else {
         setSmartEth(null);
       }
-      if (eoaAddress) {
-        const b = await publicClient.getBalance({ address: eoaAddress });
-        setEoaEth(formatEther(b));
+      if (externalAddress) {
+        const b = await publicClient.getBalance({ address: externalAddress });
+        setExternalEth(formatEther(b));
       } else {
-        setEoaEth(null);
+        setExternalEth(null);
+      }
+      if (embeddedAddress) {
+        const b = await publicClient.getBalance({ address: embeddedAddress });
+        setEmbeddedEth(formatEther(b));
+      } else {
+        setEmbeddedEth(null);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setRefreshing(false);
     }
-  }, [smartWalletAddress, eoaAddress]);
+  }, [smartWalletAddress, externalAddress, embeddedAddress]);
 
   useEffect(() => {
     refreshBalances();
-    // optional polling every 20s
     const t = setInterval(refreshBalances, 20000);
     return () => clearInterval(t);
   }, [refreshBalances]);
 
-  // Fund smart wallet (EOA -> Smart)
+  // Fund smart wallet (Funding EOA -> Smart)
   const [fundOpen, setFundOpen] = useState(false);
   const [amount, setAmount] = useState("0.01");
   const [funding, setFunding] = useState(false);
 
   const doFund = async () => {
-    if (!eoaWallet) {
-      showErrorToast(new Error("no wallet"), "No EOA wallet available");
+    if (!fundingWallet) {
+      showErrorToast(
+        new Error("no wallet"),
+        "No wallet available to fund from"
+      );
       return;
     }
     if (!smartWalletAddress) {
@@ -155,21 +185,21 @@ export default function AccountMenu() {
 
     setFunding(true);
     try {
-      const provider = await eoaWallet.getEthereumProvider();
+      const provider = await (fundingWallet as any).getEthereumProvider();
       const walletClient = createWalletClient({
         chain: baseSepolia,
         transport: custom(provider),
       });
 
-      if (!eoaAddress) {
-        throw new Error("EOA address is undefined");
+      if (!fundingWalletAddress) {
+        throw new Error("Funding wallet address is undefined");
       }
 
       const hash = await walletClient.sendTransaction({
         to: smartWalletAddress,
         value,
         chain: baseSepolia,
-        account: eoaAddress,
+        account: fundingWalletAddress,
       });
 
       showSuccessToast("Funding sent", "Waiting for confirmation…");
@@ -185,13 +215,12 @@ export default function AccountMenu() {
     }
   };
 
-  // One-click create for users who don't have a smart wallet yet
+  // One-click create for users who don't have a smart wallet yet (provisions embedded signer)
   const [creatingSmart, setCreatingSmart] = useState(false);
   const createSmartWalletNow = async () => {
     setCreatingSmart(true);
     try {
       await createWallet({});
-      // Smart wallet is provisioned shortly after embedded wallet exists
       showSuccessToast(
         "Embedded wallet created",
         "Smart wallet will initialize shortly."
@@ -289,6 +318,7 @@ export default function AccountMenu() {
                     </div>
                   )}
                 </div>
+
                 <div className="mt-2 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
                     <CoinsIcon className="w-4 h-4" />
@@ -315,48 +345,88 @@ export default function AccountMenu() {
                       variant="default"
                       size="sm"
                       onClick={() => setFundOpen(true)}
-                      disabled={!smartWalletAddress || !eoaAddress}
+                      disabled={!smartWalletAddress || !fundingWallet}
                     >
                       <ArrowDownToLineIcon className="w-4 h-4 mr-1" />
                       Fund
                     </Button>
                   </div>
                 </div>
+
+                {/* Funding source tag */}
+                {fundingWallet && (
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Funding source:{" "}
+                    {labelForWalletType(
+                      (fundingWallet as any).walletClientType
+                    )}
+                  </p>
+                )}
               </div>
 
               <DropdownMenuSeparator />
 
-              {/* EOA (signer) block */}
-              <div className="px-3 py-2">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <WalletIcon className="w-4 h-4" />
-                  <span>Signer (EOA)</span>
-                </div>
-                <div className="mt-1 text-xs text-gray-600 break-all">
-                  {eoaAddress ? (
-                    <>
-                      <code>{eoaAddress}</code>
+              {/* External EOA (MetaMask, etc.) */}
+              {externalAddress && (
+                <>
+                  <div className="px-3 py-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <WalletIcon className="w-4 h-4" />
+                      <span>External Wallet (EOA)</span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600 break-all">
+                      <code>{externalAddress}</code>
                       <button
-                        onClick={() => eoaAddress && copy(eoaAddress)}
+                        onClick={() => copy(externalAddress)}
                         className="ml-2 inline-flex items-center gap-1 text-gray-500 hover:text-gray-700"
                         title="Copy address"
                       >
                         <CopyIcon className="w-3 h-3" />
                       </button>
-                    </>
-                  ) : (
-                    <span>Unavailable</span>
-                  )}
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-sm">
-                  <CoinsIcon className="w-4 h-4" />
-                  <span>
-                    {eoaEth !== null ? `${Number(eoaEth).toFixed(5)} ETH` : "—"}
-                  </span>
-                </div>
-              </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      <CoinsIcon className="w-4 h-4" />
+                      <span>
+                        {externalEth !== null
+                          ? `${Number(externalEth).toFixed(5)} ETH`
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                </>
+              )}
 
-              <DropdownMenuSeparator />
+              {/* Embedded EOA (Privy) */}
+              {embeddedAddress && (
+                <>
+                  <div className="px-3 py-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <WalletIcon className="w-4 h-4" />
+                      <span>Embedded Wallet (EOA)</span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600 break-all">
+                      <code>{embeddedAddress}</code>
+                      <button
+                        onClick={() => copy(embeddedAddress)}
+                        className="ml-2 inline-flex items-center gap-1 text-gray-500 hover:text-gray-700"
+                        title="Copy address"
+                      >
+                        <CopyIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      <CoinsIcon className="w-4 h-4" />
+                      <span>
+                        {embeddedEth !== null
+                          ? `${Number(embeddedEth).toFixed(5)} ETH`
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                </>
+              )}
 
               {/* Quick faucet links for Base Sepolia */}
               <div className="px-3 py-2 text-xs text-gray-600">
@@ -408,16 +478,21 @@ export default function AccountMenu() {
               <DialogHeader>
                 <DialogTitle>Fund Smart Wallet</DialogTitle>
                 <DialogDescription>
-                  Send ETH from your signer (EOA) to your smart wallet on Base
-                  Sepolia.
+                  Send ETH from your{" "}
+                  <strong>
+                    {labelForWalletType(
+                      (fundingWallet as any)?.walletClientType
+                    )}
+                  </strong>{" "}
+                  to your smart wallet on Base Sepolia.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-2">
                 <div className="text-sm">
-                  <div className="text-gray-600">From (EOA)</div>
+                  <div className="text-gray-600">From (Funding EOA)</div>
                   <div className="font-mono text-xs break-all">
-                    {eoaAddress ?? "—"}
+                    {fundingWalletAddress ?? "—"}
                   </div>
                 </div>
                 <div className="text-sm">
@@ -444,7 +519,9 @@ export default function AccountMenu() {
                 </Button>
                 <Button
                   onClick={doFund}
-                  disabled={funding || !smartWalletAddress || !eoaAddress}
+                  disabled={
+                    funding || !smartWalletAddress || !fundingWalletAddress
+                  }
                 >
                   {funding && (
                     <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
