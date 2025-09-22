@@ -1,0 +1,12 @@
+{
+  "miniapp": {
+    "version": "1",
+    "name": "Abraham",
+    "iconUrl": "https://abraham.ai/abrahamlogo.png",
+    "homeUrl": "https://abraham.ai/",
+    "imageUrl": "https://abraham.ai/abrahamlogo.png",
+    "buttonTitle": "Open Abraham",
+    "splashImageUrl": "https://abraham.ai/abrahamlogo.png",
+    "splashBackgroundColor": "#ffffff"
+  }
+}

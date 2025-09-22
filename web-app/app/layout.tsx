@@ -43,6 +43,38 @@ export const metadata: Metadata = {
     description: "An Autonomous Artificial Artist",
     images: ["/abrahamlogo.png"],
   },
+  other: {
+    // Minimal example embed for root: ensure absolute URLs in production
+    "fc:miniapp": JSON.stringify({
+      version: "1",
+      imageUrl: "https://abraham.ai/abrahamlogo.png",
+      button: {
+        title: "Open Abraham",
+        action: {
+          type: "launch_miniapp",
+          url: "https://abraham.ai/",
+          name: "Abraham",
+          splashImageUrl: "https://abraham.ai/abrahamlogo.png",
+          splashBackgroundColor: "#ffffff",
+        },
+      },
+    }),
+    // Backward compatibility
+    "fc:frame": JSON.stringify({
+      version: "1",
+      imageUrl: "https://abraham.ai/abrahamlogo.png",
+      button: {
+        title: "Open Abraham",
+        action: {
+          type: "launch_frame",
+          url: "https://abraham.ai/",
+          name: "Abraham",
+          splashImageUrl: "https://abraham.ai/abrahamlogo.png",
+          splashBackgroundColor: "#ffffff",
+        },
+      },
+    }),
+  },
 };
 
 export default function RootLayout({
