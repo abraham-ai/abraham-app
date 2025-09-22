@@ -8,6 +8,7 @@ import { base } from "viem/chains";
 import Providers from "@/Providers";
 import { Toaster } from "@/components/ui/toaster";
 import { ErrorBoundary } from "@/components/error-boundary";
+import MiniAppReady from "@/components/miniapp-ready";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -84,6 +85,7 @@ export default function RootLayout({
           <Providers>
             <AuthProvider>
               <ErrorBoundary>
+                <MiniAppReady />
                 {children}
                 <Toaster />
               </ErrorBoundary>
