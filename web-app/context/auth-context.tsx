@@ -88,7 +88,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // If running inside a Farcaster Mini App, prefer Quick Auth
       try {
         const isMini = await sdk.isInMiniApp();
-        if (isMini) {
+        const suppressed =
+          typeof window !== "undefined" &&
+          sessionStorage.getItem("miniapp_logout") === "1";
+        if (isMini && !suppressed && !authenticated && !authState.idToken) {
           const { token } = await sdk.quickAuth.getToken();
           if (token) {
             setAuthState({ idToken: token });
@@ -143,6 +146,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const isMini = await sdk.isInMiniApp();
         if (isMini) {
+          try {
+            sessionStorage.removeItem("miniapp_logout");
+          } catch {}
           const { token } = await sdk.quickAuth.getToken();
           if (token) {
             setAuthState({ idToken: token });
@@ -161,6 +167,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
+      // Attempt to revoke/clear Mini App Quick Auth state
+      try {
+        const isMini = await sdk.isInMiniApp();
+        if (isMini) {
+          // No explicit revoke API today; clear our state
+          localStorage.removeItem("idToken");
+          try {
+            sessionStorage.setItem("miniapp_logout", "1");
+          } catch {}
+        }
+      } catch {}
+
+      // Disconnect all Privy wallets to avoid stale providers
+      try {
+        for (const w of wallets) {
+          try {
+            await (w as any).disconnect?.();
+          } catch {}
+        }
+      } catch {}
+
+      // Clear local state
+      setAuthState({});
+      setEipProvider(null);
+      localStorage.removeItem("idToken");
+
+      // Finally, Privy session logout
       await privyLogout();
     } catch (err) {
       console.error("[Privy] logout error", err);

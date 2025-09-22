@@ -15,9 +15,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamSmartWallet,
+  useAbrahamActions,
   BLESS_PRICE_ETHER,
-} from "@/hooks/use-abraham-smartwallet";
+} from "@/hooks/use-abraham-actions";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
@@ -45,7 +45,7 @@ export default function BlessDialog({
   onNewBlessing,
 }: Props) {
   const { loggedIn, login, loadingAuth, authState } = useAuth();
-  const { bless } = useAbrahamSmartWallet();
+  const { bless } = useAbrahamActions();
   const { user } = usePrivy();
 
   const smartAddr = useMemo(
