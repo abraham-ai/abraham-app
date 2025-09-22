@@ -34,11 +34,20 @@ function EnsureEmbeddedWalletOnce() {
 }
 
 export default function Providers({ children }: Props) {
+  const isMiniApp =
+    typeof window !== "undefined" &&
+    /Warpcast|Farcaster/i.test(navigator.userAgent || "");
   return (
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID as string}
       config={{
-        loginMethods: ["email", "wallet", "google"],
+        loginMethods: ["email", "wallet", "google", "farcaster"],
+        // In a Mini App, bias to Farcaster first for a smoother flow
+        appearance: {
+          theme: "light",
+          accentColor: "#676FFF",
+          showWalletLoginFirst: !isMiniApp,
+        },
         defaultChain: baseSepolia,
         supportedChains: [baseSepolia],
         embeddedWallets: {
@@ -46,10 +55,6 @@ export default function Providers({ children }: Props) {
           ethereum: { createOnLogin: "all-users" },
           // optional: suppress Privy confirmation modals
           showWalletUIs: false,
-        },
-        appearance: {
-          theme: "light",
-          accentColor: "#676FFF",
         },
       }}
     >
