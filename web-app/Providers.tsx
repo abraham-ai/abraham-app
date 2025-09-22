@@ -38,7 +38,7 @@ export default function Providers({ children }: Props) {
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID as string}
       config={{
-        loginMethods: ["email", "wallet", "google"],
+        loginMethods: ["email", "wallet", "google", "farcaster"],
         defaultChain: baseSepolia,
         supportedChains: [baseSepolia],
         embeddedWallets: {
