@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamSmartWallet,
+  useAbrahamActions,
   BLESS_PRICE_ETHER,
-} from "@/hooks/use-abraham-smartwallet";
+} from "@/hooks/use-abraham-actions";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
@@ -27,7 +27,7 @@ interface Props {
 
 export default function BlessBox({ creation, onNewBlessing }: Props) {
   const { loggedIn, login, loadingAuth, authState } = useAuth();
-  const { bless } = useAbrahamSmartWallet();
+  const { bless } = useAbrahamActions();
   const { user } = usePrivy();
 
   // Prefer smart wallet address for UI + attribution; fallback to EOA if any

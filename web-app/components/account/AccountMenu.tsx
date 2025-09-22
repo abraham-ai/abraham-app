@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
+import { useTxMode } from "@/context/tx-mode-context";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 
 const publicClient = createPublicClient({
@@ -68,6 +69,7 @@ function labelForWalletType(t?: string) {
 
 export default function AccountMenu() {
   const { login, logout, loggedIn, loadingAuth, authState } = useAuth();
+  const { mode, setMode, isMiniApp } = useTxMode();
   const { user } = usePrivy();
   const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
@@ -218,6 +220,13 @@ export default function AccountMenu() {
   // One-click create for users who don't have a smart wallet yet (provisions embedded signer)
   const [creatingSmart, setCreatingSmart] = useState(false);
   const createSmartWalletNow = async () => {
+    if (isMiniApp) {
+      showErrorToast(
+        new Error("miniapp"),
+        "Embedded wallet creation is unavailable inside Farcaster Mini Apps"
+      );
+      return;
+    }
     setCreatingSmart(true);
     try {
       await createWallet({});
@@ -272,6 +281,35 @@ export default function AccountMenu() {
 
               <DropdownMenuSeparator />
 
+              {/* TX MODE TOGGLE */}
+              <div className="px-3 py-2">
+                <div className="text-sm font-medium mb-1">Transaction Mode</div>
+                <div className="flex items-center gap-2 text-xs">
+                  <Button
+                    variant={mode === "wallet" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMode("wallet")}
+                  >
+                    My Wallet
+                  </Button>
+                  <Button
+                    variant={mode === "smart" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMode("smart")}
+                    disabled={isMiniApp}
+                    title={
+                      isMiniApp
+                        ? "Smart Wallet disabled in Mini App"
+                        : undefined
+                    }
+                  >
+                    Smart Wallet
+                  </Button>
+                </div>
+              </div>
+
+              <DropdownMenuSeparator />
+
               {/* Smart Wallet block */}
               <div className="px-3 py-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
@@ -301,7 +339,7 @@ export default function AccountMenu() {
                       <Button
                         size="sm"
                         onClick={createSmartWalletNow}
-                        disabled={creatingSmart}
+                        disabled={creatingSmart || isMiniApp}
                       >
                         {creatingSmart && (
                           <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
@@ -315,6 +353,11 @@ export default function AccountMenu() {
                           </>
                         )}
                       </Button>
+                      {isMiniApp && (
+                        <p className="mt-2 text-[11px] text-gray-500">
+                          Not available inside Farcaster Mini Apps.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

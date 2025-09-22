@@ -5,9 +5,9 @@ import { Blessing } from "@/types/abraham";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamSmartWallet,
+  useAbrahamActions,
   PRAISE_PRICE_ETHER,
-} from "@/hooks/use-abraham-smartwallet";
+} from "@/hooks/use-abraham-actions";
 import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
@@ -26,7 +26,7 @@ interface Props {
 
 export default function Blessings({ blessings, closed = false }: Props) {
   const { loggedIn, login, loadingAuth } = useAuth();
-  const { praise } = useAbrahamSmartWallet();
+  const { praise } = useAbrahamActions();
 
   const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
   const [counts, setCounts] = useState(() =>

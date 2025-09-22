@@ -51,16 +51,16 @@ export default function Providers({ children }: Props) {
         defaultChain: baseSepolia,
         supportedChains: [baseSepolia],
         embeddedWallets: {
-          // ✅ Create embedded signer for EVERY user (incl. MetaMask/external)
-          ethereum: { createOnLogin: "all-users" },
+          // In Mini App, avoid auto-creating embedded wallets (host may manage provider)
+          ethereum: { createOnLogin: isMiniApp ? "off" : "all-users" },
           // optional: suppress Privy confirmation modals
           showWalletUIs: false,
         },
       }}
     >
       <SmartWalletsProvider>
-        {/* Safety net for users who connected before the setting above */}
-        <EnsureEmbeddedWalletOnce />
+        {/* Safety net for users who connected before the setting above; disable in Mini App */}
+        {!isMiniApp && <EnsureEmbeddedWalletOnce />}
         {children}
       </SmartWalletsProvider>
     </PrivyProvider>

@@ -6,9 +6,9 @@ import { Loader2Icon } from "lucide-react";
 import { CreationItem } from "@/types/abraham";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamSmartWallet,
+  useAbrahamActions,
   PRAISE_PRICE_ETHER,
-} from "@/hooks/use-abraham-smartwallet";
+} from "@/hooks/use-abraham-actions";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import { getRelativeTime } from "@/lib/time-utils";
@@ -23,7 +23,7 @@ const OWNER = (process.env.NEXT_PUBLIC_OWNER_ADDRESS || "").toLowerCase();
 
 export default function Creation({ creation }: { creation: CreationItem }) {
   const { loggedIn } = useAuth();
-  const { praise } = useAbrahamSmartWallet();
+  const { praise } = useAbrahamActions();
 
   // keep praises in sync with props in case the page re-fetches
   const [praises, setPraises] = useState(creation.praiseCount);
