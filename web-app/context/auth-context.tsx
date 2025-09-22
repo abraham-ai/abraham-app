@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 declare module "@privy-io/react-auth" {
   interface Google {
@@ -65,7 +66,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /* ---------- derived state ---------- */
   const [authState, setAuthState] = useState<AuthState>({});
   const [eipProvider, setEipProvider] = useState<any | null>(null);
-  const loadingAuth = !privyReady || !walletsReady;
+  const loadingAuth = (!privyReady || !walletsReady) && !authState.idToken;
 
   /* ---------- pick a “primary” wallet & provider ---------- */
   useEffect(() => {
@@ -83,6 +84,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     (async () => {
       if (!privyReady) return;
+
+      // If running inside a Farcaster Mini App, prefer Quick Auth
+      try {
+        const isMini = await sdk.isInMiniApp();
+        if (isMini) {
+          const { token } = await sdk.quickAuth.getToken();
+          if (token) {
+            setAuthState({ idToken: token });
+            localStorage.setItem("idToken", token);
+            // Prefer host EIP-1193 provider if available
+            try {
+              const eth = await sdk.wallet.getEthereumProvider();
+              setEipProvider(eth ?? null);
+            } catch {}
+            return;
+          }
+        }
+      } catch {
+        // fall through to Privy
+      }
 
       if (!authenticated || !user) {
         localStorage.removeItem("idToken");
@@ -118,6 +139,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /* ---------- auth actions ---------- */
   const login = async () => {
     try {
+      // Inside Mini App: Quick Auth flow
+      try {
+        const isMini = await sdk.isInMiniApp();
+        if (isMini) {
+          const { token } = await sdk.quickAuth.getToken();
+          if (token) {
+            setAuthState({ idToken: token });
+            localStorage.setItem("idToken", token);
+            return;
+          }
+        }
+      } catch {}
+
+      // Fallback to Privy
       await privyLogin();
     } catch (err) {
       console.error("[Privy] login error", err);
@@ -136,7 +171,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const value: AuthContextType = useMemo(
     () => ({
       loadingAuth,
-      loggedIn: authenticated,
+      loggedIn: authenticated || Boolean(authState.idToken),
       login,
       logout,
       authState,
