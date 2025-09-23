@@ -75,10 +75,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setEipProvider(null);
         return;
       }
-      const provider = await wallets[0].getEthereumProvider();
+      // Prefer provider whose address matches current authState.walletAddress
+      let target = wallets[0];
+      try {
+        const targetAddr = authState.walletAddress?.toLowerCase();
+        if (targetAddr) {
+          const found = wallets.find(
+            (w: any) => w.address?.toLowerCase?.() === targetAddr
+          );
+          if (found) target = found as any;
+        }
+      } catch {}
+      const provider = await (target as any).getEthereumProvider();
       setEipProvider(provider);
     })();
-  }, [walletsReady, wallets]);
+  }, [walletsReady, wallets, authState.walletAddress]);
 
   /* ---------- sync AuthState ---------- */
   useEffect(() => {

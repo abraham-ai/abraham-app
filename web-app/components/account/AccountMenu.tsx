@@ -45,6 +45,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
 import { useTxMode } from "@/context/tx-mode-context";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
+import { Switch } from "@/components/ui/switch";
 
 const publicClient = createPublicClient({
   chain: baseSepolia,
@@ -74,25 +75,21 @@ export default function AccountMenu() {
   const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
 
-  // Partition wallets into external vs. embedded
-  const { externalWallets, embeddedWallets } = useMemo(() => {
-    const ext = wallets.filter((w: any) => w.walletClientType !== "privy");
-    const emb = wallets.filter((w: any) => w.walletClientType === "privy");
-    return { externalWallets: ext, embeddedWallets: emb };
-  }, [wallets]);
-
-  // Choose a funding wallet: external first (MetaMask, Coinbase, etc.), else fallback to embedded
-  const fundingWallet = externalWallets[0] ?? wallets[0] ?? null;
+  // Active EOA: pick wallet matching authState.walletAddress, else first
+  const activeWallet = useMemo(() => {
+    const target = authState.walletAddress?.toLowerCase();
+    if (!wallets.length) return null as any;
+    if (!target) return wallets[0] as any;
+    return (
+      (wallets as any[]).find((w) => w.address?.toLowerCase?.() === target) ||
+      (wallets[0] as any)
+    );
+  }, [wallets, authState.walletAddress]);
+  const fundingWallet = activeWallet ?? null;
   const fundingWalletAddress = fundingWallet?.address as
     | `0x${string}`
     | undefined;
-
-  // Explicit primary external & embedded addresses for balance display
-  const externalEOA = externalWallets[0] ?? null;
-  const externalAddress = externalEOA?.address as `0x${string}` | undefined;
-
-  const embeddedEOA = embeddedWallets[0] ?? null;
-  const embeddedAddress = embeddedEOA?.address as `0x${string}` | undefined;
+  const activeAddress = fundingWalletAddress;
 
   // Smart wallet address from Privy linked accounts
   const smartWalletAddress = useMemo(
@@ -119,8 +116,7 @@ export default function AccountMenu() {
 
   // Balances
   const [smartEth, setSmartEth] = useState<string | null>(null);
-  const [externalEth, setExternalEth] = useState<string | null>(null);
-  const [embeddedEth, setEmbeddedEth] = useState<string | null>(null);
+  const [activeEth, setActiveEth] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const refreshBalances = useCallback(async () => {
@@ -134,24 +130,18 @@ export default function AccountMenu() {
       } else {
         setSmartEth(null);
       }
-      if (externalAddress) {
-        const b = await publicClient.getBalance({ address: externalAddress });
-        setExternalEth(formatEther(b));
+      if (activeAddress) {
+        const b = await publicClient.getBalance({ address: activeAddress });
+        setActiveEth(formatEther(b));
       } else {
-        setExternalEth(null);
-      }
-      if (embeddedAddress) {
-        const b = await publicClient.getBalance({ address: embeddedAddress });
-        setEmbeddedEth(formatEther(b));
-      } else {
-        setEmbeddedEth(null);
+        setActiveEth(null);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setRefreshing(false);
     }
-  }, [smartWalletAddress, externalAddress, embeddedAddress]);
+  }, [smartWalletAddress, activeAddress]);
 
   useEffect(() => {
     refreshBalances();
@@ -310,6 +300,25 @@ export default function AccountMenu() {
 
               <DropdownMenuSeparator />
 
+              {/* Tx mode toggle with Switch */}
+              <div className="px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">Use Smart Wallet</div>
+                  <Switch
+                    checked={mode === "smart"}
+                    onCheckedChange={(v) => setMode(v ? "smart" : "wallet")}
+                    disabled={isMiniApp}
+                  />
+                </div>
+                {isMiniApp && (
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Disabled inside Farcaster Mini Apps.
+                  </p>
+                )}
+              </div>
+
+              <DropdownMenuSeparator />
+
               {/* Smart Wallet block */}
               <div className="px-3 py-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
@@ -409,18 +418,18 @@ export default function AccountMenu() {
 
               <DropdownMenuSeparator />
 
-              {/* External EOA (MetaMask, etc.) */}
-              {externalAddress && (
+              {/* Active EOA (currently selected) */}
+              {activeAddress && (
                 <>
                   <div className="px-3 py-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <WalletIcon className="w-4 h-4" />
-                      <span>External Wallet (EOA)</span>
+                      <span>My Wallet (EOA)</span>
                     </div>
                     <div className="mt-1 text-xs text-gray-600 break-all">
-                      <code>{externalAddress}</code>
+                      <code>{activeAddress}</code>
                       <button
-                        onClick={() => copy(externalAddress)}
+                        onClick={() => copy(activeAddress)}
                         className="ml-2 inline-flex items-center gap-1 text-gray-500 hover:text-gray-700"
                         title="Copy address"
                       >
@@ -430,39 +439,8 @@ export default function AccountMenu() {
                     <div className="mt-2 flex items-center gap-2 text-sm">
                       <CoinsIcon className="w-4 h-4" />
                       <span>
-                        {externalEth !== null
-                          ? `${Number(externalEth).toFixed(5)} ETH`
-                          : "—"}
-                      </span>
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-
-              {/* Embedded EOA (Privy) */}
-              {embeddedAddress && (
-                <>
-                  <div className="px-3 py-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <WalletIcon className="w-4 h-4" />
-                      <span>Embedded Wallet (EOA)</span>
-                    </div>
-                    <div className="mt-1 text-xs text-gray-600 break-all">
-                      <code>{embeddedAddress}</code>
-                      <button
-                        onClick={() => copy(embeddedAddress)}
-                        className="ml-2 inline-flex items-center gap-1 text-gray-500 hover:text-gray-700"
-                        title="Copy address"
-                      >
-                        <CopyIcon className="w-3 h-3" />
-                      </button>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2 text-sm">
-                      <CoinsIcon className="w-4 h-4" />
-                      <span>
-                        {embeddedEth !== null
-                          ? `${Number(embeddedEth).toFixed(5)} ETH`
+                        {activeEth !== null
+                          ? `${Number(activeEth).toFixed(5)} ETH`
                           : "—"}
                       </span>
                     </div>
