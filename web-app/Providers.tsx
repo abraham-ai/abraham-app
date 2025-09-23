@@ -54,7 +54,7 @@ export default function Providers({ children }: Props) {
           // In Mini App, avoid auto-creating embedded wallets (host may manage provider)
           ethereum: { createOnLogin: isMiniApp ? "off" : "all-users" },
           // optional: suppress Privy confirmation modals
-          showWalletUIs: false,
+          //showWalletUIs: false,
         },
       }}
     >
