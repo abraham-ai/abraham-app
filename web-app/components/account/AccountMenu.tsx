@@ -271,44 +271,47 @@ export default function AccountMenu() {
 
               <DropdownMenuSeparator />
 
-              {/* TX MODE TOGGLE */}
+              <DropdownMenuSeparator />
+
+              {/* Tx mode toggle with Switch */}
               <div className="px-3 py-2">
-                <div className="text-sm font-medium mb-1">Transaction Mode</div>
-                <div className="flex items-center gap-2 text-xs">
-                  <Button
-                    variant={mode === "wallet" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setMode("wallet")}
-                  >
-                    My Wallet
-                  </Button>
-                  <Button
-                    variant={mode === "smart" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setMode("smart")}
+                <div className="text-sm font-medium mb-2">Transaction Mode</div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm">
+                    <WalletIcon className="w-4 h-4" />
+                    <span>
+                      {mode === "smart"
+                        ? "Smart Wallet enabled"
+                        : "Enable smart wallet"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setMode(mode === "smart" ? "wallet" : "smart")
+                    }
                     disabled={isMiniApp}
+                    className={`
+                      relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                      ${mode === "smart" ? "bg-blue-600" : "bg-gray-200"}
+                      ${
+                        isMiniApp
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer"
+                      }
+                    `}
                     title={
                       isMiniApp
                         ? "Smart Wallet disabled in Mini App"
                         : undefined
                     }
                   >
-                    Smart Wallet
-                  </Button>
-                </div>
-              </div>
-
-              <DropdownMenuSeparator />
-
-              {/* Tx mode toggle with Switch */}
-              <div className="px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">Use Smart Wallet</div>
-                  <Switch
-                    checked={mode === "smart"}
-                    onCheckedChange={(v) => setMode(v ? "smart" : "wallet")}
-                    disabled={isMiniApp}
-                  />
+                    <span
+                      className={`
+                        inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                        ${mode === "smart" ? "translate-x-6" : "translate-x-1"}
+                      `}
+                    />
+                  </button>
                 </div>
                 {isMiniApp && (
                   <p className="mt-1 text-[11px] text-gray-500">
