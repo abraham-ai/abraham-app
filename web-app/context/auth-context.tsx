@@ -66,7 +66,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /* ---------- derived state ---------- */
   const [authState, setAuthState] = useState<AuthState>({});
   const [eipProvider, setEipProvider] = useState<any | null>(null);
-  const loadingAuth = (!privyReady || !walletsReady) && !authState.idToken;
+  const [isMiniApp, setIsMiniApp] = useState<boolean | null>(null);
+  // Derive loading state: in Mini App, do not block UI on Privy readiness
+  const loadingAuth =
+    isMiniApp === null
+      ? true // brief environment detection
+      : isMiniApp
+      ? false
+      : (!privyReady || !walletsReady) && !authState.idToken;
+
+  // Detect Mini App environment once
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mini = await sdk.isInMiniApp();
+        if (!cancelled) setIsMiniApp(!!mini);
+      } catch {
+        if (!cancelled) setIsMiniApp(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* ---------- pick a “primary” wallet & provider ---------- */
   useEffect(() => {
@@ -187,6 +210,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           try {
             sessionStorage.setItem("miniapp_logout", "1");
           } catch {}
+          // Immediately reflect logged-out state in Mini App and return
+          setAuthState({});
+          setEipProvider(null);
+          return;
         }
       } catch {}
 
