@@ -118,10 +118,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (isMiniApp !== true) return;
     let cancelled = false;
+    let removeListeners: (() => void) | undefined;
     (async () => {
       try {
         const eth = await sdk.wallet.getEthereumProvider();
         if (!cancelled) setEipProvider(eth ?? null);
+        if (eth && !cancelled) {
+          try {
+            const accounts: readonly `0x${string}`[] = await eth.request?.({
+              method: "eth_accounts",
+            });
+            if (accounts && accounts[0]) {
+              setAuthState((s) => ({
+                ...s,
+                walletAddress: accounts[0] as `0x${string}`,
+                username: s.username ?? accounts[0],
+              }));
+            }
+          } catch {}
+
+          const onAccounts = (accs: readonly `0x${string}`[]) => {
+            setAuthState((s) => ({
+              ...s,
+              walletAddress: accs?.[0],
+              username: s.username ?? accs?.[0],
+            }));
+          };
+          const onChain = (_: any) => {
+            // no-op placeholder; could surface chain in state later
+          };
+          try {
+            eth.on?.("accountsChanged", onAccounts);
+            eth.on?.("chainChanged", onChain);
+            removeListeners = () => {
+              try {
+                eth.removeListener?.("accountsChanged", onAccounts);
+              } catch {}
+              try {
+                eth.removeListener?.("chainChanged", onChain);
+              } catch {}
+            };
+          } catch {}
+        }
       } catch {
         if (!cancelled) setEipProvider(null);
       }
@@ -137,6 +175,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     })();
     return () => {
       cancelled = true;
+      try {
+        removeListeners?.();
+      } catch {}
     };
   }, [isMiniApp]);
 
