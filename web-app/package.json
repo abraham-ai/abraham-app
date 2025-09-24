@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@farcaster/miniapp-sdk": "^0.2.5",
+    "@farcaster/miniapp-wagmi-connector": "^0.0.7",
     "@apollo/client": "^3.12.4",
     "@coinbase/onchainkit": "latest",
     "@edenlabs/eden-sdk": "file:packages/eden-sdk",
@@ -62,6 +64,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "viem": "^2.37.5",
+    "wagmi": "^2.13.4",
     "web3": "^4.13.0",
     "zod": "^3.23.8"
   },

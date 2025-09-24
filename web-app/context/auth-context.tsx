@@ -91,14 +91,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  /* ---------- pick a “primary” wallet & provider ---------- */
+  /* ---------- pick a “primary” wallet & provider (Privy, non-miniapp) ---------- */
   useEffect(() => {
+    if (isMiniApp) return; // Do not override miniapp provider
     (async () => {
       if (!walletsReady || wallets.length === 0) {
         setEipProvider(null);
         return;
       }
-      // Prefer provider whose address matches current authState.walletAddress
       let target = wallets[0];
       try {
         const targetAddr = authState.walletAddress?.toLowerCase();
@@ -112,45 +112,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const provider = await (target as any).getEthereumProvider();
       setEipProvider(provider);
     })();
-  }, [walletsReady, wallets, authState.walletAddress]);
+  }, [isMiniApp, walletsReady, wallets, authState.walletAddress]);
 
-  /* ---------- sync AuthState ---------- */
+  /* ---------- Mini App: set provider and token independently of Privy ---------- */
   useEffect(() => {
+    if (isMiniApp !== true) return;
+    let cancelled = false;
     (async () => {
-      if (!privyReady) return;
-
-      // If running inside a Farcaster Mini App, prefer Quick Auth
       try {
-        const isMini = await sdk.isInMiniApp();
-        const suppressed =
-          typeof window !== "undefined" &&
-          sessionStorage.getItem("miniapp_logout") === "1";
-        if (isMini && !suppressed && !authenticated && !authState.idToken) {
-          const { token } = await sdk.quickAuth.getToken();
-          if (token) {
-            setAuthState({ idToken: token });
-            localStorage.setItem("idToken", token);
-            // Prefer host EIP-1193 provider if available
-            try {
-              const eth = await sdk.wallet.getEthereumProvider();
-              setEipProvider(eth ?? null);
-            } catch {}
-            return;
-          }
+        const eth = await sdk.wallet.getEthereumProvider();
+        if (!cancelled) setEipProvider(eth ?? null);
+      } catch {
+        if (!cancelled) setEipProvider(null);
+      }
+      try {
+        const { token } = await sdk.quickAuth.getToken();
+        if (!cancelled && token) {
+          setAuthState((s) => ({ ...s, idToken: token }));
+          localStorage.setItem("idToken", token);
         }
       } catch {
-        // fall through to Privy
+        // no-op; user may not be signed in yet
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isMiniApp]);
 
+  /* ---------- sync AuthState (Privy path only) ---------- */
+  useEffect(() => {
+    if (isMiniApp) return; // handled by miniapp effect
+    (async () => {
+      if (!privyReady) return;
       if (!authenticated || !user) {
         localStorage.removeItem("idToken");
         setAuthState({});
         return;
       }
-
-      /* fetch (or refetch) an access token */
       const token = await getAccessToken();
-
       const state: AuthState = {
         idToken: token,
         username:
@@ -166,20 +166,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           user.twitter?.picture ??
           undefined,
       };
-
       setAuthState(state);
       localStorage.setItem("idToken", token ?? "");
     })().catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [privyReady, authenticated, user, wallets]);
+  }, [isMiniApp, privyReady, authenticated, user, wallets]);
 
   /* ---------- auth actions ---------- */
   const login = async () => {
     try {
       // Inside Mini App: Quick Auth flow
       try {
-        const isMini = await sdk.isInMiniApp();
-        if (isMini) {
+        if (isMiniApp) {
           try {
             sessionStorage.removeItem("miniapp_logout");
           } catch {}
@@ -187,6 +185,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (token) {
             setAuthState({ idToken: token });
             localStorage.setItem("idToken", token);
+            try {
+              const eth = await sdk.wallet.getEthereumProvider();
+              setEipProvider(eth ?? null);
+            } catch {}
             return;
           }
         }
@@ -203,8 +205,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       // Attempt to revoke/clear Mini App Quick Auth state
       try {
-        const isMini = await sdk.isInMiniApp();
-        if (isMini) {
+        if (isMiniApp) {
           // No explicit revoke API today; clear our state
           localStorage.removeItem("idToken");
           try {
