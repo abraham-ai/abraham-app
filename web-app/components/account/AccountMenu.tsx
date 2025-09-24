@@ -123,6 +123,64 @@ export default function AccountMenu() {
   const [smartEth, setSmartEth] = useState<string | null>(null);
   const [activeEth, setActiveEth] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [providerLabel, setProviderLabel] = useState<string>("Wallet");
+
+  // Detect actual provider name in Mini App from the EIP-1193 provider
+  useEffect(() => {
+    if (!isMiniApp) {
+      setProviderLabel("Wallet");
+      return;
+    }
+    const p: any = eip1193Provider as any;
+    const detect = async () => {
+      try {
+        if (!p) {
+          setProviderLabel("Wallet");
+          return;
+        }
+        const t = p.walletClientType as string | undefined;
+        if (t && typeof t === "string") {
+          setProviderLabel(labelForWalletType(t));
+          return;
+        }
+        try {
+          const info = await p.request?.({ method: "wallet_getProviderInfo" });
+          const name = info?.name || info?.provider?.name;
+          if (name && typeof name === "string") {
+            setProviderLabel(name);
+            return;
+          }
+        } catch {}
+        const flags: Array<[string, string]> = [
+          ["isMetaMask", "MetaMask"],
+          ["isCoinbaseWallet", "Coinbase"],
+          ["isRabby", "Rabby"],
+          ["isRainbow", "Rainbow"],
+          ["isOkxWallet", "OKX"],
+          ["isOKExWallet", "OKX"],
+          ["isTrust", "Trust"],
+          ["isTrustWallet", "Trust"],
+          ["isOneKey", "OneKey"],
+          ["isFrame", "Frame"],
+          ["isZerion", "Zerion"],
+          ["isBraveWallet", "Brave"],
+          ["isTally", "Tally"],
+          ["isLedger", "Ledger"],
+          ["isPhantom", "Phantom"],
+        ];
+        for (const [flag, name] of flags) {
+          if (p?.[flag]) {
+            setProviderLabel(name);
+            return;
+          }
+        }
+        setProviderLabel("Wallet");
+      } catch {
+        setProviderLabel("Wallet");
+      }
+    };
+    detect();
+  }, [isMiniApp, eip1193Provider]);
 
   const refreshBalances = useCallback(async () => {
     setRefreshing(true);
@@ -448,14 +506,7 @@ export default function AccountMenu() {
                       </span>
                       {isMiniApp && (
                         <span className="ml-2 text-gray-500">
-                          • Provider:{" "}
-                          {(() => {
-                            const ua = navigator.userAgent.toLowerCase();
-                            if (ua.includes("warpcast")) return "Farcaster";
-                            if (ua.includes("metamask")) return "MetaMask";
-                            if (ua.includes("coinbase")) return "Coinbase";
-                            return "Wallet";
-                          })()}
+                          • Provider: {providerLabel}
                         </span>
                       )}
                     </div>
