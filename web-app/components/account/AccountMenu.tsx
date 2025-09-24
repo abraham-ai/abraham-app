@@ -506,10 +506,7 @@ export default function AccountMenu() {
                       </span>
                       {isMiniApp && (
                         <span className="ml-2 text-gray-500">
-                          • Provider:{" "}
-                          {labelForWalletType(
-                            (fundingWallet as any).walletClientType
-                          )}
+                          • Provider: {providerLabel}
                         </span>
                       )}
                     </div>
