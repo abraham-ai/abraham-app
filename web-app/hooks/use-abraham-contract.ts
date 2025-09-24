@@ -69,13 +69,32 @@ export function useAbrahamContract() {
       showErrorToast(err, "Wallet not connected");
       throw err;
     }
-    const accounts = await walletClient.getAddresses();
+    // Try to get connected accounts; if empty, request a connection
+    let accounts = await walletClient.getAddresses();
+    if (!accounts?.length) {
+      try {
+        // viem walletClient.request may be available; otherwise eip1193 will handle it
+        await (walletClient as any).request?.({
+          method: "eth_requestAccounts",
+        });
+        accounts = await walletClient.getAddresses();
+      } catch {}
+    }
+    if (!accounts?.length && authState.walletAddress) {
+      return authState.walletAddress as `0x${string}`;
+    }
     if (!accounts?.length) {
       const err = new Error("No account found");
       showErrorToast(err, "Wallet not connected");
       throw err;
     }
     return accounts[0]!;
+  };
+
+  const ensureChain = async () => {
+    try {
+      await (walletClient as any)?.switchChain?.({ id: baseSepolia.id });
+    } catch {}
   };
 
   const ensureBalance = async (addr: `0x${string}`, cost: bigint) => {
@@ -111,6 +130,7 @@ export function useAbrahamContract() {
     await ensureBalance(sender, valueWei);
 
     try {
+      await ensureChain();
       const hash = await walletClient!.writeContract({
         account: sender,
         address: CONTRACT_ADDRESS,
@@ -167,6 +187,7 @@ export function useAbrahamContract() {
     }
 
     try {
+      await ensureChain();
       const hash = await walletClient!.writeContract({
         account: sender,
         address: CONTRACT_ADDRESS,
