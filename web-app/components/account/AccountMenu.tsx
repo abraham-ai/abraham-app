@@ -285,148 +285,138 @@ export default function AccountMenu() {
 
               <DropdownMenuSeparator />
 
-              <DropdownMenuSeparator />
-
-              {/* Tx mode toggle with Switch (hidden in Mini App) */}
+              {/* In Mini App, skip Tx mode and Smart Wallet entirely */}
               {!isMiniApp && (
-                <div className="px-3 py-2">
-                  <div className="text-sm font-medium mb-2">
-                    Transaction Mode
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm">
-                      <WalletIcon className="w-4 h-4" />
-                      <span>
-                        {mode === "smart"
-                          ? "Smart Wallet enabled"
-                          : "Enable smart wallet"}
-                      </span>
+                <>
+                  <DropdownMenuSeparator />
+                  <div className="px-3 py-2">
+                    <div className="text-sm font-medium mb-2">
+                      Transaction Mode
                     </div>
-                    <button
-                      onClick={() =>
-                        setMode(mode === "smart" ? "wallet" : "smart")
-                      }
-                      disabled={isMiniApp}
-                      className={`
-                      relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                      ${mode === "smart" ? "bg-blue-600" : "bg-gray-200"}
-                      ${
-                        isMiniApp
-                          ? "opacity-50 cursor-not-allowed"
-                          : "cursor-pointer"
-                      }
-                    `}
-                      title={
-                        isMiniApp
-                          ? "Smart Wallet disabled in Mini App"
-                          : undefined
-                      }
-                    >
-                      <span
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        <WalletIcon className="w-4 h-4" />
+                        <span>
+                          {mode === "smart"
+                            ? "Smart Wallet enabled"
+                            : "Enable smart wallet"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() =>
+                          setMode(mode === "smart" ? "wallet" : "smart")
+                        }
                         className={`
-                        inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                        ${mode === "smart" ? "translate-x-6" : "translate-x-1"}
+                        relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                        ${mode === "smart" ? "bg-blue-600" : "bg-gray-200"}
+                        cursor-pointer
                       `}
-                      />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <DropdownMenuSeparator />
-
-              {/* Smart Wallet block (hidden in Mini App) */}
-              {!isMiniApp && (
-                <div className="px-3 py-2">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <WalletIcon className="w-4 h-4" />
-                    <span>Smart Wallet (Base Sepolia)</span>
-                  </div>
-                  <div className="mt-1 text-xs text-gray-600 break-all">
-                    {smartWalletAddress ? (
-                      <>
-                        <code>{smartWalletAddress}</code>
-                        <button
-                          onClick={() =>
-                            smartWalletAddress && copy(smartWalletAddress)
+                      >
+                        <span
+                          className={`
+                          inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                          ${
+                            mode === "smart" ? "translate-x-6" : "translate-x-1"
                           }
-                          className="ml-2 inline-flex items-center gap-1 text-gray-500 hover:text-gray-700"
-                          title="Copy address"
-                        >
-                          <CopyIcon className="w-3 h-3" />
-                        </button>
-                      </>
-                    ) : (
-                      <div className="rounded-md border p-3 bg-gray-50">
-                        <p className="text-xs text-gray-700 mb-2">
-                          Not provisioned yet — create an embedded signer to
-                          enable your smart wallet.
-                        </p>
+                        `}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  <DropdownMenuSeparator />
+
+                  <div className="px-3 py-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <WalletIcon className="w-4 h-4" />
+                      <span>Smart Wallet (Base Sepolia)</span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600 break-all">
+                      {smartWalletAddress ? (
+                        <>
+                          <code>{smartWalletAddress}</code>
+                          <button
+                            onClick={() =>
+                              smartWalletAddress && copy(smartWalletAddress)
+                            }
+                            className="ml-2 inline-flex items-center gap-1 text-gray-500 hover:text-gray-700"
+                            title="Copy address"
+                          >
+                            <CopyIcon className="w-3 h-3" />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="rounded-md border p-3 bg-gray-50">
+                          <p className="text-xs text-gray-700 mb-2">
+                            Not provisioned yet — create an embedded signer to
+                            enable your smart wallet.
+                          </p>
+                          <Button
+                            size="sm"
+                            onClick={createSmartWalletNow}
+                            disabled={creatingSmart || isMiniApp}
+                          >
+                            {creatingSmart && (
+                              <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                            )}
+                            {creatingSmart ? (
+                              "Creating…"
+                            ) : (
+                              <>
+                                <PlusIcon className="w-4 h-4 mr-1" /> Create
+                                smart wallet
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        <CoinsIcon className="w-4 h-4" />
+                        <span>
+                          {smartEth !== null
+                            ? `${Number(smartEth).toFixed(5)} ETH`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <Button
+                          variant="outline"
                           size="sm"
-                          onClick={createSmartWalletNow}
-                          disabled={creatingSmart || isMiniApp}
+                          onClick={refreshBalances}
+                          disabled={refreshing}
                         >
-                          {creatingSmart && (
-                            <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
-                          )}
-                          {creatingSmart ? (
-                            "Creating…"
+                          {refreshing ? (
+                            <Loader2Icon className="w-4 h-4 animate-spin" />
                           ) : (
-                            <>
-                              <PlusIcon className="w-4 h-4 mr-1" /> Create smart
-                              wallet
-                            </>
+                            "Refresh"
                           )}
                         </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setFundOpen(true)}
+                          disabled={!smartWalletAddress || !fundingWallet}
+                        >
+                          <ArrowDownToLineIcon className="w-4 h-4 mr-1" />
+                          Fund
+                        </Button>
                       </div>
+                    </div>
+
+                    {/* Funding source tag */}
+                    {fundingWallet && (
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        Funding source:{" "}
+                        {labelForWalletType(
+                          (fundingWallet as any).walletClientType
+                        )}
+                      </p>
                     )}
                   </div>
-
-                  <div className="mt-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm">
-                      <CoinsIcon className="w-4 h-4" />
-                      <span>
-                        {smartEth !== null
-                          ? `${Number(smartEth).toFixed(5)} ETH`
-                          : "—"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={refreshBalances}
-                        disabled={refreshing}
-                      >
-                        {refreshing ? (
-                          <Loader2Icon className="w-4 h-4 animate-spin" />
-                        ) : (
-                          "Refresh"
-                        )}
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => setFundOpen(true)}
-                        disabled={!smartWalletAddress || !fundingWallet}
-                      >
-                        <ArrowDownToLineIcon className="w-4 h-4 mr-1" />
-                        Fund
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Funding source tag */}
-                  {fundingWallet && (
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      Funding source:{" "}
-                      {labelForWalletType(
-                        (fundingWallet as any).walletClientType
-                      )}
-                    </p>
-                  )}
-                </div>
+                </>
               )}
 
               <DropdownMenuSeparator />
@@ -456,6 +446,18 @@ export default function AccountMenu() {
                           ? `${Number(activeEth).toFixed(5)} ETH`
                           : "—"}
                       </span>
+                      {isMiniApp && (
+                        <span className="ml-2 text-gray-500">
+                          • Provider:{" "}
+                          {(() => {
+                            const ua = navigator.userAgent.toLowerCase();
+                            if (ua.includes("warpcast")) return "Farcaster";
+                            if (ua.includes("metamask")) return "MetaMask";
+                            if (ua.includes("coinbase")) return "Coinbase";
+                            return "Wallet";
+                          })()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <DropdownMenuSeparator />
