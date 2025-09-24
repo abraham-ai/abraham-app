@@ -9,8 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@farcaster/miniapp-sdk": "^0.2.5",
-    "@farcaster/miniapp-wagmi-connector": "^0.0.7",
     "@apollo/client": "^3.12.4",
     "@coinbase/onchainkit": "latest",
     "@edenlabs/eden-sdk": "file:packages/eden-sdk",
