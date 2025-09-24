@@ -16,9 +16,9 @@ import { getRelativeTime } from "@/lib/time-utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import {
-  useAbrahamSmartWallet,
+  useAbrahamActions,
   PRAISE_PRICE_ETHER,
-} from "@/hooks/use-abraham-smartwallet";
+} from "@/hooks/use-abraham-actions";
 import {
   Tooltip,
   TooltipContent,
@@ -34,7 +34,7 @@ const PAGE_SIZE = 18;
 /* ───────────────────────────────────── component */
 export default function CreationsGrid() {
   const { loggedIn } = useAuth();
-  const { praise } = useAbrahamSmartWallet();
+  const { praise } = useAbrahamActions();
 
   const [creations, setCreations] = useState<CreationItem[]>([]);
   const [loadingInit, setLoadingInit] = useState(true);
