@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { isInWarpcastMiniApp } from "@/lib/miniapp";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 export type TxMode = "smart" | "wallet";
 
@@ -24,15 +24,31 @@ export function TxModeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<TxMode>("smart");
 
   useEffect(() => {
-    const mini = isInWarpcastMiniApp();
-    setIsMiniApp(mini);
-    const saved = (typeof window !== "undefined" &&
-      localStorage.getItem("txMode")) as TxMode | null;
-    if (saved === "smart" || saved === "wallet") {
-      setModeState(saved);
-    } else {
-      setModeState(mini ? "wallet" : "smart");
-    }
+    let cancelled = false;
+    (async () => {
+      let mini = false;
+      try {
+        mini = await sdk.isInMiniApp();
+      } catch {
+        try {
+          const ua =
+            typeof navigator !== "undefined" ? navigator.userAgent : "";
+          mini = /Warpcast|Farcaster/i.test(ua);
+        } catch {}
+      }
+      if (cancelled) return;
+      setIsMiniApp(!!mini);
+      const saved = (typeof window !== "undefined" &&
+        (localStorage.getItem("txMode") as TxMode | null)) as TxMode | null;
+      if (saved === "smart" || saved === "wallet") {
+        setModeState(saved);
+      } else {
+        setModeState(mini ? "wallet" : "smart");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const setMode = (m: TxMode) => {
