@@ -229,6 +229,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             try {
               const eth = await sdk.wallet.getEthereumProvider();
               setEipProvider(eth ?? null);
+              // Immediately refresh connected accounts so UI updates without reload
+              try {
+                const accounts = (await eth?.request?.({
+                  method: "eth_accounts",
+                })) as any;
+                if (accounts && accounts[0]) {
+                  setAuthState((s) => ({
+                    ...s,
+                    walletAddress: accounts[0] as `0x${string}`,
+                    username: s.username ?? (accounts[0] as string),
+                  }));
+                }
+              } catch {}
             } catch {}
             return;
           }
