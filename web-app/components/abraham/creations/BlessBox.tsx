@@ -13,6 +13,7 @@ import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { usePrivy } from "@privy-io/react-auth";
+import { useTxMode } from "@/context/tx-mode-context";
 
 interface Props {
   creation: CreationItem;
@@ -26,9 +27,11 @@ interface Props {
 }
 
 export default function BlessBox({ creation, onNewBlessing }: Props) {
-  const { loggedIn, login, loadingAuth, authState } = useAuth();
+  const { loggedIn, login, loadingAuth, authState, eip1193Provider } =
+    useAuth();
   const { bless } = useAbrahamActions();
   const { user } = usePrivy();
+  const { isMiniApp } = useTxMode();
 
   // Prefer smart wallet address for UI + attribution; fallback to EOA if any
   const smartAddr = useMemo(
@@ -39,7 +42,7 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
     [user]
   );
   const eoaAddr = authState.walletAddress?.toLowerCase();
-  const userAddr = smartAddr || eoaAddr || "";
+  const userAddr = isMiniApp ? eoaAddr || "" : smartAddr || eoaAddr || "";
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -64,11 +67,21 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
 
     setLoading(true);
     try {
+      // In Mini App, refresh the current address from the provider to avoid stale state
+      let currentAddr = userAddr;
+      if (isMiniApp && eip1193Provider?.request) {
+        try {
+          const accs: string[] = await eip1193Provider.request({
+            method: "eth_accounts",
+          });
+          if (accs?.[0]) currentAddr = accs[0];
+        } catch {}
+      }
       // Queued; the hook pins to IPFS and enqueues the on-chain bless()
       const { msgUuid } = await bless(creation.id, text.trim());
 
       onNewBlessing?.({
-        userAddress: userAddr,
+        userAddress: currentAddr,
         message: text.trim(),
         ethUsed: (BLESS_PRICE_ETHER * 10 ** 18).toString(),
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),
