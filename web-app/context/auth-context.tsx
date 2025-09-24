@@ -216,9 +216,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /* ---------- auth actions ---------- */
   const login = async () => {
     try {
-      // Inside Mini App: Quick Auth flow
+      // Detect Mini App synchronously for this call (don’t rely on state)
+      let inMini = false;
       try {
-        if (isMiniApp) {
+        inMini = await sdk.isInMiniApp();
+      } catch {
+        try {
+          const ua =
+            typeof navigator !== "undefined" ? navigator.userAgent : "";
+          inMini = /Warpcast|Farcaster/i.test(ua);
+        } catch {}
+      }
+
+      // Inside Mini App: Quick Auth flow
+      if (inMini) {
+        try {
           try {
             sessionStorage.removeItem("miniapp_logout");
           } catch {}
@@ -245,8 +257,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             } catch {}
             return;
           }
+        } catch {
+          // fall through to Privy if Quick Auth fails
         }
-      } catch {}
+      }
 
       // Fallback to Privy
       await privyLogin();
