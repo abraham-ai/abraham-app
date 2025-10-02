@@ -38,7 +38,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
     setLoading(true);
     try {
       // Queues into a batched user operation (single approval for many actions)
-      await praise(creation.id, creation.messageUuid);
+      await praise(creation.sessionIdRaw || creation.id, creation.messageUuid);
       setPraises((p) => p + 1);
     } catch (e) {
       // toast handled inside the hook for non-reject errors

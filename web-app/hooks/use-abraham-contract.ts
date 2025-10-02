@@ -127,21 +127,80 @@ export function useAbrahamContract() {
     }
   };
 
-  // Check if user has enough staked and stake more if needed
+  // Get available stake (total staked - linked to other creations)
+  const getAvailableStake = async (userAddress: string) => {
+    try {
+      const [totalStaked, totalLinked] = await Promise.all([
+        publicClient
+          .readContract({
+            address: CONTRACT_ADDRESS,
+            abi: AbrahamAbi,
+            functionName: "staking",
+          })
+          .then((stakingAddress) =>
+            publicClient.readContract({
+              address: stakingAddress as `0x${string}`,
+              abi: [
+                {
+                  inputs: [
+                    { internalType: "address", name: "user", type: "address" },
+                  ],
+                  name: "stakedBalance",
+                  outputs: [
+                    { internalType: "uint256", name: "", type: "uint256" },
+                  ],
+                  stateMutability: "view",
+                  type: "function",
+                },
+              ],
+              functionName: "stakedBalance",
+              args: [userAddress as `0x${string}`],
+            })
+          ),
+        publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "getUserTotalLinked",
+          args: [userAddress as `0x${string}`],
+        }),
+      ]);
+
+      const availableStake = (totalStaked as bigint) - (totalLinked as bigint);
+      return availableStake > BigInt(0) ? availableStake : BigInt(0);
+    } catch (error) {
+      console.error("Error fetching available stake:", error);
+      // If we can't determine linked stake, assume all stake is available
+      const currentStaked = stakedBalance
+        ? parseEther(stakedBalance)
+        : BigInt(0);
+      return currentStaked;
+    }
+  };
+
+  // Check if user has enough available stake and stake more if needed
+  // Now checks available stake (total - linked) instead of just total staked
   const ensureStaking = async (
     requiredAmount: bigint,
     actionType: "praise" | "bless"
   ) => {
-    const currentStaked = stakedBalance ? parseEther(stakedBalance) : BigInt(0);
+    const sender = await requireWallet();
+    const availableStake = await getAvailableStake(sender);
 
-    if (currentStaked < requiredAmount) {
-      const deficit = requiredAmount - currentStaked;
+    if (availableStake < requiredAmount) {
+      const deficit = requiredAmount - availableStake;
 
       const confirmed = window.confirm(
-        `You need ${formatEther(
-          deficit
-        )} more ABRAHAM staked to ${actionType}. ` +
-          "Would you like to stake the required amount now?"
+        availableStake === BigInt(0)
+          ? `You need ${formatEther(
+              requiredAmount
+            )} ABRAHAM staked to ${actionType}. Would you like to stake now?`
+          : `You have ${formatEther(
+              availableStake
+            )} ABRAHAM available but need ${formatEther(
+              requiredAmount
+            )} to ${actionType}. Your other staked tokens are linked to other creations. Would you like to stake ${formatEther(
+              deficit
+            )} more ABRAHAM?`
       );
 
       if (!confirmed) {
@@ -214,14 +273,14 @@ export function useAbrahamContract() {
     // 1) Pin to IPFS via server
     const msgUuid = crypto.randomUUID();
     const payload = {
-      messageUuid: msgUuid,
+      sessionId: sessionUuid,
+      messageId: msgUuid,
       content: trimmed,
-      userAddress: sender,
-      ethUsed: "0", // No ETH used anymore
-      blockTimestamp: Math.floor(Date.now() / 1000).toString(),
+      author: sender,
+      kind: "blessing",
     };
 
-    const resp = await fetch("/api/pin", {
+    const resp = await fetch("/api/ipfs/message", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -255,6 +314,7 @@ export function useAbrahamContract() {
     praise,
     bless,
     getStakingRequirements,
+    getAvailableStake,
     stakedBalance,
     fetchStakedBalance,
   };

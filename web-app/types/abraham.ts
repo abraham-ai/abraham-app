@@ -9,6 +9,7 @@ export interface SubgraphMessage {
 
 export interface SubgraphCreation {
   id: string;
+  sessionIdRaw?: string;
   closed: boolean;
   linkedTotal: string;
   totalBlessings: number;
@@ -25,10 +26,12 @@ export interface Blessing {
   timestamp: string;
   messageUuid: string;
   creationId: string;
+  sessionIdRaw?: string;
 }
 
 export interface CreationItem {
   id: string;
+  sessionIdRaw?: string;
   closed: boolean;
   image: string;
   description: string;

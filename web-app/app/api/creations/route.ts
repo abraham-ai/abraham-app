@@ -53,6 +53,7 @@ const LIST_QUERY = /* GraphQL */ `
       orderDirection: desc
     ) {
       id
+      sessionIdRaw
       closed
       linkedTotal
       totalBlessings
@@ -298,6 +299,7 @@ async function shapeCreationsList(
           timestamp: m.timestamp,
           messageUuid: m.uuid,
           creationId: c.id,
+          sessionIdRaw: c.sessionIdRaw,
         }));
 
       const messages: SubgraphMessage[] = tailAsc.map((m) => ({
@@ -313,6 +315,7 @@ async function shapeCreationsList(
 
       return {
         id: c.id,
+        sessionIdRaw: c.sessionIdRaw,
         closed: c.closed,
         image: heroImage, // ← most recent owner msg with media
         description: heroDescription,

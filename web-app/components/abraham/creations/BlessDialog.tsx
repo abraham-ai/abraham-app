@@ -73,7 +73,10 @@ export default function BlessDialog({
     setLoading(true);
     try {
       // Queued; pins to IPFS then enqueues on-chain bless()
-      const { msgUuid } = await bless(creation.id, text.trim());
+      const { msgUuid } = await bless(
+        creation.sessionIdRaw || creation.id,
+        text.trim()
+      );
 
       /* optimistic UI */
       setBlessingsCount(blessingsCount + 1);

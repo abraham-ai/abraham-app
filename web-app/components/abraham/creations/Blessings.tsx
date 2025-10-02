@@ -39,7 +39,7 @@ export default function Blessings({ blessings, closed = false }: Props) {
     const b = blessings[i];
     setLoadingIdx(i);
     try {
-      await praise(b.creationId, b.messageUuid);
+      await praise(b.sessionIdRaw || b.creationId, b.messageUuid);
       setCounts((c) => c.map((v, idx) => (idx === i ? v + 1 : v)));
     } catch (e) {
       /* toast already handled in hook */

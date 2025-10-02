@@ -29,6 +29,7 @@ const DETAIL_QUERY_LITE = /* GraphQL */ `
   query OneLite($id: ID!, $tail: Int!, $owner: Bytes!) {
     creation(id: $id) {
       id
+      sessionIdRaw
       closed
       linkedTotal
       totalBlessings
@@ -304,11 +305,13 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
       praiseCount: m.praiseCount,
       timestamp: m.timestamp,
       creationId: c.id,
+      sessionIdRaw: c.sessionIdRaw,
       messageUuid: m.uuid,
     }));
 
   return {
     id: c.id,
+    sessionIdRaw: c.sessionIdRaw,
     closed: c.closed,
     image: heroImage,
     description: heroDescription,
@@ -388,11 +391,13 @@ async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
       praiseCount: m.praiseCount,
       timestamp: m.timestamp,
       creationId: c.id,
+      sessionIdRaw: c.sessionIdRaw,
       messageUuid: m.uuid,
     }));
 
   return {
     id: c.id,
+    sessionIdRaw: c.sessionIdRaw,
     closed: c.closed,
     image: heroImage,
     description: heroDescription,

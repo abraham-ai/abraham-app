@@ -75,7 +75,10 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
         } catch {}
       }
       // Queued; the hook pins to IPFS and enqueues the on-chain bless()
-      const { msgUuid } = await bless(creation.id, text.trim());
+      const { msgUuid } = await bless(
+        creation.sessionIdRaw || creation.id,
+        text.trim()
+      );
 
       onNewBlessing?.({
         userAddress: currentAddr,

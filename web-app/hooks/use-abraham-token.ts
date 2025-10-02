@@ -203,6 +203,49 @@ export function useAbrahamToken() {
     [walletClient, userAddress, publicClient, fetchBalance]
   );
 
+  // Simple transfer tokens (for sending to other addresses)
+  const transfer = useCallback(
+    async (to: `0x${string}`, amountTokens: number) => {
+      if (!walletClient || !userAddress) {
+        throw new Error("Wallet not connected");
+      }
+
+      const amount = parseEther(amountTokens.toString());
+
+      try {
+        let accounts = await walletClient.getAddresses();
+        if (!accounts?.length) {
+          throw new Error("No wallet accounts found");
+        }
+
+        const hash = await walletClient.writeContract({
+          address: TOKEN_ADDRESS,
+          abi: AbrahamTokenAbi,
+          functionName: "transfer",
+          args: [to, amount],
+          account: accounts[0],
+          chain: baseSepolia,
+        });
+
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+        if (receipt.status === "success") {
+          await fetchBalance(); // Refresh balance
+          return true;
+        } else {
+          throw new Error("Transaction failed");
+        }
+      } catch (error: any) {
+        if (error?.message?.toLowerCase().includes("user rejected")) {
+          showErrorToast(error, "Transaction cancelled by user");
+          return false;
+        }
+        throw error;
+      }
+    },
+    [walletClient, userAddress, publicClient, fetchBalance]
+  );
+
   return {
     balance,
     loading,
@@ -211,6 +254,7 @@ export function useAbrahamToken() {
     fetchBalance,
     getAllowance,
     approve,
+    transfer,
     transferAndCall,
   };
 }

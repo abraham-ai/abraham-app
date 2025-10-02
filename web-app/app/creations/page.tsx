@@ -210,7 +210,11 @@ export default function CreationsGrid() {
   }, [creationsWithComputed, sortBy]);
 
   /* -------- praise action -------- */
-  const handlePraise = async (c: { id: string; lastMessageUuid: string }) => {
+  const handlePraise = async (c: {
+    id: string;
+    sessionIdRaw?: string;
+    lastMessageUuid: string;
+  }) => {
     if (!loggedIn) {
       showWarningToast("Authentication Required", "Please log in.");
       return;
@@ -219,7 +223,7 @@ export default function CreationsGrid() {
     setLoadingPraise(c.id);
     try {
       // Queued; auto-batches to one approval for bursts
-      await praise(c.id, c.lastMessageUuid);
+      await praise(c.sessionIdRaw || c.id, c.lastMessageUuid);
       setPraiseCounts((prev) => ({
         ...prev,
         [c.id]: (prev[c.id] ?? 0) + 1,
