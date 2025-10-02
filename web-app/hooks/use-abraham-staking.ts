@@ -16,7 +16,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { AbrahamStakingAbi } from "@/lib/abis/AbrahamStaking";
 import { useAbrahamToken, TOKEN_ADDRESS } from "./use-abraham-token";
-import { showSuccessToast, showErrorToast } from "@/lib/utils";
+import { showSuccessToast, showErrorToast } from "@/lib/error-utils";
 
 export const STAKING_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_STAKING_ADDRESS as `0x${string}`) ??

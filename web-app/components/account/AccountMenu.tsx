@@ -196,9 +196,11 @@ export default function AccountMenu() {
     detect();
   }, [isMiniApp, eip1193Provider]);
 
-  const refreshBalances = useCallback(async () => {
+  // Refresh ABRAHAM token balances when other balances refresh
+  const refreshAllBalances = useCallback(async () => {
     setRefreshing(true);
     try {
+      // Refresh ETH balances
       if (!isMiniApp && smartWalletAddress) {
         const b = await publicClient.getBalance({
           address: smartWalletAddress,
@@ -213,23 +215,37 @@ export default function AccountMenu() {
       } else {
         setActiveEth(null);
       }
+      
+      // Refresh ABRAHAM token balances
+      if (activeAddress) {
+        await fetchAbrahamBalance();
+        await fetchStakedBalance();
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setRefreshing(false);
     }
-  }, [isMiniApp, smartWalletAddress, activeAddress]);
+  }, [isMiniApp, smartWalletAddress, activeAddress, fetchAbrahamBalance, fetchStakedBalance]);
 
   useEffect(() => {
-    refreshBalances();
-    const t = setInterval(refreshBalances, 20000);
+    refreshAllBalances();
+    const t = setInterval(refreshAllBalances, 20000);
     return () => clearInterval(t);
-  }, [refreshBalances]);
+  }, [refreshAllBalances]);
+
+  // Fetch ABRAHAM token balances when activeAddress changes
+  useEffect(() => {
+    if (activeAddress) {
+      fetchAbrahamBalance();
+      fetchStakedBalance();
+    }
+  }, [activeAddress, fetchAbrahamBalance, fetchStakedBalance]);
 
   // In Mini App, when authState.walletAddress changes (e.g., after a bless), re-pull balances
   useEffect(() => {
     if (!isMiniApp) return;
-    refreshBalances();
+    refreshAllBalances();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMiniApp, authState.walletAddress]);
 
@@ -283,7 +299,7 @@ export default function AccountMenu() {
       showSuccessToast("Smart wallet funded", "Funds are available.");
       setFundOpen(false);
       setAmount("0.01");
-      refreshBalances();
+      refreshAllBalances();
     } catch (e) {
       showErrorToast(e as Error, "Funding failed");
     } finally {
@@ -308,7 +324,7 @@ export default function AccountMenu() {
         "Embedded wallet created",
         "Smart wallet will initialize shortly."
       );
-      setTimeout(refreshBalances, 1500);
+      setTimeout(refreshAllBalances, 1500);
     } catch (e) {
       showErrorToast(e as Error, "Failed to create embedded wallet");
     } finally {
@@ -457,7 +473,7 @@ export default function AccountMenu() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={refreshBalances}
+                          onClick={refreshAllBalances}
                           disabled={refreshing}
                         >
                           {refreshing ? (
@@ -488,6 +504,58 @@ export default function AccountMenu() {
                       </p>
                     )}
                   </div>
+
+                  <DropdownMenuSeparator />
+
+                  {/* ABRAHAM Token Balance Section */}
+                  {activeAddress && (
+                    <div className="px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <CoinsIcon className="w-4 h-4" />
+                        <span>ABRAHAM Token</span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {/* Token Balance */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Balance:</span>
+                          <span className="font-mono">
+                            {abrahamLoading ? (
+                              <Loader2Icon className="w-4 h-4 animate-spin" />
+                            ) : abrahamBalance !== null ? (
+                              `${Number(abrahamBalance).toLocaleString()} $ABRAHAM`
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                        </div>
+                        
+                        {/* Staked Balance */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Staked:</span>
+                          <span className="font-mono">
+                            {stakingLoading ? (
+                              <Loader2Icon className="w-4 h-4 animate-spin" />
+                            ) : stakedBalance !== null ? (
+                              `${Number(stakedBalance).toLocaleString()} $ABRAHAM`
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                        </div>
+                        
+                        {/* Total (Balance + Staked) */}
+                        {abrahamBalance !== null && stakedBalance !== null && (
+                          <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-200">
+                            <span className="font-medium">Total:</span>
+                            <span className="font-mono font-medium">
+                              {(Number(abrahamBalance) + Number(stakedBalance)).toLocaleString()} $ABRAHAM
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -523,6 +591,44 @@ export default function AccountMenu() {
                           • Provider: {providerLabel}
                         </span>
                       )}
+                    </div>
+                    
+                    {/* ABRAHAM Token Balance for Mini App */}
+                    <div className="mt-3 pt-2 border-t border-gray-200">
+                      <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <CoinsIcon className="w-4 h-4" />
+                        <span>ABRAHAM Token</span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        {/* Token Balance */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Balance:</span>
+                          <span className="font-mono text-xs">
+                            {abrahamLoading ? (
+                              <Loader2Icon className="w-3 h-3 animate-spin" />
+                            ) : abrahamBalance !== null ? (
+                              `${Number(abrahamBalance).toLocaleString()} $ABRAHAM`
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                        </div>
+                        
+                        {/* Staked Balance */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Staked:</span>
+                          <span className="font-mono text-xs">
+                            {stakingLoading ? (
+                              <Loader2Icon className="w-3 h-3 animate-spin" />
+                            ) : stakedBalance !== null ? (
+                              `${Number(stakedBalance).toLocaleString()} $ABRAHAM`
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <DropdownMenuSeparator />

@@ -225,9 +225,6 @@ type GraphMsgTail = {
 };
 type GraphCreation = Omit<SubgraphCreation, "messages"> & {
   messageCount: number;
-  linkedTotal: string;
-  totalBlessings: number;
-  totalPraises: number;
   abrahamLatest: GraphMsgLatest[];
   messagesTail: GraphMsgTail[];
 };
@@ -321,7 +318,9 @@ async function shapeCreationsList(
         description: heroDescription,
         praiseCount: heroPraise,
         messageUuid: heroUuid,
-        ethTotal: asTokenFloat(c.linkedTotal),
+        linkedTotal: asTokenFloat(c.linkedTotal),
+        totalBlessings: c.totalBlessings,
+        totalPraises: c.totalPraises,
         blessingCnt: blessings.length,
         firstMessageAt: c.firstMessageAt,
         lastActivityAt: c.lastActivityAt,

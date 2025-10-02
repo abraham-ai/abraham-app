@@ -111,19 +111,11 @@ export function useAbrahamSmartWallet() {
       }
     }
 
-    // Count the number of praises and blessings for better toast messages
-    const praiseCount = calls.filter(
-      (call) => call.value === PRAISE_PRICE_WEI
-    ).length;
-    const blessCount = calls.filter(
-      (call) => call.value === BLESS_PRICE_WEI
-    ).length;
-
-    // Calculate the total cost in ETH
-    const totalCost =
-      Number(
-        calls.reduce((acc, c) => acc + (c.value ?? BigInt(0)), BigInt(0))
-      ) / 1e18;
+    // You still need *value* funds for payable calls (gas can be sponsored separately)
+    const totalValueNeeded = calls.reduce(
+      (sum, call) => sum + (call.value ?? BigInt(0)),
+      BigInt(0)
+    );
 
     // One approval for all calls (atomic batch)
     const txHash = await clientToUse.sendTransaction(
@@ -144,36 +136,18 @@ export function useAbrahamSmartWallet() {
         hash: txHash,
       });
       if (rcpt.status === "success") {
-        // Create detailed success message
-        let actionDescription = "";
-        if (praiseCount && blessCount) {
-          actionDescription = `${praiseCount} praise${
-            praiseCount > 1 ? "s" : ""
-          } and ${blessCount} blessing${blessCount > 1 ? "s" : ""}`;
-        } else if (praiseCount) {
-          actionDescription = `${praiseCount} praise${
-            praiseCount > 1 ? "s" : ""
-          }`;
-        } else if (blessCount) {
-          actionDescription = `${blessCount} blessing${
-            blessCount > 1 ? "s" : ""
-          }`;
-        } else {
-          actionDescription = `${calls.length} action${
-            calls.length > 1 ? "s" : ""
-          }`;
-        }
+        // Create detailed success message based on calls count
+        const actionDescription = `${calls.length} action${
+          calls.length > 1 ? "s" : ""
+        }`;
 
         showSuccessToast(
           `Sent ${actionDescription}`,
-          `Transaction confirmed on-chain (${totalCost.toFixed(5)} ETH spent)`
+          `Transaction confirmed on-chain`
         );
       } else {
         const err = new Error("Transaction failed on-chain");
-        showErrorToast(
-          err,
-          `Transaction Failed (${totalCost.toFixed(5)} ETH attempted)`
-        );
+        showErrorToast(err, `Transaction Failed`);
         throw err;
       }
       return txHash;

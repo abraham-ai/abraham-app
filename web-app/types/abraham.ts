@@ -10,7 +10,9 @@ export interface SubgraphMessage {
 export interface SubgraphCreation {
   id: string;
   closed: boolean;
-  ethSpent: string;
+  linkedTotal: string;
+  totalBlessings: number;
+  totalPraises: number;
   firstMessageAt: string;
   lastActivityAt: string;
   messages: SubgraphMessage[];
@@ -32,7 +34,9 @@ export interface CreationItem {
   description: string;
   praiseCount: number;
   messageUuid: string;
-  ethTotal: number;
+  linkedTotal: number;
+  totalBlessings: number;
+  totalPraises: number;
   blessingCnt: number;
   firstMessageAt: string;
   lastActivityAt: string;

@@ -12,17 +12,9 @@ import { CreationItem } from "@/types/abraham";
 import { Loader2Icon, CircleXIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getRelativeTime }                              <div>
-                                <div className="font-medium">Praise Creation</div>
-                                <div className="text-xs">
-                                  Requires staked ABRAHAM tokens
-                                </div>
-                              </div>"@/lib/time-utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
-import {
-  useAbrahamActions,
-} from "@/hooks/use-abraham-actions";
+import { useAbrahamActions } from "@/hooks/use-abraham-actions";
 import {
   Tooltip,
   TooltipContent,
@@ -34,6 +26,7 @@ import { HIDDEN_SESSION_IDS } from "@/config/hidden-sessions";
 
 type SortOption = "most-praised" | "latest";
 const PAGE_SIZE = 18;
+// Removed ETH pricing as we now use ABRAHAM token staking
 
 /* ───────────────────────────────────── component */
 export default function CreationsGrid() {
@@ -355,7 +348,7 @@ export default function CreationsGrid() {
                             <div>
                               <div className="font-medium">Praise Creation</div>
                               <div className="text-xs">
-                                {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                                Requires staked ABRAHAM tokens
                               </div>
                             </div>
                           )}
@@ -363,11 +356,11 @@ export default function CreationsGrid() {
                       </Tooltip>
                     </TooltipProvider>
 
-                    <Link href={`/creation/${c.id}`}>
+                    {/*<Link href={`/creation/${c.id}`}>
                       <span className="text-sm text-gray-500 hover:text-gray-700">
                         {getRelativeTime(Number(c.lastActivityAt) * 1000)}
                       </span>
-                    </Link>
+                    </Link>*/}
                   </div>
                 </div>
               </div>

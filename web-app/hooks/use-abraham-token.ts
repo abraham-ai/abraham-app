@@ -15,7 +15,7 @@ import { useTxMode } from "@/context/tx-mode-context";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { AbrahamTokenAbi } from "@/lib/abis/AbrahamToken";
-import { showSuccessToast, showErrorToast } from "@/lib/utils";
+import { showSuccessToast, showErrorToast } from "@/lib/error-utils";
 
 export const TOKEN_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_TOKEN_ADDRESS as `0x${string}`) ??

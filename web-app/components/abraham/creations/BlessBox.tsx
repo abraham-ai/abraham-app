@@ -4,10 +4,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
-import {
-  useAbrahamActions,
-  BLESS_PRICE_ETHER,
-} from "@/hooks/use-abraham-actions";
+import { useAbrahamActions } from "@/hooks/use-abraham-actions";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
@@ -83,7 +80,7 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
       onNewBlessing?.({
         userAddress: currentAddr,
         message: text.trim(),
-        ethUsed: "0", // No ETH used in new system
+        ethUsed: "0", // No ETH used in new staking system
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),
         messageUuid: msgUuid,
       });
@@ -130,7 +127,7 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
                   {loading && (
                     <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
                   )}
-                  {loading ? "Blessing…" : `Bless for ${BLESS_PRICE_ETHER} ETH`}
+                  {loading ? "Blessing…" : "Bless (Requires Staking)"}
                 </Button>
               </div>
             </>

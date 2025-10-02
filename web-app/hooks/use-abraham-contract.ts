@@ -241,6 +241,7 @@ export function useAbrahamContract() {
         functionName: "bless",
         args: [sessionUuid, msgUuid, cid],
         account: sender,
+        chain: baseSepolia,
       });
       await waitAndToast(hash, "Blessing sent!");
       return { msgUuid };

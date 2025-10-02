@@ -14,10 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
-import {
-  useAbrahamActions,
-  BLESS_PRICE_ETHER,
-} from "@/hooks/use-abraham-actions";
+import { useAbrahamActions } from "@/hooks/use-abraham-actions";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
@@ -80,11 +77,11 @@ export default function BlessDialog({
 
       /* optimistic UI */
       setBlessingsCount(blessingsCount + 1);
-      setLocalTotalEthUsed((e) => e + 0); // No ETH used anymore
+      setLocalTotalEthUsed((e) => e + 0); // No ETH used in new staking system
       onNewBlessing?.({
         userAddress,
         message: text.trim(),
-        ethUsed: "0", // No ETH used in new system
+        ethUsed: "0", // No ETH used in new staking system
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),
         messageUuid: msgUuid,
       });
@@ -140,7 +137,7 @@ export default function BlessDialog({
               maxLength={500}
             />
             <p className="text-sm text-gray-500 mt-3">
-              Cost: {BLESS_PRICE_ETHER} ETH
+              Requires staked ABRAHAM tokens
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
@@ -150,7 +147,7 @@ export default function BlessDialog({
                 {loading && (
                   <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
                 )}
-                {loading ? "Blessing…" : `Bless (${BLESS_PRICE_ETHER} ETH)`}
+                {loading ? "Blessing…" : "Bless (Requires Staking)"}
               </Button>
             </DialogFooter>
           </>

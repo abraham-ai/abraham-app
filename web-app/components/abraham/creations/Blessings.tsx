@@ -4,9 +4,7 @@ import { useState } from "react";
 import { Blessing } from "@/types/abraham";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useAuth } from "@/context/auth-context";
-import {
-  useAbrahamActions,
-} from "@/hooks/use-abraham-actions";
+import { useAbrahamActions } from "@/hooks/use-abraham-actions";
 import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
