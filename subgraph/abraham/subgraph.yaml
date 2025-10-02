@@ -7,9 +7,9 @@ dataSources:
     name: Abraham
     network: base-sepolia
     source:
-      address: "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E"
+      address: "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E" # <- update if redeployed
       abi: Abraham
-      startBlock: 31825800
+      startBlock: 31825800 # <- set to your deploy block
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -34,6 +34,7 @@ dataSources:
           handler: handleMessageAdded
         - event: Praised(string,string,address)
           handler: handlePraised
+        # sessionId is indexed in the ABI, so it must be indexed here too
         - event: LinkedStake(indexed address,indexed string,uint256,uint256,uint256)
           handler: handleLinkedStake
       file: ./src/abraham.ts

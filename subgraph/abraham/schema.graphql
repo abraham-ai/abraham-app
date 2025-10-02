@@ -32,7 +32,7 @@ type Praise @entity(immutable: true) {
 
 type Curator @entity(immutable: false) {
   id: ID! # user address
-  totalLinked: BigInt! # sum of linked across creations
+  totalLinked: BigInt! # sum of linked across creations (monotonic with current event model)
   praisesGiven: Int!
   praisesReceived: Int!
   links: [CuratorLink!]! @derivedFrom(field: "curator")
@@ -43,6 +43,6 @@ type CuratorLink @entity(immutable: false) {
   creation: Creation!
   curator: Curator!
   linkedAmount: BigInt! # current linked for this user on this creation
-  pointsAccrued: BigInt! # cumulative token-seconds at lastUpdate (optional usage)
-  lastUpdate: BigInt!
+  pointsAccrued: BigInt! # cumulative token-seconds captured at lastUpdate
+  lastUpdate: BigInt! # last timestamp we updated accrual
 }

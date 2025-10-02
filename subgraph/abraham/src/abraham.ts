@@ -16,14 +16,15 @@ import {
 } from "../generated/schema";
 import { Address, BigInt, Bytes, crypto } from "@graphprotocol/graph-ts";
 
-/* helpers */
+/* ───────── helpers ───────── */
+
 function creationHashFromString(sessionId: string): string {
   // keccak256(sessionId) -> 0x...
   return crypto.keccak256(Bytes.fromUTF8(sessionId)).toHexString();
 }
 
 function creationHashFromIndexedTopic(topic: Bytes): string {
-  // Already keccak(sessionId) as Bytes -> to hex
+  // Already keccak(sessionId) as Bytes -> to hex string
   return topic.toHexString();
 }
 
@@ -58,7 +59,8 @@ function linkId(creationHash: string, user: Address): string {
   return creationHash.concat("-").concat(user.toHexString());
 }
 
-/* sessions (string param -> compute hash, also store raw string) */
+/* ───────── sessions (string param -> compute hash, also store raw string) ───────── */
+
 export function handleSessionCreated(e: SessionCreated): void {
   const raw = e.params.sessionId;
   const hash = creationHashFromString(raw);
@@ -92,7 +94,8 @@ export function handleSessionReopened(e: SessionReopened): void {
   c.save();
 }
 
-/* messages (string param -> compute same hash) */
+/* ───────── messages (string param -> compute same hash) ───────── */
+
 export function handleMessageAdded(e: MessageAdded): void {
   const raw = e.params.sessionId;
   const hash = creationHashFromString(raw);
@@ -115,7 +118,8 @@ export function handleMessageAdded(e: MessageAdded): void {
   creation.save();
 }
 
-/* praises (string param -> compute same hash) */
+/* ───────── praises (string param -> compute same hash) ───────── */
+
 export function handlePraised(e: Praised): void {
   const raw = e.params.sessionId;
   const hash = creationHashFromString(raw);
@@ -154,21 +158,27 @@ export function handlePraised(e: Praised): void {
   rec.save();
 }
 
-/* linked stake (indexed string -> Bytes topic -> use hash hex directly) */
+/* ───────── linked stake (indexed string -> Bytes topic -> use hash hex directly) ─────────
+   Accrual logic:
+   pointsAccrued += linkedAmount * (now - lastUpdate)
+   then update: lastUpdate = now; linkedAmount += delta
+*/
 export function handleLinkedStake(e: LinkedStake): void {
   const hash = creationHashFromIndexedTopic(e.params.sessionId); // hex string id
   const user = e.params.user;
 
+  // Creation aggregate (trust contract's sessionLinkedTotal)
   let creation = getOrCreateCreationByHash(hash, e.block.timestamp);
-  // sessionIdRaw may be unknown here (if no prior non-indexed events yet); that's fine.
   creation.linkedTotal = e.params.sessionLinkedTotal;
   creation.lastActivityAt = e.block.timestamp;
   creation.save();
 
+  // Curator aggregate
   let curator = getOrCreateCurator(user);
   curator.totalLinked = curator.totalLinked.plus(e.params.delta);
   curator.save();
 
+  // Per-creation link + accrual
   let id = linkId(hash, user);
   let cl = CuratorLink.load(id);
   if (cl == null) {
@@ -180,7 +190,16 @@ export function handleLinkedStake(e: LinkedStake): void {
     cl.lastUpdate = BigInt.zero();
   }
 
-  cl.linkedAmount = cl.linkedAmount.plus(e.params.delta);
+  // Accrue time-weighted points before changing link
+  if (cl.lastUpdate.gt(BigInt.zero()) && cl.linkedAmount.gt(BigInt.zero())) {
+    const dt = e.block.timestamp.minus(cl.lastUpdate);
+    // points += linkedAmount * dt
+    cl.pointsAccrued = cl.pointsAccrued.plus(cl.linkedAmount.times(dt));
+  }
+
+  // Update timestamp then link amount (+delta)
   cl.lastUpdate = e.block.timestamp;
+  cl.linkedAmount = cl.linkedAmount.plus(e.params.delta);
+
   cl.save();
 }
