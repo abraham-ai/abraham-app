@@ -7,7 +7,7 @@ dataSources:
     name: Abraham
     network: base-sepolia
     source:
-      address: "0x318564b3C584CBc475CDAbC1E6087D7C6bEb1e94"
+      address: "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E"
       abi: Abraham
       startBlock: 29329131
     mapping:
@@ -18,7 +18,8 @@ dataSources:
         - Creation
         - Message
         - Praise
-        - User
+        - Curator
+        - CuratorLink
       abis:
         - name: Abraham
           file: ./abis/Abraham.json
@@ -29,9 +30,10 @@ dataSources:
           handler: handleSessionClosed
         - event: SessionReopened(string)
           handler: handleSessionReopened
-        # UPDATED signature: content/media removed, 'cid' added
         - event: MessageAdded(string,string,address,string)
           handler: handleMessageAdded
         - event: Praised(string,string,address)
           handler: handlePraised
+        - event: LinkedStake(indexed address,indexed string,uint256,uint256,uint256)
+          handler: handleLinkedStake
       file: ./src/abraham.ts
