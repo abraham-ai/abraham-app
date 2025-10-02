@@ -9,7 +9,7 @@ dataSources:
     source:
       address: "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E"
       abi: Abraham
-      startBlock: 29329131
+      startBlock: 31825800
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
