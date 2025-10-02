@@ -239,6 +239,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
                       messageUuid: b.uuid,
                     }))}
                   closed={creation.closed}
+                  parentSessionIdRaw={creation.sessionIdRaw}
                 />
               </div>
             ))}

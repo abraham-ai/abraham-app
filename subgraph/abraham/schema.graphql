@@ -1,35 +1,48 @@
 type Creation @entity(immutable: false) {
-  id: ID! # session UUID
+  id: ID! # keccak256(sessionId) hex string
+  sessionIdRaw: String # original sessionId string when available
   messageCount: Int!
   firstMessageAt: BigInt!
   lastActivityAt: BigInt!
-  ethSpent: BigInt! # total Wei spent on blessings + praises (user costs)
   closed: Boolean!
-  totalBlessings: Int! # matches contract Session.totalBlessings
-  totalPraises: Int! # matches contract Session.totalPraises
+  totalBlessings: Int!
+  totalPraises: Int!
+  linkedTotal: BigInt! # sum of linked stake for this creation
   messages: [Message!]! @derivedFrom(field: "creation")
+  curatorLinks: [CuratorLink!]! @derivedFrom(field: "creation")
 }
 
 type Message @entity(immutable: false) {
-  id: ID! # "${sessionId}-${messageId}"
+  id: ID! # "${creationHash}-${messageId}"
   creation: Creation!
-  uuid: String! # original per-session message UUID
+  uuid: String! # per-session message UUID
   author: Bytes!
-  cid: String! # IPFS CID for the JSON blob (content + media)
+  cid: String!
   timestamp: BigInt!
-  praiseCount: Int! # mirrors on-chain Message.praiseCount
+  praiseCount: Int!
   praises: [Praise!]! @derivedFrom(field: "message")
 }
 
 type Praise @entity(immutable: true) {
-  id: ID! # "${sessionId}-${messageId}-${txHash}-${logIdx}"
+  id: ID! # "${creationHash}-${messageId}-${txHash}-${logIdx}"
   message: Message!
   praiser: Bytes!
   timestamp: BigInt!
 }
 
-type User @entity(immutable: false) {
-  id: ID! # address
+type Curator @entity(immutable: false) {
+  id: ID! # user address
+  totalLinked: BigInt! # sum of linked across creations (monotonic with current event model)
   praisesGiven: Int!
   praisesReceived: Int!
+  links: [CuratorLink!]! @derivedFrom(field: "curator")
+}
+
+type CuratorLink @entity(immutable: false) {
+  id: ID! # "${creationHash}-${user}"
+  creation: Creation!
+  curator: Curator!
+  linkedAmount: BigInt! # current linked for this user on this creation
+  pointsAccrued: BigInt! # cumulative token-seconds captured at lastUpdate
+  lastUpdate: BigInt! # last timestamp we updated accrual
 }

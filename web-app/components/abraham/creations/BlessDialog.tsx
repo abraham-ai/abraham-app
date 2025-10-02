@@ -14,10 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
-import {
-  useAbrahamActions,
-  BLESS_PRICE_ETHER,
-} from "@/hooks/use-abraham-actions";
+import { useAbrahamActions } from "@/hooks/use-abraham-actions";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
@@ -76,15 +73,24 @@ export default function BlessDialog({
     setLoading(true);
     try {
       // Queued; pins to IPFS then enqueues on-chain bless()
-      const { msgUuid } = await bless(creation.id, text.trim());
+      // Call the bless action
+      if (!creation.sessionIdRaw) {
+        showWarningToast(
+          "Session ID Missing",
+          "Cannot bless: Session ID not available for this creation"
+        );
+        return;
+      }
+
+      const { msgUuid } = await bless(creation.sessionIdRaw, text.trim());
 
       /* optimistic UI */
       setBlessingsCount(blessingsCount + 1);
-      setLocalTotalEthUsed((e) => e + BLESS_PRICE_ETHER);
+      setLocalTotalEthUsed((e) => e + 0); // No ETH used in new staking system
       onNewBlessing?.({
         userAddress,
         message: text.trim(),
-        ethUsed: (BLESS_PRICE_ETHER * 10 ** 18).toString(),
+        ethUsed: "0", // No ETH used in new staking system
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),
         messageUuid: msgUuid,
       });
@@ -140,7 +146,7 @@ export default function BlessDialog({
               maxLength={500}
             />
             <p className="text-sm text-gray-500 mt-3">
-              Cost: {BLESS_PRICE_ETHER} ETH
+              Requires staked ABRAHAM tokens
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
@@ -150,7 +156,7 @@ export default function BlessDialog({
                 {loading && (
                   <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
                 )}
-                {loading ? "Blessing…" : `Bless (${BLESS_PRICE_ETHER} ETH)`}
+                {loading ? "Blessing…" : "Bless (Requires Staking)"}
               </Button>
             </DialogFooter>
           </>

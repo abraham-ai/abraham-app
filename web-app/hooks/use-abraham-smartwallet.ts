@@ -6,30 +6,27 @@ import {
   http,
   encodeFunctionData,
   parseEther,
+  formatEther,
   type PublicClient,
 } from "viem";
 import { baseSepolia } from "@/lib/base-sepolia";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
+import { useAbrahamStaking } from "./use-abraham-staking";
 import {
   showErrorToast,
   showInfoToast,
   showSuccessToast,
+  showWarningToast,
 } from "@/lib/error-utils";
 
 /* ------------------------------------------------------------------ */
-/*                        CONTRACT + PRICES                           */
+/*                        CONTRACT ADDRESS                             */
 /* ------------------------------------------------------------------ */
 export const CONTRACT_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS as `0x${string}`) ??
-  "0x318564b3C584CBc475CDAbC1E6087D7C6bEb1e94";
-
-export const PRAISE_PRICE_ETHER = 0.00001;
-export const BLESS_PRICE_ETHER = 0.00002;
-
-const PRAISE_PRICE_WEI = parseEther(PRAISE_PRICE_ETHER.toString());
-const BLESS_PRICE_WEI = parseEther(BLESS_PRICE_ETHER.toString());
+  "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E";
 
 type BatchedCall = {
   to: `0x${string}`;
@@ -38,6 +35,7 @@ type BatchedCall = {
 };
 
 export function useAbrahamSmartWallet() {
+  const { stakedBalance, stake, fetchStakedBalance } = useAbrahamStaking();
   /* ---------- public client ---------- */
   const publicClient: PublicClient = useMemo(
     () =>
@@ -113,19 +111,11 @@ export function useAbrahamSmartWallet() {
       }
     }
 
-    // Count the number of praises and blessings for better toast messages
-    const praiseCount = calls.filter(
-      (call) => call.value === PRAISE_PRICE_WEI
-    ).length;
-    const blessCount = calls.filter(
-      (call) => call.value === BLESS_PRICE_WEI
-    ).length;
-
-    // Calculate the total cost in ETH
-    const totalCost =
-      Number(
-        calls.reduce((acc, c) => acc + (c.value ?? BigInt(0)), BigInt(0))
-      ) / 1e18;
+    // You still need *value* funds for payable calls (gas can be sponsored separately)
+    const totalValueNeeded = calls.reduce(
+      (sum, call) => sum + (call.value ?? BigInt(0)),
+      BigInt(0)
+    );
 
     // One approval for all calls (atomic batch)
     const txHash = await clientToUse.sendTransaction(
@@ -146,36 +136,18 @@ export function useAbrahamSmartWallet() {
         hash: txHash,
       });
       if (rcpt.status === "success") {
-        // Create detailed success message
-        let actionDescription = "";
-        if (praiseCount && blessCount) {
-          actionDescription = `${praiseCount} praise${
-            praiseCount > 1 ? "s" : ""
-          } and ${blessCount} blessing${blessCount > 1 ? "s" : ""}`;
-        } else if (praiseCount) {
-          actionDescription = `${praiseCount} praise${
-            praiseCount > 1 ? "s" : ""
-          }`;
-        } else if (blessCount) {
-          actionDescription = `${blessCount} blessing${
-            blessCount > 1 ? "s" : ""
-          }`;
-        } else {
-          actionDescription = `${calls.length} action${
-            calls.length > 1 ? "s" : ""
-          }`;
-        }
+        // Create detailed success message based on calls count
+        const actionDescription = `${calls.length} action${
+          calls.length > 1 ? "s" : ""
+        }`;
 
         showSuccessToast(
           `Sent ${actionDescription}`,
-          `Transaction confirmed on-chain (${totalCost.toFixed(5)} ETH spent)`
+          `Transaction confirmed on-chain`
         );
       } else {
         const err = new Error("Transaction failed on-chain");
-        showErrorToast(
-          err,
-          `Transaction Failed (${totalCost.toFixed(5)} ETH attempted)`
-        );
+        showErrorToast(err, `Transaction Failed`);
         throw err;
       }
       return txHash;
@@ -213,6 +185,127 @@ export function useAbrahamSmartWallet() {
     }
   };
 
+  // Get staking requirements from contract
+  const getStakingRequirements = async () => {
+    try {
+      const [praiseReq, blessReq] = await Promise.all([
+        publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "praiseRequirement",
+        }),
+        publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "blessRequirement",
+        }),
+      ]);
+      return {
+        praise: praiseReq as bigint,
+        bless: blessReq as bigint,
+      };
+    } catch (error) {
+      console.error("Error fetching staking requirements:", error);
+      return {
+        praise: parseEther("10"), // 10 ABRAHAM
+        bless: parseEther("20"), // 20 ABRAHAM
+      };
+    }
+  };
+
+  // Get available stake (total staked - linked to other creations)
+  const getAvailableStake = async (userAddress: string) => {
+    try {
+      const [totalStaked, totalLinked] = await Promise.all([
+        publicClient
+          .readContract({
+            address: CONTRACT_ADDRESS,
+            abi: AbrahamAbi,
+            functionName: "staking",
+          })
+          .then((stakingAddress) =>
+            publicClient.readContract({
+              address: stakingAddress as `0x${string}`,
+              abi: [
+                {
+                  inputs: [
+                    { internalType: "address", name: "user", type: "address" },
+                  ],
+                  name: "stakedBalance",
+                  outputs: [
+                    { internalType: "uint256", name: "", type: "uint256" },
+                  ],
+                  stateMutability: "view",
+                  type: "function",
+                },
+              ],
+              functionName: "stakedBalance",
+              args: [userAddress as `0x${string}`],
+            })
+          ),
+        publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "getUserTotalLinked",
+          args: [userAddress as `0x${string}`],
+        }),
+      ]);
+
+      const availableStake = (totalStaked as bigint) - (totalLinked as bigint);
+      return availableStake > BigInt(0) ? availableStake : BigInt(0);
+    } catch (error) {
+      console.error("Error fetching available stake:", error);
+      // If we can't determine linked stake, assume all stake is available
+      const currentStaked = stakedBalance
+        ? parseEther(stakedBalance)
+        : BigInt(0);
+      return currentStaked;
+    }
+  };
+
+  // Check if user has enough available stake and stake more if needed
+  // Now checks available stake (total - linked) instead of just total staked
+  const ensureStaking = async (
+    requiredAmount: bigint,
+    actionType: "praise" | "bless"
+  ) => {
+    if (!smartWalletAddress) {
+      throw new Error("Smart wallet address not available");
+    }
+
+    const availableStake = await getAvailableStake(smartWalletAddress);
+
+    if (availableStake < requiredAmount) {
+      const deficit = requiredAmount - availableStake;
+
+      const confirmed = window.confirm(
+        availableStake === BigInt(0)
+          ? `You need ${formatEther(
+              requiredAmount
+            )} ABRAHAM staked to ${actionType}. Would you like to stake now?`
+          : `You have ${formatEther(
+              availableStake
+            )} ABRAHAM available but need ${formatEther(
+              requiredAmount
+            )} to ${actionType}. Your other staked tokens are linked to other creations. Would you like to stake ${formatEther(
+              deficit
+            )} more ABRAHAM?`
+      );
+
+      if (!confirmed) {
+        throw new Error("Insufficient staking for this action");
+      }
+
+      showWarningToast(
+        "Staking Required",
+        `Staking ${formatEther(deficit)} ABRAHAM tokens...`
+      );
+
+      await stake(deficit);
+      await fetchStakedBalance();
+    }
+  };
+
   const isUserReject = (e: any) =>
     typeof e?.message === "string" &&
     e.message.toLowerCase().includes("user rejected");
@@ -221,20 +314,23 @@ export function useAbrahamSmartWallet() {
   /*                             SINGLE ACTIONS (QUEUED)                */
   /* ------------------------------------------------------------------ */
 
-  /** Queue a Praise (payable). */
+  /** Queue a Praise (requires staking). */
   const praise = async (
     sessionUuid: string,
     messageUuid: string,
     opts?: { immediate?: boolean }
   ) => {
     try {
+      const requirements = await getStakingRequirements();
+      await ensureStaking(requirements.praise, "praise");
+
       const data = encodeFunctionData({
         abi: AbrahamAbi,
         functionName: "praise",
         args: [sessionUuid, messageUuid],
       });
       enqueue(
-        { to: CONTRACT_ADDRESS, data, value: PRAISE_PRICE_WEI },
+        { to: CONTRACT_ADDRESS, data }, // No value needed anymore
         { immediate: !!opts?.immediate }
       );
 
@@ -243,9 +339,7 @@ export function useAbrahamSmartWallet() {
       if (!opts?.immediate) {
         showInfoToast(
           "Praise queued",
-          `Praise action (${PRAISE_PRICE_ETHER.toFixed(
-            5
-          )} ETH) added to batch. Will be sent shortly.`
+          "Praise action added to batch. Will be sent shortly."
         );
       }
     } catch (e: any) {
@@ -254,7 +348,7 @@ export function useAbrahamSmartWallet() {
     }
   };
 
-  /** Queue a Bless (pins JSON to IPFS first, then payable call). */
+  /** Queue a Bless (pins JSON to IPFS first, requires staking). */
   const bless = async (
     sessionUuid: string,
     content: string,
@@ -268,6 +362,14 @@ export function useAbrahamSmartWallet() {
     }
 
     const msgUuid = crypto.randomUUID();
+
+    try {
+      const requirements = await getStakingRequirements();
+      await ensureStaking(requirements.bless, "bless");
+    } catch (e: any) {
+      if (!isUserReject(e)) showErrorToast(e, "Blessing Failed");
+      throw e;
+    }
 
     // Server pins JSON; author = smart wallet (preferred) or fallback
     let cid: string;
@@ -307,7 +409,7 @@ export function useAbrahamSmartWallet() {
         args: [sessionUuid, msgUuid, cid],
       });
       enqueue(
-        { to: CONTRACT_ADDRESS, data, value: BLESS_PRICE_WEI },
+        { to: CONTRACT_ADDRESS, data }, // No value needed anymore
         { immediate: !!opts?.immediate }
       );
 
@@ -316,9 +418,7 @@ export function useAbrahamSmartWallet() {
       if (!opts?.immediate) {
         showInfoToast(
           "Blessing queued",
-          `Blessing action (${BLESS_PRICE_ETHER.toFixed(
-            5
-          )} ETH) added to batch. Will be sent shortly.`
+          "Blessing action added to batch. Will be sent shortly."
         );
       }
       return { msgUuid };

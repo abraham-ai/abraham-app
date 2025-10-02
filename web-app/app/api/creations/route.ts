@@ -53,8 +53,11 @@ const LIST_QUERY = /* GraphQL */ `
       orderDirection: desc
     ) {
       id
+      sessionIdRaw
       closed
-      ethSpent
+      linkedTotal
+      totalBlessings
+      totalPraises
       firstMessageAt
       lastActivityAt
       messageCount
@@ -227,7 +230,7 @@ type GraphCreation = Omit<SubgraphCreation, "messages"> & {
   messagesTail: GraphMsgTail[];
 };
 
-function asEthFloat(weiStr: string): number {
+function asTokenFloat(weiStr: string): number {
   const bi = BigInt(weiStr);
   return Number((bi / BigInt(1e14)).toString()) / 1e4;
 }
@@ -296,6 +299,7 @@ async function shapeCreationsList(
           timestamp: m.timestamp,
           messageUuid: m.uuid,
           creationId: c.id,
+          sessionIdRaw: c.sessionIdRaw,
         }));
 
       const messages: SubgraphMessage[] = tailAsc.map((m) => ({
@@ -311,12 +315,15 @@ async function shapeCreationsList(
 
       return {
         id: c.id,
+        sessionIdRaw: c.sessionIdRaw,
         closed: c.closed,
         image: heroImage, // ← most recent owner msg with media
         description: heroDescription,
         praiseCount: heroPraise,
         messageUuid: heroUuid,
-        ethTotal: asEthFloat(c.ethSpent),
+        linkedTotal: asTokenFloat(c.linkedTotal),
+        totalBlessings: c.totalBlessings,
+        totalPraises: c.totalPraises,
         blessingCnt: blessings.length,
         firstMessageAt: c.firstMessageAt,
         lastActivityAt: c.lastActivityAt,

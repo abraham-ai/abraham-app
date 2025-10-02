@@ -1,0 +1,14 @@
+{
+  "network": {
+    "name": "base-sepolia",
+    "chainId": 84532
+  },
+  "contracts": {
+    "AbrahamToken": "0xa3189F7a118e797c91a1548C02E45F2ed5fB69a5",
+    "AbrahamStaking": "0xDFF0A23e74cBA6A1B37e082FDa2e241c8271CEBb",
+    "Abraham": "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E",
+    "owner": "0x641f5ffC5F6239A0873Bd00F9975091FB035aAFC",
+    "deployer": "0x641f5ffC5F6239A0873Bd00F9975091FB035aAFC"
+  },
+  "timestamp": "2025-10-02T13:43:04.666Z"
+}

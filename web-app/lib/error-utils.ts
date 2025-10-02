@@ -94,8 +94,8 @@ export function parseContractError(error: UnknownError): ContractError {
   const errorMessage =
     (typeof errObj === "string"
       ? errObj
-      : (errObj as Error)?.message || (errObj as any)?.reason) ||
-    String(errObj);
+      : (errObj as Error)?.message ||
+        (errObj as { reason?: string })?.reason) || String(errObj);
   const lowerMessage = errorMessage.toLowerCase();
 
   // Check for specific contract errors

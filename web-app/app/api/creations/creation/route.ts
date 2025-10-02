@@ -29,8 +29,11 @@ const DETAIL_QUERY_LITE = /* GraphQL */ `
   query OneLite($id: ID!, $tail: Int!, $owner: Bytes!) {
     creation(id: $id) {
       id
+      sessionIdRaw
       closed
-      ethSpent
+      linkedTotal
+      totalBlessings
+      totalPraises
       firstMessageAt
       lastActivityAt
       # newest Abraham message (for fallback + hero selection)
@@ -63,7 +66,9 @@ const DETAIL_QUERY_FULL = /* GraphQL */ `
     creation(id: $id) {
       id
       closed
-      ethSpent
+      linkedTotal
+      totalBlessings
+      totalPraises
       firstMessageAt
       lastActivityAt
       messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
@@ -204,7 +209,7 @@ async function mapConcurrent<T, R>(
   return ret;
 }
 
-function asEthFloat(weiStr: string): number {
+function asTokenFloat(weiStr: string): number {
   const bi = BigInt(weiStr);
   return Number((bi / BigInt(1e14)).toString()) / 1e4;
 }
@@ -300,17 +305,21 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
       praiseCount: m.praiseCount,
       timestamp: m.timestamp,
       creationId: c.id,
+      sessionIdRaw: c.sessionIdRaw,
       messageUuid: m.uuid,
     }));
 
   return {
     id: c.id,
+    sessionIdRaw: c.sessionIdRaw,
     closed: c.closed,
     image: heroImage,
     description: heroDescription,
     praiseCount: heroPraise,
     messageUuid: heroUuid,
-    ethTotal: asEthFloat(c.ethSpent),
+    linkedTotal: asTokenFloat(c.linkedTotal),
+    totalBlessings: c.totalBlessings,
+    totalPraises: c.totalPraises,
     blessingCnt: blessings.length,
     blessings,
     messages: hydratedAsc, // ← contains all owner + blessing messages (ASC) from the tail
@@ -382,17 +391,21 @@ async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
       praiseCount: m.praiseCount,
       timestamp: m.timestamp,
       creationId: c.id,
+      sessionIdRaw: c.sessionIdRaw,
       messageUuid: m.uuid,
     }));
 
   return {
     id: c.id,
+    sessionIdRaw: c.sessionIdRaw,
     closed: c.closed,
     image: heroImage,
     description: heroDescription,
     praiseCount: heroPraise,
     messageUuid: heroUuid,
-    ethTotal: asEthFloat(c.ethSpent),
+    linkedTotal: asTokenFloat(c.linkedTotal),
+    totalBlessings: c.totalBlessings,
+    totalPraises: c.totalPraises,
     blessingCnt: blessings.length,
     blessings,
     messages,

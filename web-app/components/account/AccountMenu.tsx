@@ -11,6 +11,7 @@ import {
   CopyIcon,
   ExternalLinkIcon,
   PlusIcon,
+  SendIcon,
 } from "lucide-react";
 import { usePrivy, useWallets, useCreateWallet } from "@privy-io/react-auth";
 import {
@@ -44,8 +45,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
 import { useTxMode } from "@/context/tx-mode-context";
+import { useAbrahamToken } from "@/hooks/use-abraham-token";
+import { useAbrahamStaking } from "@/hooks/use-abraham-staking";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 import { Switch } from "@/components/ui/switch";
+import SendAbrahamTokens from "@/components/account/SendAbrahamTokens";
 
 const publicClient = createPublicClient({
   chain: baseSepolia,
@@ -75,6 +79,18 @@ export default function AccountMenu() {
   const { user } = usePrivy();
   const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
+
+  // ABRAHAM token and staking hooks
+  const {
+    balance: abrahamBalance,
+    loading: abrahamLoading,
+    fetchBalance: fetchAbrahamBalance,
+  } = useAbrahamToken();
+  const {
+    stakedBalance,
+    loading: stakingLoading,
+    fetchStakedBalance,
+  } = useAbrahamStaking();
 
   // Active EOA: pick wallet matching authState.walletAddress, else first
   const activeWallet = useMemo(() => {
@@ -182,9 +198,11 @@ export default function AccountMenu() {
     detect();
   }, [isMiniApp, eip1193Provider]);
 
-  const refreshBalances = useCallback(async () => {
+  // Refresh ABRAHAM token balances when other balances refresh
+  const refreshAllBalances = useCallback(async () => {
     setRefreshing(true);
     try {
+      // Refresh ETH balances
       if (!isMiniApp && smartWalletAddress) {
         const b = await publicClient.getBalance({
           address: smartWalletAddress,
@@ -199,23 +217,43 @@ export default function AccountMenu() {
       } else {
         setActiveEth(null);
       }
+
+      // Refresh ABRAHAM token balances
+      if (activeAddress) {
+        await fetchAbrahamBalance();
+        await fetchStakedBalance();
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setRefreshing(false);
     }
-  }, [isMiniApp, smartWalletAddress, activeAddress]);
+  }, [
+    isMiniApp,
+    smartWalletAddress,
+    activeAddress,
+    fetchAbrahamBalance,
+    fetchStakedBalance,
+  ]);
 
   useEffect(() => {
-    refreshBalances();
-    const t = setInterval(refreshBalances, 20000);
+    refreshAllBalances();
+    const t = setInterval(refreshAllBalances, 20000);
     return () => clearInterval(t);
-  }, [refreshBalances]);
+  }, [refreshAllBalances]);
+
+  // Fetch ABRAHAM token balances when activeAddress changes
+  useEffect(() => {
+    if (activeAddress) {
+      fetchAbrahamBalance();
+      fetchStakedBalance();
+    }
+  }, [activeAddress, fetchAbrahamBalance, fetchStakedBalance]);
 
   // In Mini App, when authState.walletAddress changes (e.g., after a bless), re-pull balances
   useEffect(() => {
     if (!isMiniApp) return;
-    refreshBalances();
+    refreshAllBalances();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMiniApp, authState.walletAddress]);
 
@@ -223,6 +261,9 @@ export default function AccountMenu() {
   const [fundOpen, setFundOpen] = useState(false);
   const [amount, setAmount] = useState("0.01");
   const [funding, setFunding] = useState(false);
+
+  // Send ABRAHAM tokens dialog
+  const [sendTokensOpen, setSendTokensOpen] = useState(false);
 
   const doFund = async () => {
     if (!fundingWallet) {
@@ -269,7 +310,7 @@ export default function AccountMenu() {
       showSuccessToast("Smart wallet funded", "Funds are available.");
       setFundOpen(false);
       setAmount("0.01");
-      refreshBalances();
+      refreshAllBalances();
     } catch (e) {
       showErrorToast(e as Error, "Funding failed");
     } finally {
@@ -294,7 +335,7 @@ export default function AccountMenu() {
         "Embedded wallet created",
         "Smart wallet will initialize shortly."
       );
-      setTimeout(refreshBalances, 1500);
+      setTimeout(refreshAllBalances, 1500);
     } catch (e) {
       showErrorToast(e as Error, "Failed to create embedded wallet");
     } finally {
@@ -336,7 +377,10 @@ export default function AccountMenu() {
               </div>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent
+              align="end"
+              className="w-80 max-h-[80vh] overflow-y-auto"
+            >
               <DropdownMenuLabel>
                 <p className="truncate">{authState.username}</p>
               </DropdownMenuLabel>
@@ -443,7 +487,7 @@ export default function AccountMenu() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={refreshBalances}
+                          onClick={refreshAllBalances}
                           disabled={refreshing}
                         >
                           {refreshing ? (
@@ -474,6 +518,87 @@ export default function AccountMenu() {
                       </p>
                     )}
                   </div>
+
+                  <DropdownMenuSeparator />
+
+                  {/* ABRAHAM Token Balance Section */}
+                  {activeAddress && (
+                    <div className="px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <CoinsIcon className="w-4 h-4" />
+                        <span>ABRAHAM Token</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {/* Token Balance */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Balance:</span>
+                          <span className="font-mono">
+                            {abrahamLoading ? (
+                              <Loader2Icon className="w-4 h-4 animate-spin" />
+                            ) : abrahamBalance !== null ? (
+                              `${Number(
+                                abrahamBalance
+                              ).toLocaleString()} $ABRAHAM`
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Staked Balance */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Staked:</span>
+                          <span className="font-mono">
+                            {stakingLoading ? (
+                              <Loader2Icon className="w-4 h-4 animate-spin" />
+                            ) : stakedBalance !== null ? (
+                              `${Number(
+                                stakedBalance
+                              ).toLocaleString()} $ABRAHAM`
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Total (Balance + Staked) */}
+                        {abrahamBalance !== null && stakedBalance !== null && (
+                          <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-200">
+                            <span className="font-medium">Total:</span>
+                            <span className="font-mono font-medium">
+                              {(
+                                Number(abrahamBalance) + Number(stakedBalance)
+                              ).toLocaleString()}{" "}
+                              $ABRAHAM
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Send Button */}
+                        {abrahamBalance !== null &&
+                          Number(abrahamBalance) > 0 && (
+                            <div className="pt-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSendTokensOpen(true)}
+                                className="w-full flex items-center gap-2"
+                                disabled={isMiniApp} // Disable in Mini App as MetaMask might not be available
+                              >
+                                <SendIcon className="w-4 h-4" />
+                                Send Tokens
+                              </Button>
+                              {isMiniApp && (
+                                <p className="text-xs text-gray-500 mt-1 text-center">
+                                  Sending tokens not available in Mini Apps
+                                </p>
+                              )}
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -510,42 +635,52 @@ export default function AccountMenu() {
                         </span>
                       )}
                     </div>
+
+                    {/* ABRAHAM Token Balance for Mini App */}
+                    <div className="mt-3 pt-2 border-t border-gray-200">
+                      <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <CoinsIcon className="w-4 h-4" />
+                        <span>ABRAHAM Token</span>
+                      </div>
+
+                      <div className="space-y-1">
+                        {/* Token Balance */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Balance:</span>
+                          <span className="font-mono text-xs">
+                            {abrahamLoading ? (
+                              <Loader2Icon className="w-3 h-3 animate-spin" />
+                            ) : abrahamBalance !== null ? (
+                              `${Number(
+                                abrahamBalance
+                              ).toLocaleString()} $ABRAHAM`
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Staked Balance */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Staked:</span>
+                          <span className="font-mono text-xs">
+                            {stakingLoading ? (
+                              <Loader2Icon className="w-3 h-3 animate-spin" />
+                            ) : stakedBalance !== null ? (
+                              `${Number(
+                                stakedBalance
+                              ).toLocaleString()} $ABRAHAM`
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <DropdownMenuSeparator />
                 </>
               )}
-
-              {/* Quick faucet links for Base Sepolia */}
-              <div className="px-3 py-2 text-xs text-gray-600">
-                <div className="mb-1 font-medium">Get testnet ETH</div>
-                <div className="flex flex-col gap-1">
-                  <a
-                    className="inline-flex items-center gap-1 hover:underline"
-                    href="https://docs.base.org/tools/network-faucets"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Base docs faucet list{" "}
-                    <ExternalLinkIcon className="w-3 h-3" />
-                  </a>
-                  <a
-                    className="inline-flex items-center gap-1 hover:underline"
-                    href="https://faucets.chain.link/base-sepolia"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Chainlink faucet <ExternalLinkIcon className="w-3 h-3" />
-                  </a>
-                  <a
-                    className="inline-flex items-center gap-1 hover:underline"
-                    href="https://www.alchemy.com/faucets/base-sepolia"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Alchemy faucet <ExternalLinkIcon className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
 
               <DropdownMenuSeparator />
 
@@ -558,6 +693,22 @@ export default function AccountMenu() {
               <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* SEND ABRAHAM TOKENS DIALOG */}
+          <SendAbrahamTokens
+            open={sendTokensOpen}
+            onOpenChange={setSendTokensOpen}
+            currentBalance={abrahamBalance ? Number(abrahamBalance) : null}
+            onTransactionComplete={refreshAllBalances}
+          />
+
+          {/* SEND ABRAHAM TOKENS DIALOG */}
+          <SendAbrahamTokens
+            open={sendTokensOpen}
+            onOpenChange={setSendTokensOpen}
+            currentBalance={abrahamBalance ? Number(abrahamBalance) : null}
+            onTransactionComplete={refreshAllBalances}
+          />
 
           {/* FUND DIALOG */}
           <Dialog open={fundOpen} onOpenChange={setFundOpen}>
