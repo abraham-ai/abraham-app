@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
     const curatorAddresses = data.data.curators.map((c: any) => c.id);
 
     // Fetch blessing counts for these curators
-    let blessingCounts: Record<string, number> = {};
+    const blessingCounts: Record<string, number> = {};
     if (curatorAddresses.length > 0) {
       try {
         const blessingsResponse = await fetch(SUBGRAPH_URL, {
