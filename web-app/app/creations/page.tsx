@@ -219,11 +219,21 @@ export default function CreationsGrid() {
       showWarningToast("Authentication Required", "Please log in.");
       return;
     }
+
+    // Ensure we have a valid session ID
+    if (!c.sessionIdRaw) {
+      showWarningToast(
+        "Session ID Missing",
+        "Cannot praise: Session ID not available for this creation"
+      );
+      return;
+    }
+
     if (loadingPraise) return;
     setLoadingPraise(c.id);
     try {
-      // Queued; auto-batches to one approval for bursts
-      await praise(c.sessionIdRaw || c.id, c.lastMessageUuid);
+      // Use the raw session ID from the subgraph
+      await praise(c.sessionIdRaw, c.lastMessageUuid);
       setPraiseCounts((prev) => ({
         ...prev,
         [c.id]: (prev[c.id] ?? 0) + 1,

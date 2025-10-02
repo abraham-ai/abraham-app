@@ -35,10 +35,25 @@ export default function Creation({ creation }: { creation: CreationItem }) {
     }
     if (creation.closed) return;
 
+    // Ensure we have a valid session ID - prefer sessionIdRaw, but if not available,
+    // this is likely an issue with the subgraph data
+    if (!creation.sessionIdRaw) {
+      console.error("Missing sessionIdRaw for creation:", {
+        id: creation.id,
+        sessionIdRaw: creation.sessionIdRaw,
+        messageUuid: creation.messageUuid,
+      });
+      showErrorToast(
+        new Error("Session ID not available"),
+        "Cannot praise: Session ID missing. This creation may need to be re-indexed."
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      // Queues into a batched user operation (single approval for many actions)
-      await praise(creation.sessionIdRaw || creation.id, creation.messageUuid);
+      // Use the raw session ID from the subgraph
+      await praise(creation.sessionIdRaw, creation.messageUuid);
       setPraises((p) => p + 1);
     } catch (e) {
       // toast handled inside the hook for non-reject errors

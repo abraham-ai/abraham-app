@@ -19,9 +19,14 @@ import {
 interface Props {
   blessings: Blessing[];
   closed?: boolean; // ⇦ NEW (default: false)
+  parentSessionIdRaw?: string; // ⇦ NEW: session ID from parent creation
 }
 
-export default function Blessings({ blessings, closed = false }: Props) {
+export default function Blessings({
+  blessings,
+  closed = false,
+  parentSessionIdRaw,
+}: Props) {
   const { loggedIn, login, loadingAuth } = useAuth();
   const { praise } = useAbrahamActions();
 
@@ -37,9 +42,19 @@ export default function Blessings({ blessings, closed = false }: Props) {
       return;
     }
     const b = blessings[i];
+
+    // Use parent creation's session ID for praising blessings
+    if (!parentSessionIdRaw) {
+      showWarningToast(
+        "Session ID Missing",
+        "Cannot praise: Session ID not available for this creation"
+      );
+      return;
+    }
+
     setLoadingIdx(i);
     try {
-      await praise(b.sessionIdRaw || b.creationId, b.messageUuid);
+      await praise(parentSessionIdRaw, b.messageUuid);
       setCounts((c) => c.map((v, idx) => (idx === i ? v + 1 : v)));
     } catch (e) {
       /* toast already handled in hook */

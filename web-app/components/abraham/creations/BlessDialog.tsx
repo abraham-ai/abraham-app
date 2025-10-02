@@ -73,10 +73,16 @@ export default function BlessDialog({
     setLoading(true);
     try {
       // Queued; pins to IPFS then enqueues on-chain bless()
-      const { msgUuid } = await bless(
-        creation.sessionIdRaw || creation.id,
-        text.trim()
-      );
+      // Call the bless action
+      if (!creation.sessionIdRaw) {
+        showWarningToast(
+          "Session ID Missing",
+          "Cannot bless: Session ID not available for this creation"
+        );
+        return;
+      }
+
+      const { msgUuid } = await bless(creation.sessionIdRaw, text.trim());
 
       /* optimistic UI */
       setBlessingsCount(blessingsCount + 1);
