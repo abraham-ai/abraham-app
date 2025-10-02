@@ -12,12 +12,16 @@ import { CreationItem } from "@/types/abraham";
 import { Loader2Icon, CircleXIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getRelativeTime } from "@/lib/time-utils";
+import { getRelativeTime }                              <div>
+                                <div className="font-medium">Praise Creation</div>
+                                <div className="text-xs">
+                                  Requires staked ABRAHAM tokens
+                                </div>
+                              </div>"@/lib/time-utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import {
   useAbrahamActions,
-  PRAISE_PRICE_ETHER,
 } from "@/hooks/use-abraham-actions";
 import {
   Tooltip,

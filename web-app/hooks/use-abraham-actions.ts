@@ -1,19 +1,8 @@
 "use client";
 
 import { useTxMode } from "@/context/tx-mode-context";
-import {
-  useAbrahamSmartWallet,
-  PRAISE_PRICE_ETHER as SW_PRAISE,
-  BLESS_PRICE_ETHER as SW_BLESS,
-} from "@/hooks/use-abraham-smartwallet";
-import {
-  useAbrahamContract,
-  PRAISE_PRICE_ETHER as EOA_PRAISE,
-  BLESS_PRICE_ETHER as EOA_BLESS,
-} from "@/hooks/use-abraham-contract";
-
-export const PRAISE_PRICE_ETHER = SW_PRAISE; // same constants across paths
-export const BLESS_PRICE_ETHER = SW_BLESS;
+import { useAbrahamSmartWallet } from "@/hooks/use-abraham-smartwallet";
+import { useAbrahamContract } from "@/hooks/use-abraham-contract";
 
 export function useAbrahamActions() {
   const { mode } = useTxMode();

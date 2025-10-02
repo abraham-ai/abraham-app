@@ -54,7 +54,9 @@ const LIST_QUERY = /* GraphQL */ `
     ) {
       id
       closed
-      ethSpent
+      linkedTotal
+      totalBlessings
+      totalPraises
       firstMessageAt
       lastActivityAt
       messageCount
@@ -223,11 +225,14 @@ type GraphMsgTail = {
 };
 type GraphCreation = Omit<SubgraphCreation, "messages"> & {
   messageCount: number;
+  linkedTotal: string;
+  totalBlessings: number;
+  totalPraises: number;
   abrahamLatest: GraphMsgLatest[];
   messagesTail: GraphMsgTail[];
 };
 
-function asEthFloat(weiStr: string): number {
+function asTokenFloat(weiStr: string): number {
   const bi = BigInt(weiStr);
   return Number((bi / BigInt(1e14)).toString()) / 1e4;
 }
@@ -316,7 +321,7 @@ async function shapeCreationsList(
         description: heroDescription,
         praiseCount: heroPraise,
         messageUuid: heroUuid,
-        ethTotal: asEthFloat(c.ethSpent),
+        ethTotal: asTokenFloat(c.linkedTotal),
         blessingCnt: blessings.length,
         firstMessageAt: c.firstMessageAt,
         lastActivityAt: c.lastActivityAt,

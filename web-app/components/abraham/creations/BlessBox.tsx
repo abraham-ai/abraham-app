@@ -83,7 +83,7 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
       onNewBlessing?.({
         userAddress: currentAddr,
         message: text.trim(),
-        ethUsed: (BLESS_PRICE_ETHER * 10 ** 18).toString(),
+        ethUsed: "0", // No ETH used in new system
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),
         messageUuid: msgUuid,
       });

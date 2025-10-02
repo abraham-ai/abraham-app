@@ -80,11 +80,11 @@ export default function BlessDialog({
 
       /* optimistic UI */
       setBlessingsCount(blessingsCount + 1);
-      setLocalTotalEthUsed((e) => e + BLESS_PRICE_ETHER);
+      setLocalTotalEthUsed((e) => e + 0); // No ETH used anymore
       onNewBlessing?.({
         userAddress,
         message: text.trim(),
-        ethUsed: (BLESS_PRICE_ETHER * 10 ** 18).toString(),
+        ethUsed: "0", // No ETH used in new system
         blockTimestamp: Math.floor(Date.now() / 1000).toString(),
         messageUuid: msgUuid,
       });

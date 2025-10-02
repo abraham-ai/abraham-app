@@ -30,7 +30,9 @@ const DETAIL_QUERY_LITE = /* GraphQL */ `
     creation(id: $id) {
       id
       closed
-      ethSpent
+      linkedTotal
+      totalBlessings
+      totalPraises
       firstMessageAt
       lastActivityAt
       # newest Abraham message (for fallback + hero selection)
@@ -63,7 +65,9 @@ const DETAIL_QUERY_FULL = /* GraphQL */ `
     creation(id: $id) {
       id
       closed
-      ethSpent
+      linkedTotal
+      totalBlessings
+      totalPraises
       firstMessageAt
       lastActivityAt
       messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
@@ -204,7 +208,7 @@ async function mapConcurrent<T, R>(
   return ret;
 }
 
-function asEthFloat(weiStr: string): number {
+function asTokenFloat(weiStr: string): number {
   const bi = BigInt(weiStr);
   return Number((bi / BigInt(1e14)).toString()) / 1e4;
 }
@@ -310,7 +314,7 @@ async function shapeLite(c: GraphCreationLite): Promise<CreationItem> {
     description: heroDescription,
     praiseCount: heroPraise,
     messageUuid: heroUuid,
-    ethTotal: asEthFloat(c.ethSpent),
+    ethTotal: asTokenFloat(c.linkedTotal),
     blessingCnt: blessings.length,
     blessings,
     messages: hydratedAsc, // ← contains all owner + blessing messages (ASC) from the tail
@@ -392,7 +396,7 @@ async function shapeFull(c: GraphCreationFull): Promise<CreationItem> {
     description: heroDescription,
     praiseCount: heroPraise,
     messageUuid: heroUuid,
-    ethTotal: asEthFloat(c.ethSpent),
+    ethTotal: asTokenFloat(c.linkedTotal),
     blessingCnt: blessings.length,
     blessings,
     messages,

@@ -7,26 +7,26 @@ import {
   custom,
   http,
   parseEther,
+  formatEther,
   type PublicClient,
   type WalletClient,
 } from "viem";
 import { baseSepolia } from "@/lib/base-sepolia";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { useAuth } from "@/context/auth-context";
-import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
+import { useAbrahamStaking } from "./use-abraham-staking";
+import {
+  showErrorToast,
+  showSuccessToast,
+  showWarningToast,
+} from "@/lib/error-utils";
 
 /* ------------------------------------------------------------------ */
-/*                        CONTRACT + PRICES                           */
+/*                        CONTRACT ADDRESS                             */
 /* ------------------------------------------------------------------ */
 export const CONTRACT_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS as `0x${string}`) ??
-  "0x318564b3C584CBc475CDAbC1E6087D7C6bEb1e94";
-
-export const PRAISE_PRICE_ETHER = 0.00001;
-export const BLESS_PRICE_ETHER = 0.00002;
-
-const PRAISE_PRICE_WEI = parseEther(PRAISE_PRICE_ETHER.toString());
-const BLESS_PRICE_WEI = parseEther(BLESS_PRICE_ETHER.toString());
+  "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E";
 
 /**
  * Read-/write helpers for the Abraham contract.
@@ -36,6 +36,7 @@ const BLESS_PRICE_WEI = parseEther(BLESS_PRICE_ETHER.toString());
  */
 export function useAbrahamContract() {
   const { eip1193Provider, authState } = useAuth();
+  const { stakedBalance, stake, fetchStakedBalance } = useAbrahamStaking();
 
   /* ---------- viem clients ---------- */
   const publicClient: PublicClient = useMemo(
@@ -97,12 +98,63 @@ export function useAbrahamContract() {
     } catch {}
   };
 
-  const ensureBalance = async (addr: `0x${string}`, cost: bigint) => {
-    const bal = await publicClient.getBalance({ address: addr });
-    if (bal < cost) {
-      const err = new Error("Insufficient funds");
-      showErrorToast(err, "Insufficient Balance");
-      throw err;
+  // Get staking requirements from contract
+  const getStakingRequirements = async () => {
+    try {
+      const [praiseReq, blessReq] = await Promise.all([
+        publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "praiseRequirement",
+        }),
+        publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "blessRequirement",
+        }),
+      ]);
+      return {
+        praise: praiseReq as bigint,
+        bless: blessReq as bigint,
+      };
+    } catch (error) {
+      console.error("Error fetching staking requirements:", error);
+      // Fallback to default values from contract
+      return {
+        praise: parseEther("10"), // 10 ABRAHAM
+        bless: parseEther("20"), // 20 ABRAHAM
+      };
+    }
+  };
+
+  // Check if user has enough staked and stake more if needed
+  const ensureStaking = async (
+    requiredAmount: bigint,
+    actionType: "praise" | "bless"
+  ) => {
+    const currentStaked = stakedBalance ? parseEther(stakedBalance) : BigInt(0);
+
+    if (currentStaked < requiredAmount) {
+      const deficit = requiredAmount - currentStaked;
+
+      const confirmed = window.confirm(
+        `You need ${formatEther(
+          deficit
+        )} more ABRAHAM staked to ${actionType}. ` +
+          "Would you like to stake the required amount now?"
+      );
+
+      if (!confirmed) {
+        throw new Error("Insufficient staking for this action");
+      }
+
+      showWarningToast(
+        "Staking Required",
+        `Staking ${formatEther(deficit)} ABRAHAM tokens...`
+      );
+
+      await stake(deficit);
+      await fetchStakedBalance();
     }
   };
 
@@ -123,11 +175,11 @@ export function useAbrahamContract() {
   /*                             SINGLE ACTIONS                          */
   /* ------------------------------------------------------------------ */
 
-  /** Praise any message (unlimited). */
+  /** Praise any message (requires staking). */
   const praise = async (sessionUuid: string, messageUuid: string) => {
     const sender = await requireWallet();
-    const valueWei = PRAISE_PRICE_WEI;
-    await ensureBalance(sender, valueWei);
+    const requirements = await getStakingRequirements();
+    await ensureStaking(requirements.praise, "praise");
 
     try {
       await ensureChain();
@@ -137,7 +189,6 @@ export function useAbrahamContract() {
         abi: AbrahamAbi,
         functionName: "praise",
         args: [sessionUuid, messageUuid],
-        value: valueWei,
         chain: baseSepolia,
       });
       await waitAndToast(hash, "Praise sent! 🙌");
@@ -152,58 +203,58 @@ export function useAbrahamContract() {
   const bless = async (sessionUuid: string, content: string) => {
     const trimmed = (content ?? "").trim();
     if (!trimmed) {
-      const err = new Error("Content required");
-      showErrorToast(err, "Content required");
-      throw err;
+      showWarningToast("Missing Content", "Enter a message to bless.");
+      return { msgUuid: "" };
     }
 
     const sender = await requireWallet();
-    const valueWei = BLESS_PRICE_WEI;
-    await ensureBalance(sender, valueWei);
+    const requirements = await getStakingRequirements();
+    await ensureStaking(requirements.bless, "bless");
 
+    // 1) Pin to IPFS via server
     const msgUuid = crypto.randomUUID();
+    const payload = {
+      messageUuid: msgUuid,
+      content: trimmed,
+      userAddress: sender,
+      ethUsed: "0", // No ETH used anymore
+      blockTimestamp: Math.floor(Date.now() / 1000).toString(),
+    };
 
-    // Ask server to pin the message JSON (content only; no media for blessings)
-    let cid: string;
-    try {
-      const res = await fetch("/api/ipfs/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: sessionUuid,
-          messageId: msgUuid,
-          content: trimmed,
-          author: authState.walletAddress ?? sender,
-          kind: "blessing",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "IPFS pin failed");
-      cid = data.cid as string;
-      if (!cid) throw new Error("CID missing from server response");
-    } catch (e: any) {
-      showErrorToast(e, "Failed to pin blessing to IPFS");
-      throw e;
+    const resp = await fetch("/api/pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(errData.error || "Failed to pin content");
     }
+    const { cid } = await resp.json();
 
+    // 2) Send on-chain
     try {
       await ensureChain();
       const hash = await walletClient!.writeContract({
-        account: sender,
         address: CONTRACT_ADDRESS,
         abi: AbrahamAbi,
         functionName: "bless",
         args: [sessionUuid, msgUuid, cid],
-        value: valueWei,
-        chain: baseSepolia,
+        account: sender,
       });
-      await waitAndToast(hash, "Blessing sent! 🙏");
-      return { hash, msgUuid };
+      await waitAndToast(hash, "Blessing sent!");
+      return { msgUuid };
     } catch (e: any) {
-      if (!isUserReject(e)) showErrorToast(e, "Blessing Failed");
+      if (!isUserReject(e)) showErrorToast(e, "Bless failed");
       throw e;
     }
   };
 
-  return { praise, bless };
+  return {
+    praise,
+    bless,
+    getStakingRequirements,
+    stakedBalance,
+    fetchStakedBalance,
+  };
 }

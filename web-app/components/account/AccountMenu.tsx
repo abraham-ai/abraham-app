@@ -44,6 +44,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
 import { useTxMode } from "@/context/tx-mode-context";
+import { useAbrahamToken } from "@/hooks/use-abraham-token";
+import { useAbrahamStaking } from "@/hooks/use-abraham-staking";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 import { Switch } from "@/components/ui/switch";
 
@@ -75,6 +77,18 @@ export default function AccountMenu() {
   const { user } = usePrivy();
   const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
+
+  // ABRAHAM token and staking hooks
+  const {
+    balance: abrahamBalance,
+    loading: abrahamLoading,
+    fetchBalance: fetchAbrahamBalance,
+  } = useAbrahamToken();
+  const {
+    stakedBalance,
+    loading: stakingLoading,
+    fetchStakedBalance,
+  } = useAbrahamStaking();
 
   // Active EOA: pick wallet matching authState.walletAddress, else first
   const activeWallet = useMemo(() => {

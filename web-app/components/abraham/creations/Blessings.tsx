@@ -6,7 +6,6 @@ import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useAuth } from "@/context/auth-context";
 import {
   useAbrahamActions,
-  PRAISE_PRICE_ETHER,
 } from "@/hooks/use-abraham-actions";
 import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -112,7 +111,7 @@ export default function Blessings({ blessings, closed = false }: Props) {
                       <div>
                         <div className="font-medium">Praise Blessing</div>
                         <div className="text-xs">
-                          {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                          Requires staked ABRAHAM tokens
                         </div>
                       </div>
                     )}

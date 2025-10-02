@@ -6,30 +6,27 @@ import {
   http,
   encodeFunctionData,
   parseEther,
+  formatEther,
   type PublicClient,
 } from "viem";
 import { baseSepolia } from "@/lib/base-sepolia";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
+import { useAbrahamStaking } from "./use-abraham-staking";
 import {
   showErrorToast,
   showInfoToast,
   showSuccessToast,
+  showWarningToast,
 } from "@/lib/error-utils";
 
 /* ------------------------------------------------------------------ */
-/*                        CONTRACT + PRICES                           */
+/*                        CONTRACT ADDRESS                             */
 /* ------------------------------------------------------------------ */
 export const CONTRACT_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS as `0x${string}`) ??
-  "0x318564b3C584CBc475CDAbC1E6087D7C6bEb1e94";
-
-export const PRAISE_PRICE_ETHER = 0.00001;
-export const BLESS_PRICE_ETHER = 0.00002;
-
-const PRAISE_PRICE_WEI = parseEther(PRAISE_PRICE_ETHER.toString());
-const BLESS_PRICE_WEI = parseEther(BLESS_PRICE_ETHER.toString());
+  "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E";
 
 type BatchedCall = {
   to: `0x${string}`;
@@ -38,6 +35,7 @@ type BatchedCall = {
 };
 
 export function useAbrahamSmartWallet() {
+  const { stakedBalance, stake, fetchStakedBalance } = useAbrahamStaking();
   /* ---------- public client ---------- */
   const publicClient: PublicClient = useMemo(
     () =>
@@ -213,6 +211,65 @@ export function useAbrahamSmartWallet() {
     }
   };
 
+  // Get staking requirements from contract
+  const getStakingRequirements = async () => {
+    try {
+      const [praiseReq, blessReq] = await Promise.all([
+        publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "praiseRequirement",
+        }),
+        publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "blessRequirement",
+        }),
+      ]);
+      return {
+        praise: praiseReq as bigint,
+        bless: blessReq as bigint,
+      };
+    } catch (error) {
+      console.error("Error fetching staking requirements:", error);
+      return {
+        praise: parseEther("10"), // 10 ABRAHAM
+        bless: parseEther("20"), // 20 ABRAHAM
+      };
+    }
+  };
+
+  // Check if user has enough staked and stake more if needed
+  const ensureStaking = async (
+    requiredAmount: bigint,
+    actionType: "praise" | "bless"
+  ) => {
+    const currentStaked = stakedBalance ? parseEther(stakedBalance) : BigInt(0);
+
+    if (currentStaked < requiredAmount) {
+      const deficit = requiredAmount - currentStaked;
+
+      const confirmed = window.confirm(
+        `You need ${formatEther(
+          deficit
+        )} more ABRAHAM staked to ${actionType}. ` +
+          "Would you like to stake the required amount now?"
+      );
+
+      if (!confirmed) {
+        throw new Error("Insufficient staking for this action");
+      }
+
+      showWarningToast(
+        "Staking Required",
+        `Staking ${formatEther(deficit)} ABRAHAM tokens...`
+      );
+
+      await stake(deficit);
+      await fetchStakedBalance();
+    }
+  };
+
   const isUserReject = (e: any) =>
     typeof e?.message === "string" &&
     e.message.toLowerCase().includes("user rejected");
@@ -221,20 +278,23 @@ export function useAbrahamSmartWallet() {
   /*                             SINGLE ACTIONS (QUEUED)                */
   /* ------------------------------------------------------------------ */
 
-  /** Queue a Praise (payable). */
+  /** Queue a Praise (requires staking). */
   const praise = async (
     sessionUuid: string,
     messageUuid: string,
     opts?: { immediate?: boolean }
   ) => {
     try {
+      const requirements = await getStakingRequirements();
+      await ensureStaking(requirements.praise, "praise");
+
       const data = encodeFunctionData({
         abi: AbrahamAbi,
         functionName: "praise",
         args: [sessionUuid, messageUuid],
       });
       enqueue(
-        { to: CONTRACT_ADDRESS, data, value: PRAISE_PRICE_WEI },
+        { to: CONTRACT_ADDRESS, data }, // No value needed anymore
         { immediate: !!opts?.immediate }
       );
 
@@ -243,9 +303,7 @@ export function useAbrahamSmartWallet() {
       if (!opts?.immediate) {
         showInfoToast(
           "Praise queued",
-          `Praise action (${PRAISE_PRICE_ETHER.toFixed(
-            5
-          )} ETH) added to batch. Will be sent shortly.`
+          "Praise action added to batch. Will be sent shortly."
         );
       }
     } catch (e: any) {
@@ -254,7 +312,7 @@ export function useAbrahamSmartWallet() {
     }
   };
 
-  /** Queue a Bless (pins JSON to IPFS first, then payable call). */
+  /** Queue a Bless (pins JSON to IPFS first, requires staking). */
   const bless = async (
     sessionUuid: string,
     content: string,
@@ -268,6 +326,14 @@ export function useAbrahamSmartWallet() {
     }
 
     const msgUuid = crypto.randomUUID();
+
+    try {
+      const requirements = await getStakingRequirements();
+      await ensureStaking(requirements.bless, "bless");
+    } catch (e: any) {
+      if (!isUserReject(e)) showErrorToast(e, "Blessing Failed");
+      throw e;
+    }
 
     // Server pins JSON; author = smart wallet (preferred) or fallback
     let cid: string;
@@ -307,7 +373,7 @@ export function useAbrahamSmartWallet() {
         args: [sessionUuid, msgUuid, cid],
       });
       enqueue(
-        { to: CONTRACT_ADDRESS, data, value: BLESS_PRICE_WEI },
+        { to: CONTRACT_ADDRESS, data }, // No value needed anymore
         { immediate: !!opts?.immediate }
       );
 
@@ -316,9 +382,7 @@ export function useAbrahamSmartWallet() {
       if (!opts?.immediate) {
         showInfoToast(
           "Blessing queued",
-          `Blessing action (${BLESS_PRICE_ETHER.toFixed(
-            5
-          )} ETH) added to batch. Will be sent shortly.`
+          "Blessing action added to batch. Will be sent shortly."
         );
       }
       return { msgUuid };

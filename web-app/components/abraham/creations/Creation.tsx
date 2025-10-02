@@ -7,7 +7,6 @@ import { CreationItem } from "@/types/abraham";
 import { useAuth } from "@/context/auth-context";
 import {
   useAbrahamActions,
-  PRAISE_PRICE_ETHER,
 } from "@/hooks/use-abraham-actions";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
@@ -156,7 +155,7 @@ export default function Creation({ creation }: { creation: CreationItem }) {
                   <div>
                     <div className="font-medium">Praise Creation</div>
                     <div className="text-xs">
-                      {PRAISE_PRICE_ETHER.toFixed(5)} ETH will be sent
+                      Requires staked ABRAHAM tokens
                     </div>
                   </div>
                 )}

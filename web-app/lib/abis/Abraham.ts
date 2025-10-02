@@ -1,6 +1,12 @@
 export const AbrahamAbi = [
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "address",
+        name: "staking_",
+        type: "address",
+      },
+    ],
     stateMutability: "nonpayable",
     type: "constructor",
   },
@@ -27,9 +33,41 @@ export const AbrahamAbi = [
     type: "error",
   },
   {
-    inputs: [],
-    name: "ReentrancyGuardReentrantCall",
-    type: "error",
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "user",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "string",
+        name: "sessionId",
+        type: "string",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "delta",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "userSessionLinked",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "sessionLinkedTotal",
+        type: "uint256",
+      },
+    ],
+    name: "LinkedStake",
+    type: "event",
   },
   {
     anonymous: false,
@@ -148,32 +186,6 @@ export const AbrahamAbi = [
   {
     stateMutability: "payable",
     type: "fallback",
-  },
-  {
-    inputs: [],
-    name: "BLESS_PRICE",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "PRAISE_PRICE",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
   },
   {
     inputs: [
@@ -323,7 +335,7 @@ export const AbrahamAbi = [
     ],
     name: "batchBless",
     outputs: [],
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -341,7 +353,7 @@ export const AbrahamAbi = [
     ],
     name: "batchPraise",
     outputs: [],
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -364,7 +376,20 @@ export const AbrahamAbi = [
     ],
     name: "bless",
     outputs: [],
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "blessRequirement",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -473,6 +498,93 @@ export const AbrahamAbi = [
         name: "closed",
         type: "bool",
       },
+      {
+        internalType: "uint256",
+        name: "linkedTotal",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "sessionId",
+        type: "string",
+      },
+      {
+        internalType: "address",
+        name: "user",
+        type: "address",
+      },
+    ],
+    name: "getUserLinkInfo",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "linkedAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "lastUpdate",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "pointsAccrued",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "user",
+        type: "address",
+      },
+    ],
+    name: "getUserTotalLinked",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "sessionId",
+        type: "string",
+      },
+      {
+        internalType: "address",
+        name: "user",
+        type: "address",
+      },
+    ],
+    name: "getUserUsage",
+    outputs: [
+      {
+        internalType: "uint64",
+        name: "praisesMade_",
+        type: "uint64",
+      },
+      {
+        internalType: "uint64",
+        name: "blessingsMade_",
+        type: "uint64",
+      },
     ],
     stateMutability: "view",
     type: "function",
@@ -524,14 +636,20 @@ export const AbrahamAbi = [
     ],
     name: "praise",
     outputs: [],
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [],
-    name: "renounceOwnership",
-    outputs: [],
-    stateMutability: "nonpayable",
+    name: "praiseRequirement",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -550,19 +668,43 @@ export const AbrahamAbi = [
   {
     inputs: [
       {
-        internalType: "address",
-        name: "newOwner",
-        type: "address",
+        internalType: "uint256",
+        name: "newPraiseRequirement",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "newBlessRequirement",
+        type: "uint256",
       },
     ],
-    name: "transferOwnership",
+    name: "setRequirements",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [],
-    name: "withdraw",
+    name: "staking",
+    outputs: [
+      {
+        internalType: "contract IAbrahamStakingView",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "newOwner",
+        type: "address",
+      },
+    ],
+    name: "transferOwnership",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
