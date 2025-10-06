@@ -8,6 +8,7 @@ import {
   http,
   parseEther,
   formatEther,
+  encodeFunctionData,
 } from "viem";
 import { baseSepolia } from "viem/chains";
 import { useAuth } from "@/context/auth-context";
@@ -129,13 +130,35 @@ export function useAbrahamToken() {
       try {
         setApproving(true);
 
-        const hash = await walletClient.writeContract({
-          address: TOKEN_ADDRESS,
-          abi: AbrahamTokenAbi,
-          functionName: "approve",
-          args: [spender, amount],
-          account: userAddress,
-        });
+        let hash: `0x${string}`;
+
+        // In Mini App, use provider directly (host controls chain)
+        if (isMiniApp && eip1193Provider) {
+          const data = encodeFunctionData({
+            abi: AbrahamTokenAbi,
+            functionName: "approve",
+            args: [spender, amount],
+          });
+          hash = (await eip1193Provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                from: userAddress,
+                to: TOKEN_ADDRESS,
+                data,
+              },
+            ],
+          })) as `0x${string}`;
+        } else {
+          // Regular Privy wallet flow
+          hash = await walletClient.writeContract({
+            address: TOKEN_ADDRESS,
+            abi: AbrahamTokenAbi,
+            functionName: "approve",
+            args: [spender, amount],
+            account: userAddress,
+          });
+        }
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
@@ -167,13 +190,35 @@ export function useAbrahamToken() {
       }
 
       try {
-        const hash = await walletClient.writeContract({
-          address: TOKEN_ADDRESS,
-          abi: AbrahamTokenAbi,
-          functionName: "transferAndCall",
-          args: [to, amount, data],
-          account: userAddress,
-        });
+        let hash: `0x${string}`;
+
+        // In Mini App, use provider directly (host controls chain)
+        if (isMiniApp && eip1193Provider) {
+          const encodedData = encodeFunctionData({
+            abi: AbrahamTokenAbi,
+            functionName: "transferAndCall",
+            args: [to, amount, data],
+          });
+          hash = (await eip1193Provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                from: userAddress,
+                to: TOKEN_ADDRESS,
+                data: encodedData,
+              },
+            ],
+          })) as `0x${string}`;
+        } else {
+          // Regular Privy wallet flow
+          hash = await walletClient.writeContract({
+            address: TOKEN_ADDRESS,
+            abi: AbrahamTokenAbi,
+            functionName: "transferAndCall",
+            args: [to, amount, data],
+            account: userAddress,
+          });
+        }
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
@@ -204,14 +249,36 @@ export function useAbrahamToken() {
       const amount = parseEther(amountTokens.toString());
 
       try {
-        const hash = await walletClient.writeContract({
-          address: TOKEN_ADDRESS,
-          abi: AbrahamTokenAbi,
-          functionName: "transfer",
-          args: [to, amount],
-          account: userAddress,
-          chain: baseSepolia,
-        });
+        let hash: `0x${string}`;
+
+        // In Mini App, use provider directly (host controls chain)
+        if (isMiniApp && eip1193Provider) {
+          const data = encodeFunctionData({
+            abi: AbrahamTokenAbi,
+            functionName: "transfer",
+            args: [to, amount],
+          });
+          hash = (await eip1193Provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                from: userAddress,
+                to: TOKEN_ADDRESS,
+                data,
+              },
+            ],
+          })) as `0x${string}`;
+        } else {
+          // Regular Privy wallet flow
+          hash = await walletClient.writeContract({
+            address: TOKEN_ADDRESS,
+            abi: AbrahamTokenAbi,
+            functionName: "transfer",
+            args: [to, amount],
+            account: userAddress,
+            chain: baseSepolia,
+          });
+        }
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
 

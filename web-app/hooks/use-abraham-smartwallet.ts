@@ -11,6 +11,7 @@ import {
 } from "viem";
 import { baseSepolia } from "@/lib/base-sepolia";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
+import { AbrahamTokenAbi } from "@/lib/abis/AbrahamToken";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useAbrahamStaking } from "./use-abraham-staking";
@@ -27,6 +28,14 @@ import {
 export const CONTRACT_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_ADDRESS as `0x${string}`) ??
   "0xd442F8B7A223e35A9b98E02a9c5Ddbe0D288659E";
+
+export const TOKEN_ADDRESS =
+  (process.env.NEXT_PUBLIC_ABRAHAM_TOKEN_ADDRESS as `0x${string}`) ??
+  "0xa3189F7a118e797c91a1548C02E45F2ed5fB69a5";
+
+export const STAKING_ADDRESS =
+  (process.env.NEXT_PUBLIC_ABRAHAM_STAKING_ADDRESS as `0x${string}`) ??
+  "0xDFF0A23e74cBA6A1B37e082FDa2e241c8271CEBb";
 
 type BatchedCall = {
   to: `0x${string}`;
@@ -116,6 +125,21 @@ export function useAbrahamSmartWallet() {
       (sum, call) => sum + (call.value ?? BigInt(0)),
       BigInt(0)
     );
+
+    // Ensure we have the smart wallet address
+    if (!smartWalletAddress) {
+      const err = new Error(
+        "Smart wallet address not available for transaction"
+      );
+      console.error("[Smart Wallet] Cannot send transaction without address");
+      showErrorToast(err, "Smart Wallet Not Ready");
+      throw err;
+    }
+
+    console.log("[Smart Wallet] Sending transaction:", {
+      calls: calls.length,
+      account: smartWalletAddress,
+    });
 
     // One approval for all calls (atomic batch)
     const txHash = await clientToUse.sendTransaction(
@@ -270,10 +294,37 @@ export function useAbrahamSmartWallet() {
     actionType: "praise" | "bless"
   ) => {
     if (!smartWalletAddress) {
-      throw new Error("Smart wallet address not available");
+      const err = new Error("Smart wallet address not available");
+      console.error("[Smart Wallet] No smart wallet address found:", {
+        user,
+        smartWalletAddress,
+        linkedAccounts: user?.linkedAccounts,
+      });
+      showErrorToast(err, "Smart Wallet Not Found");
+      throw err;
     }
 
-    const availableStake = await getAvailableStake(smartWalletAddress);
+    console.log("[Smart Wallet] Checking stake for:", {
+      address: smartWalletAddress,
+      requiredAmount: formatEther(requiredAmount),
+      actionType,
+    });
+
+    let availableStake: bigint;
+    try {
+      availableStake = await getAvailableStake(smartWalletAddress);
+      console.log("[Smart Wallet] Available stake:", {
+        available: formatEther(availableStake),
+        required: formatEther(requiredAmount),
+      });
+    } catch (error) {
+      console.error("[Smart Wallet] Error getting available stake:", error);
+      showErrorToast(
+        error,
+        "Failed to check staking balance. Please try again."
+      );
+      throw error;
+    }
 
     if (availableStake < requiredAmount) {
       const deficit = requiredAmount - availableStake;
@@ -301,14 +352,126 @@ export function useAbrahamSmartWallet() {
         `Staking ${formatEther(deficit)} ABRAHAM tokens...`
       );
 
-      await stake(deficit);
+      console.log("[Smart Wallet] Initiating stake:", {
+        deficit: formatEther(deficit),
+      });
+
+      await stakeWithSmartWallet(deficit);
       await fetchStakedBalance();
+
+      // Re-check available stake after staking
+      const newAvailableStake = await getAvailableStake(smartWalletAddress);
+      console.log("[Smart Wallet] New available stake after staking:", {
+        available: formatEther(newAvailableStake),
+      });
     }
   };
 
   const isUserReject = (e: any) =>
     typeof e?.message === "string" &&
     e.message.toLowerCase().includes("user rejected");
+
+  /* ------------------------------------------------------------------ */
+  /*                         SMART WALLET STAKING                        */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Stake tokens using smart wallet.
+   * Uses transferAndCall on the ABRAHAM token contract to stake in one transaction.
+   */
+  const stakeWithSmartWallet = async (amount: bigint) => {
+    if (!smartWalletAddress) {
+      const err = new Error("Smart wallet address not available");
+      console.error("[Smart Wallet] Cannot stake without smart wallet address");
+      showErrorToast(err, "Smart Wallet Not Found");
+      throw err;
+    }
+
+    console.log("[Smart Wallet] Staking:", {
+      amount: formatEther(amount),
+      smartWalletAddress,
+    });
+
+    // Check if user has enough ABRAHAM tokens
+    let tokenBalance: bigint;
+    try {
+      tokenBalance = (await publicClient.readContract({
+        address: TOKEN_ADDRESS,
+        abi: AbrahamTokenAbi,
+        functionName: "balanceOf",
+        args: [smartWalletAddress],
+      })) as bigint;
+
+      console.log("[Smart Wallet] Token balance:", {
+        balance: formatEther(tokenBalance),
+        needed: formatEther(amount),
+      });
+
+      if (tokenBalance < amount) {
+        const err = new Error(
+          `Insufficient ABRAHAM balance. You have ${formatEther(
+            tokenBalance
+          )} but need ${formatEther(amount)}`
+        );
+        showErrorToast(err, "Insufficient Balance");
+        throw err;
+      }
+    } catch (error) {
+      console.error("[Smart Wallet] Error checking token balance:", error);
+      throw error;
+    }
+
+    // Encode transferAndCall to stake
+    const data = encodeFunctionData({
+      abi: AbrahamTokenAbi,
+      functionName: "transferAndCall",
+      args: [STAKING_ADDRESS, amount, "0x"],
+    });
+
+    // Wait for client readiness
+    const clientToUse = await ensureSmartClient();
+
+    try {
+      console.log("[Smart Wallet] Sending stake transaction...");
+      const txHash = await clientToUse.sendTransaction(
+        {
+          calls: [{ to: TOKEN_ADDRESS, data }],
+        },
+        {
+          uiOptions: {
+            showWalletUIs: false,
+            title: "Staking ABRAHAM",
+            description: `Staking ${formatEther(amount)} ABRAHAM tokens`,
+            buttonText: "Confirm",
+          },
+        }
+      );
+
+      console.log("[Smart Wallet] Stake transaction sent:", txHash);
+
+      const rcpt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+
+      if (rcpt.status === "success") {
+        showSuccessToast(
+          "Staking Successful",
+          `Staked ${formatEther(amount)} ABRAHAM tokens`
+        );
+        return txHash;
+      } else {
+        const err = new Error("Staking transaction failed");
+        showErrorToast(err, "Staking Failed");
+        throw err;
+      }
+    } catch (e: any) {
+      console.error("[Smart Wallet] Staking error:", e);
+      if (!isUserReject(e)) {
+        showErrorToast(e, "Staking Failed");
+      }
+      throw e;
+    }
+  };
 
   /* ------------------------------------------------------------------ */
   /*                             SINGLE ACTIONS (QUEUED)                */
@@ -320,8 +483,17 @@ export function useAbrahamSmartWallet() {
     messageUuid: string,
     opts?: { immediate?: boolean }
   ) => {
+    console.log("[Smart Wallet] Praise called:", {
+      sessionUuid,
+      messageUuid,
+      immediate: opts?.immediate,
+      smartWalletAddress,
+    });
     try {
       const requirements = await getStakingRequirements();
+      console.log("[Smart Wallet] Praise requirements:", {
+        required: formatEther(requirements.praise),
+      });
       await ensureStaking(requirements.praise, "praise");
 
       const data = encodeFunctionData({
@@ -354,6 +526,13 @@ export function useAbrahamSmartWallet() {
     content: string,
     opts?: { immediate?: boolean }
   ) => {
+    console.log("[Smart Wallet] Bless called:", {
+      sessionUuid,
+      contentLength: content?.length,
+      immediate: opts?.immediate,
+      smartWalletAddress,
+    });
+
     const trimmed = (content ?? "").trim();
     if (!trimmed) {
       const err = new Error("Content required");
@@ -365,8 +544,12 @@ export function useAbrahamSmartWallet() {
 
     try {
       const requirements = await getStakingRequirements();
+      console.log("[Smart Wallet] Bless requirements:", {
+        required: formatEther(requirements.bless),
+      });
       await ensureStaking(requirements.bless, "bless");
     } catch (e: any) {
+      console.error("[Smart Wallet] Bless staking check failed:", e);
       if (!isUserReject(e)) showErrorToast(e, "Blessing Failed");
       throw e;
     }

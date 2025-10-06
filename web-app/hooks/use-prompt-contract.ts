@@ -7,11 +7,13 @@ import {
   custom,
   http,
   parseEther,
+  encodeFunctionData,
 } from "viem";
 import { baseSepolia } from "@/lib/base-sepolia";
 import { SystemPromptPayPatchAbi } from "@/lib/abis/SystemPromptPayPatch";
 import { buildPatch } from "@/lib/patch"; // diff ➜ binary ops
 import { useAuth } from "@/context/auth-context"; // gives eip1193Provider
+import { useTxMode } from "@/context/tx-mode-context";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 
 /* ---------- constants ---------- */
@@ -22,7 +24,8 @@ export const DEFAULT_PRICE_PER_BYTE = BigInt("10000000000000"); // → 0.00001 
 /*                     HOOK IMPLEMENTATION                            */
 /* ------------------------------------------------------------------ */
 export function usePromptContract() {
-  const { eip1193Provider } = useAuth();
+  const { eip1193Provider, authState } = useAuth();
+  const { isMiniApp } = useTxMode();
 
   /* read‑only client */
   const [publicClient] = useState(() =>
@@ -97,22 +100,58 @@ export function usePromptContract() {
 
     const { hex: patch, changed } = buildPatch(oldText, newText);
 
-    const [sender] = await walletClient.getAddresses();
+    // Get sender address
+    let sender: `0x${string}`;
+    if (authState.walletAddress) {
+      sender = authState.walletAddress as `0x${string}`;
+    } else {
+      const addresses = await walletClient.getAddresses();
+      if (!addresses?.[0]) {
+        showErrorToast(new Error("no account"), "No account found");
+        throw new Error("no account");
+      }
+      sender = addresses[0];
+    }
+
     const pricePerByte = await fetchPrice().catch(() => DEFAULT_PRICE_PER_BYTE);
     const fee = pricePerByte * BigInt(changed);
 
     await ensureBalance(sender, fee);
 
     try {
-      const hash = await walletClient.writeContract({
-        account: sender,
-        address: DOC_ADDRESS,
-        abi: SystemPromptPayPatchAbi,
-        functionName: "applyPatch",
-        args: [patch],
-        value: fee,
-        chain: baseSepolia,
-      });
+      let hash: `0x${string}`;
+
+      // In Mini App, use provider directly (host controls chain)
+      if (isMiniApp && eip1193Provider) {
+        const data = encodeFunctionData({
+          abi: SystemPromptPayPatchAbi,
+          functionName: "applyPatch",
+          args: [patch],
+        });
+        hash = (await eip1193Provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: sender,
+              to: DOC_ADDRESS,
+              data,
+              value: `0x${fee.toString(16)}`,
+            },
+          ],
+        })) as `0x${string}`;
+      } else {
+        // Regular Privy wallet flow
+        hash = await walletClient.writeContract({
+          account: sender,
+          address: DOC_ADDRESS,
+          abi: SystemPromptPayPatchAbi,
+          functionName: "applyPatch",
+          args: [patch],
+          value: fee,
+          chain: baseSepolia,
+        });
+      }
+
       await waitAndToast(hash, "Prompt updated! ✨");
       return hash;
     } catch (e: any) {
