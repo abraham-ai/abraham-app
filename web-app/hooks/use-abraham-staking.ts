@@ -110,6 +110,13 @@ export function useAbrahamStaking() {
         throw new Error("Wallet not connected");
       }
 
+      console.log("[Staking] Stake called:", {
+        amount: formatEther(amount),
+        userAddress,
+        balance,
+        isMiniApp,
+      });
+
       try {
         setStaking(true);
 
@@ -119,8 +126,10 @@ export function useAbrahamStaking() {
           throw new Error("Insufficient ABRAHAM balance");
         }
 
+        console.log("[Staking] Calling transferAndCall...");
         // Use transferAndCall to stake directly
         const hash = await transferAndCall(STAKING_ADDRESS, amount);
+        console.log("[Staking] TransferAndCall successful:", hash);
 
         showSuccessToast(
           "Staking Successful",
@@ -132,6 +141,7 @@ export function useAbrahamStaking() {
 
         return hash;
       } catch (error: any) {
+        console.error("[Staking] Stake error:", error);
         if (error?.message?.toLowerCase().includes("user rejected")) {
           throw error;
         }
@@ -141,7 +151,7 @@ export function useAbrahamStaking() {
         setStaking(false);
       }
     },
-    [userAddress, transferAndCall, fetchStakedBalance, balance]
+    [userAddress, transferAndCall, fetchStakedBalance, balance, isMiniApp]
   );
 
   // Unstake tokens

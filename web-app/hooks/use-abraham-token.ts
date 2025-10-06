@@ -189,11 +189,20 @@ export function useAbrahamToken() {
         throw new Error("Wallet not connected");
       }
 
+      console.log("[Token] transferAndCall called:", {
+        isMiniApp,
+        hasProvider: !!eip1193Provider,
+        to,
+        amount: formatEther(amount),
+        userAddress,
+      });
+
       try {
         let hash: `0x${string}`;
 
         // In Mini App, use provider directly (host controls chain)
         if (isMiniApp && eip1193Provider) {
+          console.log("[Token] Using Mini App provider for transferAndCall");
           const encodedData = encodeFunctionData({
             abi: AbrahamTokenAbi,
             functionName: "transferAndCall",
@@ -209,7 +218,9 @@ export function useAbrahamToken() {
               },
             ],
           })) as `0x${string}`;
+          console.log("[Token] Mini App transferAndCall tx sent:", hash);
         } else {
+          console.log("[Token] Using walletClient for transferAndCall");
           // Regular Privy wallet flow
           hash = await walletClient.writeContract({
             address: TOKEN_ADDRESS,
@@ -218,6 +229,7 @@ export function useAbrahamToken() {
             args: [to, amount, data],
             account: userAddress,
           });
+          console.log("[Token] Regular transferAndCall tx sent:", hash);
         }
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -229,6 +241,7 @@ export function useAbrahamToken() {
           throw new Error("Transaction failed");
         }
       } catch (error: any) {
+        console.error("[Token] transferAndCall error:", error);
         if (error?.message?.toLowerCase().includes("user rejected")) {
           throw error;
         }
@@ -236,7 +249,14 @@ export function useAbrahamToken() {
         throw error;
       }
     },
-    [walletClient, userAddress, publicClient, fetchBalance]
+    [
+      walletClient,
+      userAddress,
+      publicClient,
+      fetchBalance,
+      isMiniApp,
+      eip1193Provider,
+    ]
   );
 
   // Simple transfer tokens (for sending to other addresses)
