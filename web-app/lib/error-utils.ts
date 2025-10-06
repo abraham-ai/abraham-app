@@ -51,6 +51,19 @@ export const CONTRACT_ERRORS: Record<string, ContractError> = {
     userMessage: "Media is required for this action.",
     recovery: "Please upload an image or media file.",
   },
+  // Staking errors
+  "Insufficient ABRAHAM balance": {
+    code: "INSUFFICIENT_ABRAHAM_BALANCE",
+    message: "Insufficient ABRAHAM balance",
+    userMessage: "You do not have enough ABRAHAM tokens to stake.",
+    recovery: "Please acquire more ABRAHAM tokens before staking.",
+  },
+  "Insufficient staked balance": {
+    code: "INSUFFICIENT_STAKED_BALANCE",
+    message: "Insufficient staked balance",
+    userMessage: "You do not have enough staked ABRAHAM to unstake this amount.",
+    recovery: "Please reduce the amount you wish to unstake.",
+  },
   // Common blockchain errors
   "insufficient funds": {
     code: "INSUFFICIENT_FUNDS",
