@@ -57,13 +57,14 @@ export function useAbrahamToken() {
     }
   }, [mode, smartWalletClient, eip1193Provider]);
 
-  // Get user address
+  // Get user address - prioritize authState in wallet mode for miniapp compatibility
   const userAddress = useMemo(() => {
     if (mode === "smart") {
       return user?.linkedAccounts?.find(
         (a) => a.type === "smart_wallet" && "address" in a
       )?.address as `0x${string}` | undefined;
     }
+    // In wallet mode (including miniapp), use authState.walletAddress
     return authState.walletAddress as `0x${string}` | undefined;
   }, [mode, user, authState.walletAddress]);
 
@@ -128,17 +129,12 @@ export function useAbrahamToken() {
       try {
         setApproving(true);
 
-        let accounts = await walletClient.getAddresses();
-        if (!accounts?.length) {
-          throw new Error("No wallet accounts found");
-        }
-
         const hash = await walletClient.writeContract({
           address: TOKEN_ADDRESS,
           abi: AbrahamTokenAbi,
           functionName: "approve",
           args: [spender, amount],
-          account: accounts[0],
+          account: userAddress,
         });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -171,17 +167,12 @@ export function useAbrahamToken() {
       }
 
       try {
-        let accounts = await walletClient.getAddresses();
-        if (!accounts?.length) {
-          throw new Error("No wallet accounts found");
-        }
-
         const hash = await walletClient.writeContract({
           address: TOKEN_ADDRESS,
           abi: AbrahamTokenAbi,
           functionName: "transferAndCall",
           args: [to, amount, data],
-          account: accounts[0],
+          account: userAddress,
         });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -213,17 +204,12 @@ export function useAbrahamToken() {
       const amount = parseEther(amountTokens.toString());
 
       try {
-        let accounts = await walletClient.getAddresses();
-        if (!accounts?.length) {
-          throw new Error("No wallet accounts found");
-        }
-
         const hash = await walletClient.writeContract({
           address: TOKEN_ADDRESS,
           abi: AbrahamTokenAbi,
           functionName: "transfer",
           args: [to, amount],
-          account: accounts[0],
+          account: userAddress,
           chain: baseSepolia,
         });
 
