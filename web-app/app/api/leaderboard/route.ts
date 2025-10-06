@@ -210,8 +210,11 @@ export async function GET(req: NextRequest) {
         }
 
         // Calculate total points from all curator links
-        // Points are in token-wei-seconds, which grows VERY large
-        // We'll normalize this to a more reasonable scale
+        // IMPORTANT: Each link independently accrues (linkedAmount × time)
+        // If a user stakes 50 tokens for 30 days on Creation A, then 30 tokens for 10 days on Creation B:
+        // - Link A pointsAccrued: 50 × 30 days (in wei-seconds)
+        // - Link B pointsAccrued: 30 × 10 days (in wei-seconds)
+        // Total = sum of both = properly accounts for different staking times!
         const totalPointsWeiSeconds = (curator.links || []).reduce(
           (sum: bigint, link: any) => {
             return sum + BigInt(link.pointsAccrued || "0");
@@ -251,6 +254,8 @@ export async function GET(req: NextRequest) {
         );
 
         // Calculate max stake duration (time since earliest lastUpdate)
+        // NOTE: This shows the LONGEST single staking duration, not a weighted average
+        // A user might have multiple stakes at different times - this just shows the oldest one
         const now = Math.floor(Date.now() / 1000); // Current time in seconds
         let maxStakeDuration = 0;
 
