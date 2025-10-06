@@ -15,6 +15,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import { useAbrahamActions } from "@/hooks/use-abraham-actions";
+import { useAbrahamEligibility } from "@/hooks/use-abraham-eligibility";
 import {
   Tooltip,
   TooltipContent,
@@ -32,6 +33,7 @@ const PAGE_SIZE = 18;
 export default function CreationsGrid() {
   const { loggedIn } = useAuth();
   const { praise } = useAbrahamActions();
+  const { canPraise, praiseMessage } = useAbrahamEligibility();
 
   const [creations, setCreations] = useState<CreationItem[]>([]);
   const [loadingInit, setLoadingInit] = useState(true);
@@ -334,8 +336,10 @@ export default function CreationsGrid() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button
-                            className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-colors disabled:opacity-50"
-                            disabled={c.closed || loadingPraise === c.id}
+                            className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={
+                              c.closed || loadingPraise === c.id || !canPraise
+                            }
                             onClick={
                               !c.closed ? () => handlePraise(c) : undefined
                             }
@@ -360,10 +364,12 @@ export default function CreationsGrid() {
                             <div>Closed</div>
                           ) : (
                             <div>
-                              <div className="font-medium">Praise Creation</div>
-                              <div className="text-xs">
-                                Requires staked ABRAHAM tokens
-                              </div>
+                              <div className="font-medium">{praiseMessage}</div>
+                              {canPraise && (
+                                <div className="text-xs">
+                                  Requires staked ABRAHAM tokens
+                                </div>
+                              )}
                             </div>
                           )}
                         </TooltipContent>

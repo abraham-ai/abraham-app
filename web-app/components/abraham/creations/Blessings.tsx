@@ -5,6 +5,7 @@ import { Blessing } from "@/types/abraham";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { useAuth } from "@/context/auth-context";
 import { useAbrahamActions } from "@/hooks/use-abraham-actions";
+import { useAbrahamEligibility } from "@/hooks/use-abraham-eligibility";
 import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
@@ -29,6 +30,7 @@ export default function Blessings({
 }: Props) {
   const { loggedIn, login, loadingAuth } = useAuth();
   const { praise } = useAbrahamActions();
+  const { canPraise, praiseMessage } = useAbrahamEligibility();
 
   const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
   const [counts, setCounts] = useState(() =>
@@ -97,8 +99,8 @@ export default function Blessings({
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors"
-                      disabled={closed || loadingIdx === i}
+                      className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors disabled:cursor-not-allowed"
+                      disabled={closed || loadingIdx === i || !canPraise}
                       onClick={() => loginOrPraise(i)}
                     >
                       {loadingIdx === i ? (
@@ -122,10 +124,12 @@ export default function Blessings({
                       <div>Closed</div>
                     ) : (
                       <div>
-                        <div className="font-medium">Praise Blessing</div>
-                        <div className="text-xs">
-                          Requires staked ABRAHAM tokens
-                        </div>
+                        <div className="font-medium">{praiseMessage}</div>
+                        {canPraise && (
+                          <div className="text-xs">
+                            Requires staked ABRAHAM tokens
+                          </div>
+                        )}
                       </div>
                     )}
                   </TooltipContent>
