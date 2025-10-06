@@ -1,6 +1,70 @@
 ## How Abraham talks to the on-chain contract (CID-only)
 
 Abraham now stores **every message (owner + blessings) as a single JSON file on IPFS**.
+The contract stores **only** the message's **CID** (plus ## 3 — Anyone can "Bless" (usua## 4 — Anyone can "Praise" any message
+
+**Note:** Praising requires the user to have **10 ABRAHAM staked** in the AbrahamStaking contract. This amount gets linked to the creation.
+
+```js
+await contract.praise(sessionId, messageId);
+```
+
+### Batch operations for users
+
+````js
+// Batch praise multiple messages in one creation
+await contract.batchPraise(sessionId, [messageId1, messageId2, messageId3]);
+
+// Batch bless multiple messages in one creation
+await contract.batchBless(
+  sessionId,
+  [messageId1, messageId2],
+  ["<CID1>", "<CID2>"]
+);
+```only)
+
+A blessing is just another message JSON (usually `kind: "blessing"` with text only).
+
+**Note:** Blessings require the user to have **20 ABRAHAM staked** in the AbrahamStaking contract. This amount gets linked to the creation.
+
+```js
+await contract.bless(
+  sessionId,
+  crypto.randomUUID(), // messageId
+  "<CID>", // message JSON CID (e.g., {"kind":"blessing","content":"Make the sky purple"})
+);
+````
+
+> You _can_ include media in a blessing JSON if your UI allows it; the contract does not inspect the payload — it only stores the **CID**.d the session's open/closed state).
+> The frontend/Subgraph hydrate `content` & `media` by fetching that JSON from IPFS.
+
+## Staking & Token System
+
+Abraham uses a **three-contract system**:
+
+1. **AbrahamToken** - ERC20 token with `transferAndCall` support (ERC-677-like)
+2. **AbrahamStaking** - Global staking vault where users stake tokens
+3. **Abraham** - Main contract that links staked tokens to creations (sessions)
+
+### How it works
+
+- Users **stake** by calling `token.transferAndCall(stakingContract, amount, "")`
+- Users **unstake** by calling `staking.unstake(amount)`
+- When users **bless** or **praise**, the Abraham contract:
+  1. Accrues points for existing linked stake (token-wei-seconds)
+  2. Links additional stake to that creation (`blessRequirement` = 20 ABRAHAM, `praiseRequirement` = 10 ABRAHAM)
+  3. Checks constraint: `totalLinkedByUser <= staking.stakedBalance(user)` (reverts if insufficient)
+  4. Records the action on-chain
+
+**Key points:**
+
+- Stake is **global** per user (in AbrahamStaking)
+- Linking is **per-creation** (tracked in Abraham contract)
+- Users can link the same stake to multiple creations as long as `totalLinkedByUser <= stakedBalance`
+- Linked amounts **never decrease** (past actions are permanent)
+- Points accrue over time: `pointsAccrued += linkedAmount × (now - lastUpdate)`w Abraham talks to the on-chain contract (CID-only)
+
+Abraham now stores **every message (owner + blessings) as a single JSON file on IPFS**.
 The contract stores **only** the message’s **CID** (plus who praised and the session’s open/closed state).
 The frontend/Subgraph hydrate `content` & `media` by fetching that JSON from IPFS.
 
@@ -205,12 +269,24 @@ await contract.praise(
 
 ```js
 import { ethers } from "ethers";
-import abi from "./Abraham.json" assert { type: "json" };
+import abrahamAbi from "./Abraham.json" assert { type: "json" };
+import tokenAbi from "./AbrahamToken.json" assert { type: "json" };
+import stakingAbi from "./AbrahamStaking.json" assert { type: "json" };
 // import your Pinata/IPFS helper here
 
 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-const contract = new ethers.Contract(process.env.ABRAHAM_ADDR, abi, wallet);
+const abraham = new ethers.Contract(
+  process.env.ABRAHAM_ADDR,
+  abrahamAbi,
+  wallet
+);
+const token = new ethers.Contract(process.env.TOKEN_ADDR, tokenAbi, wallet);
+const staking = new ethers.Contract(
+  process.env.STAKING_ADDR,
+  stakingAbi,
+  wallet
+);
 
 // Helper: build & pin message JSON, return CID
 async function pinMessageJson({
@@ -238,7 +314,15 @@ async function pinMessageJson({
   return cid;
 }
 
-// 1) create a new session (open)
+// 0) Stake tokens first
+{
+  const amount = ethers.parseEther("100"); // 100 ABRAHAM
+  // Using transferAndCall (ERC-677-like)
+  await token.transferAndCall(process.env.STAKING_ADDR, amount, "0x");
+  // Or approve + user calls staking directly (not supported by current contract)
+}
+
+// 1) create a new session (open) - owner only
 {
   const sessionId = crypto.randomUUID();
   const firstMessageId = crypto.randomUUID();
@@ -252,10 +336,10 @@ async function pinMessageJson({
     mediaSrc: "ipfs://bafybeih4…abc", // or http(s)
   });
 
-  await contract.createSession(sessionId, firstMessageId, cid);
+  await abraham.createSession(sessionId, firstMessageId, cid);
 }
 
-// 2) update + close
+// 2) update + close - owner only
 {
   const sessionId = "existing-session-uuid";
   const messageId = crypto.randomUUID();
@@ -269,10 +353,10 @@ async function pinMessageJson({
     mediaSrc: "ipfs://bafybeia6…xyz",
   });
 
-  await contract.abrahamUpdate(sessionId, messageId, cid, true);
+  await abraham.abrahamUpdate(sessionId, messageId, cid, true);
 }
 
-// 3) bless (text-only)
+// 3) bless (text-only) - anyone with staked tokens
 {
   const sessionId = "existing-session-uuid";
   const messageId = crypto.randomUUID();
@@ -286,16 +370,36 @@ async function pinMessageJson({
     mediaSrc: undefined,
   });
 
-  await contract.bless(sessionId, messageId, cid, {
-    value: ethers.parseEther("0.00002"),
-  });
+  await abraham.bless(sessionId, messageId, cid);
 }
 
-// 4) praise
+// 4) praise - anyone with staked tokens
 {
-  await contract.praise("existing-session-uuid", "some-message-uuid", {
-    value: ethers.parseEther("0.00001"),
-  });
+  await abraham.praise("existing-session-uuid", "some-message-uuid");
+}
+
+// 5) Check user's stake and linked amounts
+{
+  const userStaked = await staking.stakedBalance(wallet.address);
+  const userTotalLinked = await abraham.getUserTotalLinked(wallet.address);
+  const [linkedAmount, lastUpdate, pointsAccrued] =
+    await abraham.getUserLinkInfo(sessionId, wallet.address);
+
+  console.log("Staked:", ethers.formatEther(userStaked), "ABRAHAM");
+  console.log("Total linked:", ethers.formatEther(userTotalLinked), "ABRAHAM");
+  console.log(
+    "Linked to this creation:",
+    ethers.formatEther(linkedAmount),
+    "ABRAHAM"
+  );
+  console.log("Points accrued:", pointsAccrued.toString());
+}
+
+// 6) Unstake tokens
+{
+  const amount = ethers.parseEther("50");
+  // Note: Can only unstake what isn't linked to creations
+  await staking.unstake(amount);
 }
 ```
 
@@ -311,18 +415,26 @@ https://api.studio.thegraph.com/query/102152/abraham/version/latest
 
 **Note:** The contract stores **CIDs**, so subgraph entities expose `cid` (not raw content/media). Your app fetches the JSON from IPFS and fills `content`/`media`.
 
+### Schema Overview
+
+- **Creation** - A session/creation with messages, blessings, praises, and linked stake
+- **Message** - Individual message with CID, author, timestamp, praise count
+- **Praise** - Individual praise action linking praiser to message
+- **Curator** - User entity tracking total linked stake and praise stats
+- **CuratorLink** - Per-user, per-creation linking info (linkedAmount, pointsAccrued, lastUpdate)
+
 ### List many sessions (latest first)
 
 ```graphql
-query Timeline($firstCreations: Int!, $msgLimit: Int!, $owner: Bytes!) {
-  creations(
-    first: $firstCreations
-    orderBy: lastActivityAt
-    orderDirection: desc
-  ) {
+query Timeline($first: Int!, $msgLimit: Int!) {
+  creations(first: $first, orderBy: lastActivityAt, orderDirection: desc) {
     id
+    sessionIdRaw
     closed
-    ethSpent
+    messageCount
+    totalBlessings
+    totalPraises
+    linkedTotal
     firstMessageAt
     lastActivityAt
     messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
@@ -332,56 +444,83 @@ query Timeline($firstCreations: Int!, $msgLimit: Int!, $owner: Bytes!) {
       praiseCount
       timestamp
     }
-    abrahamLatest: messages(
-      first: 1
-      orderBy: timestamp
-      orderDirection: desc
-      where: { author: $owner }
-    ) {
+  }
+}
+```
+
+### Messages for a single Creation
+
+```graphql
+query MessagesForCreation($id: ID!, $msgLimit: Int!) {
+  creation(id: $id) {
+    id
+    sessionIdRaw
+    closed
+    messageCount
+    totalBlessings
+    totalPraises
+    linkedTotal
+    firstMessageAt
+    lastActivityAt
+    messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
       uuid
       author
       cid
       praiseCount
       timestamp
+    }
+  }
+}
+```
+
+### Get curator stake info for a creation
+
+```graphql
+query CuratorLinks($creationId: ID!) {
+  creation(id: $creationId) {
+    id
+    linkedTotal
+    curatorLinks {
+      id
+      curator {
+        id
+        totalLinked
+        praisesGiven
+        praisesReceived
+      }
+      linkedAmount
+      pointsAccrued
+      lastUpdate
+    }
+  }
+}
+```
+
+### Get a curator's activity across creations
+
+```graphql
+query CuratorActivity($curatorId: ID!) {
+  curator(id: $curatorId) {
+    id
+    totalLinked
+    praisesGiven
+    praisesReceived
+    links {
+      id
+      creation {
+        id
+        sessionIdRaw
+        closed
+      }
+      linkedAmount
+      pointsAccrued
+      lastUpdate
     }
   }
 }
 ```
 
 > Tip: keep `$msgLimit ≤ 1000`. If you need more, paginate with `skip`.
-
-### Messages for a single Creation
-
-```graphql
-query MessagesForCreation($id: ID!, $msgLimit: Int!, $owner: Bytes!) {
-  creation(id: $id) {
-    id
-    closed
-    ethSpent
-    firstMessageAt
-    lastActivityAt
-    messages(first: $msgLimit, orderBy: timestamp, orderDirection: asc) {
-      uuid
-      author
-      cid
-      praiseCount
-      timestamp
-    }
-    abrahamLatest: messages(
-      first: 1
-      orderBy: timestamp
-      orderDirection: desc
-      where: { author: $owner }
-    ) {
-      uuid
-      author
-      cid
-      praiseCount
-      timestamp
-    }
-  }
-}
-```
 
 ## Gateway tips
 
