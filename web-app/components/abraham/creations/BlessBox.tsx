@@ -5,12 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
 import { useAbrahamActions } from "@/hooks/use-abraham-actions";
+import { useAbrahamEligibility } from "@/hooks/use-abraham-eligibility";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import RandomPixelAvatar from "@/components/account/RandomPixelAvatar";
 import { usePrivy } from "@privy-io/react-auth";
 import { useTxMode } from "@/context/tx-mode-context";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Props {
   creation: CreationItem;
@@ -27,6 +34,7 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
   const { loggedIn, login, loadingAuth, authState, eip1193Provider } =
     useAuth();
   const { bless } = useAbrahamActions();
+  const { canBless, blessMessage } = useAbrahamEligibility();
   const { user } = usePrivy();
   const { isMiniApp } = useTxMode();
 
@@ -127,16 +135,32 @@ export default function BlessBox({ creation, onNewBlessing }: Props) {
                 <span className="text-sm text-gray-500">
                   {text.length > 300 && `${text.length}/320 characters`}
                 </span>
-                <Button
-                  onClick={submit}
-                  disabled={loading || !text.trim()}
-                  size="sm"
-                >
-                  {loading && (
-                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
-                  )}
-                  {loading ? "Blessing…" : "Bless (Requires Staking)"}
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          onClick={submit}
+                          disabled={loading || !text.trim() || !canBless}
+                          size="sm"
+                        >
+                          {loading && (
+                            <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                          )}
+                          {loading ? "Blessing…" : "Bless (Requires Staking)"}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!canBless && (
+                      <TooltipContent
+                        side="top"
+                        className="bg-gray-800 text-white border-gray-700"
+                      >
+                        {blessMessage}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </>
           ) : (

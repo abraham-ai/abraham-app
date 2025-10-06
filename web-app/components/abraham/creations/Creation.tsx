@@ -6,6 +6,7 @@ import { Loader2Icon } from "lucide-react";
 import { CreationItem } from "@/types/abraham";
 import { useAuth } from "@/context/auth-context";
 import { useAbrahamActions } from "@/hooks/use-abraham-actions";
+import { useAbrahamEligibility } from "@/hooks/use-abraham-eligibility";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import { getRelativeTime } from "@/lib/time-utils";
@@ -21,6 +22,7 @@ const OWNER = (process.env.NEXT_PUBLIC_OWNER_ADDRESS || "").toLowerCase();
 export default function Creation({ creation }: { creation: CreationItem }) {
   const { loggedIn } = useAuth();
   const { praise } = useAbrahamActions();
+  const { canPraise, praiseMessage } = useAbrahamEligibility();
 
   // keep praises in sync with props in case the page re-fetches
   const [praises, setPraises] = useState(creation.praiseCount);
@@ -142,8 +144,8 @@ export default function Creation({ creation }: { creation: CreationItem }) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50"
-                  disabled={loading || creation.closed}
+                  className="flex items-center space-x-3 text-gray-600 hover:text-blue-500 transition-colors group relative disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || creation.closed || !canPraise}
                   onClick={!creation.closed ? handlePraise : undefined}
                 >
                   {loading ? (
@@ -166,10 +168,12 @@ export default function Creation({ creation }: { creation: CreationItem }) {
                   <div>Closed</div>
                 ) : (
                   <div>
-                    <div className="font-medium">Praise Creation</div>
-                    <div className="text-xs">
-                      Requires staked ABRAHAM tokens
-                    </div>
+                    <div className="font-medium">{praiseMessage}</div>
+                    {canPraise && (
+                      <div className="text-xs">
+                        Requires staked ABRAHAM tokens
+                      </div>
+                    )}
                   </div>
                 )}
               </TooltipContent>

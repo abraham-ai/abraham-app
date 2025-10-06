@@ -61,13 +61,14 @@ export function useAbrahamStaking() {
     }
   }, [mode, smartWalletClient, eip1193Provider]);
 
-  // Get user address
+  // Get user address - prioritize authState in wallet mode for miniapp compatibility
   const userAddress = useMemo(() => {
     if (mode === "smart") {
       return user?.linkedAccounts?.find(
         (a) => a.type === "smart_wallet" && "address" in a
       )?.address as `0x${string}` | undefined;
     }
+    // In wallet mode (including miniapp), use authState.walletAddress
     return authState.walletAddress as `0x${string}` | undefined;
   }, [mode, user, authState.walletAddress]);
 
@@ -160,17 +161,12 @@ export function useAbrahamStaking() {
           throw new Error("Insufficient staked balance");
         }
 
-        let accounts = await walletClient.getAddresses();
-        if (!accounts?.length) {
-          throw new Error("No wallet accounts found");
-        }
-
         const hash = await walletClient.writeContract({
           address: STAKING_ADDRESS,
           abi: AbrahamStakingAbi,
           functionName: "unstake",
           args: [amount],
-          account: accounts[0],
+          account: userAddress,
         });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });

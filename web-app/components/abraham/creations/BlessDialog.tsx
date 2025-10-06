@@ -15,10 +15,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
 import { useAbrahamActions } from "@/hooks/use-abraham-actions";
+import { useAbrahamEligibility } from "@/hooks/use-abraham-eligibility";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";
 import { usePrivy } from "@privy-io/react-auth";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Props {
   creation: CreationItem;
@@ -43,6 +50,7 @@ export default function BlessDialog({
 }: Props) {
   const { loggedIn, login, loadingAuth, authState } = useAuth();
   const { bless } = useAbrahamActions();
+  const { canBless, blessMessage } = useAbrahamEligibility();
   const { user } = usePrivy();
 
   const smartAddr = useMemo(
@@ -111,12 +119,26 @@ export default function BlessDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button
-          className="flex items-center space-x-2 text-gray-600 hover:text-blue-500 transition-colors"
-          disabled={loading}
-        >
-          <span className="text-2xl">🙏</span>
-        </button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="flex items-center space-x-2 text-gray-600 hover:text-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || !canBless}
+              >
+                <span className="text-2xl">🙏</span>
+              </button>
+            </TooltipTrigger>
+            {!canBless && (
+              <TooltipContent
+                side="top"
+                className="bg-gray-800 text-white border-gray-700"
+              >
+                {blessMessage}
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </DialogTrigger>
 
       <DialogContent className="bg-white">
@@ -152,12 +174,31 @@ export default function BlessDialog({
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={submit} disabled={loading || !text.trim()}>
-                {loading && (
-                  <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
-                )}
-                {loading ? "Blessing…" : "Bless (Requires Staking)"}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        onClick={submit}
+                        disabled={loading || !text.trim() || !canBless}
+                      >
+                        {loading && (
+                          <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                        )}
+                        {loading ? "Blessing…" : "Bless (Requires Staking)"}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!canBless && (
+                    <TooltipContent
+                      side="top"
+                      className="bg-gray-800 text-white border-gray-700"
+                    >
+                      {blessMessage}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </DialogFooter>
           </>
         ) : (

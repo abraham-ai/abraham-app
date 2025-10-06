@@ -70,6 +70,26 @@ export function useAbrahamContract() {
       showErrorToast(err, "Wallet not connected");
       throw err;
     }
+
+    // In miniapp or when authState has wallet address, try provider directly first
+    if (eip1193Provider && authState.walletAddress) {
+      try {
+        const accounts: string[] = await eip1193Provider.request({
+          method: "eth_accounts",
+        });
+        if (accounts?.[0]) {
+          return accounts[0] as `0x${string}`;
+        }
+      } catch (e) {
+        console.warn("Failed to get accounts from provider:", e);
+      }
+    }
+
+    // Fallback to authState wallet address if available
+    if (authState.walletAddress) {
+      return authState.walletAddress as `0x${string}`;
+    }
+
     // Try to get connected accounts; if empty, request a connection
     let accounts = await walletClient.getAddresses();
     if (!accounts?.length) {
@@ -81,9 +101,7 @@ export function useAbrahamContract() {
         accounts = await walletClient.getAddresses();
       } catch {}
     }
-    if (!accounts?.length && authState.walletAddress) {
-      return authState.walletAddress as `0x${string}`;
-    }
+
     if (!accounts?.length) {
       const err = new Error("No account found");
       showErrorToast(err, "Wallet not connected");
