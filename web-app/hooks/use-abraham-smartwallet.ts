@@ -329,41 +329,43 @@ export function useAbrahamSmartWallet() {
     if (availableStake < requiredAmount) {
       const deficit = requiredAmount - availableStake;
 
-      const confirmed = window.confirm(
+      // Inform user about staking requirement and proceed automatically
+      showWarningToast(
+        "Staking Required",
         availableStake === BigInt(0)
-          ? `You need ${formatEther(
-              requiredAmount
-            )} ABRAHAM staked to ${actionType}. Would you like to stake now?`
+          ? `Staking ${formatEther(requiredAmount)} ABRAHAM to ${actionType}...`
           : `You have ${formatEther(
               availableStake
             )} ABRAHAM available but need ${formatEther(
               requiredAmount
-            )} to ${actionType}. Your other staked tokens are linked to other creations. Would you like to stake ${formatEther(
-              deficit
-            )} more ABRAHAM?`
-      );
-
-      if (!confirmed) {
-        throw new Error("Insufficient staking for this action");
-      }
-
-      showWarningToast(
-        "Staking Required",
-        `Staking ${formatEther(deficit)} ABRAHAM tokens...`
+            )}. Staking ${formatEther(deficit)} more...`
       );
 
       console.log("[Smart Wallet] Initiating stake:", {
         deficit: formatEther(deficit),
       });
 
-      await stakeWithSmartWallet(deficit);
-      await fetchStakedBalance();
+      try {
+        await stakeWithSmartWallet(deficit);
+        await fetchStakedBalance();
 
-      // Re-check available stake after staking
-      const newAvailableStake = await getAvailableStake(smartWalletAddress);
-      console.log("[Smart Wallet] New available stake after staking:", {
-        available: formatEther(newAvailableStake),
-      });
+        // Re-check available stake after staking
+        const newAvailableStake = await getAvailableStake(smartWalletAddress);
+        console.log("[Smart Wallet] New available stake after staking:", {
+          available: formatEther(newAvailableStake),
+        });
+
+        showSuccessToast(
+          "Staking Complete",
+          `Successfully staked ${formatEther(deficit)} ABRAHAM`
+        );
+      } catch (error: any) {
+        // If staking fails, show error and re-throw
+        if (!error?.message?.toLowerCase().includes("user rejected")) {
+          showErrorToast(error, "Staking failed. Cannot proceed with action.");
+        }
+        throw error;
+      }
     }
   };
 
