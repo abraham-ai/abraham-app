@@ -8,12 +8,14 @@ import {
   http,
   parseEther,
   formatEther,
+  encodeFunctionData,
   type PublicClient,
   type WalletClient,
 } from "viem";
 import { baseSepolia } from "@/lib/base-sepolia";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { useAuth } from "@/context/auth-context";
+import { useTxMode } from "@/context/tx-mode-context";
 import { useAbrahamStaking } from "./use-abraham-staking";
 import {
   showErrorToast,
@@ -36,6 +38,7 @@ export const CONTRACT_ADDRESS =
  */
 export function useAbrahamContract() {
   const { eip1193Provider, authState } = useAuth();
+  const { isMiniApp } = useTxMode();
   const { stakedBalance, stake, fetchStakedBalance } = useAbrahamStaking();
 
   /* ---------- viem clients ---------- */
@@ -71,8 +74,13 @@ export function useAbrahamContract() {
       throw err;
     }
 
-    // In miniapp or when authState has wallet address, try provider directly first
-    if (eip1193Provider && authState.walletAddress) {
+    // Priority 1: Use authState wallet address (most reliable, already validated)
+    if (authState.walletAddress) {
+      return authState.walletAddress as `0x${string}`;
+    }
+
+    // Priority 2: Try provider directly
+    if (eip1193Provider) {
       try {
         const accounts: string[] = await eip1193Provider.request({
           method: "eth_accounts",
@@ -85,16 +93,10 @@ export function useAbrahamContract() {
       }
     }
 
-    // Fallback to authState wallet address if available
-    if (authState.walletAddress) {
-      return authState.walletAddress as `0x${string}`;
-    }
-
-    // Try to get connected accounts; if empty, request a connection
+    // Priority 3: Try wallet client
     let accounts = await walletClient.getAddresses();
     if (!accounts?.length) {
       try {
-        // viem walletClient.request may be available; otherwise eip1193 will handle it
         await (walletClient as any).request?.({
           method: "eth_requestAccounts",
         });
@@ -259,17 +261,40 @@ export function useAbrahamContract() {
     await ensureStaking(requirements.praise, "praise");
 
     try {
-      await ensureChain();
-      const hash = await walletClient!.writeContract({
-        account: sender,
-        address: CONTRACT_ADDRESS,
-        abi: AbrahamAbi,
-        functionName: "praise",
-        args: [sessionUuid, messageUuid],
-        chain: baseSepolia,
-      });
-      await waitAndToast(hash, "Praise sent! 🙌");
-      return hash;
+      // In Mini App, use provider directly (host controls chain)
+      if (isMiniApp && eip1193Provider) {
+        // Use provider directly for better Mini App compatibility
+        const data = encodeFunctionData({
+          abi: AbrahamAbi,
+          functionName: "praise",
+          args: [sessionUuid, messageUuid],
+        });
+        const hash = (await eip1193Provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: sender,
+              to: CONTRACT_ADDRESS,
+              data,
+            },
+          ],
+        })) as `0x${string}`;
+        await waitAndToast(hash, "Praise sent! 🙌");
+        return hash;
+      } else {
+        // Regular Privy wallet flow
+        await ensureChain();
+        const hash = await walletClient!.writeContract({
+          account: sender,
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "praise",
+          args: [sessionUuid, messageUuid],
+          chain: baseSepolia,
+        });
+        await waitAndToast(hash, "Praise sent! 🙌");
+        return hash;
+      }
     } catch (e: any) {
       if (!isUserReject(e)) showErrorToast(e, "Praise Failed");
       throw e;
@@ -311,17 +336,40 @@ export function useAbrahamContract() {
 
     // 2) Send on-chain
     try {
-      await ensureChain();
-      const hash = await walletClient!.writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: AbrahamAbi,
-        functionName: "bless",
-        args: [sessionUuid, msgUuid, cid],
-        account: sender,
-        chain: baseSepolia,
-      });
-      await waitAndToast(hash, "Blessing sent!");
-      return { msgUuid };
+      // In Mini App, use provider directly (host controls chain)
+      if (isMiniApp && eip1193Provider) {
+        // Use provider directly for better Mini App compatibility
+        const data = encodeFunctionData({
+          abi: AbrahamAbi,
+          functionName: "bless",
+          args: [sessionUuid, msgUuid, cid],
+        });
+        const hash = (await eip1193Provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: sender,
+              to: CONTRACT_ADDRESS,
+              data,
+            },
+          ],
+        })) as `0x${string}`;
+        await waitAndToast(hash, "Blessing sent!");
+        return { msgUuid };
+      } else {
+        // Regular Privy wallet flow
+        await ensureChain();
+        const hash = await walletClient!.writeContract({
+          address: CONTRACT_ADDRESS,
+          abi: AbrahamAbi,
+          functionName: "bless",
+          args: [sessionUuid, msgUuid, cid],
+          account: sender,
+          chain: baseSepolia,
+        });
+        await waitAndToast(hash, "Blessing sent!");
+        return { msgUuid };
+      }
     } catch (e: any) {
       if (!isUserReject(e)) showErrorToast(e, "Bless failed");
       throw e;

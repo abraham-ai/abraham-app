@@ -8,6 +8,7 @@ import {
   http,
   parseEther,
   formatEther,
+  encodeFunctionData,
 } from "viem";
 import { baseSepolia } from "viem/chains";
 import { useAuth } from "@/context/auth-context";
@@ -161,13 +162,35 @@ export function useAbrahamStaking() {
           throw new Error("Insufficient staked balance");
         }
 
-        const hash = await walletClient.writeContract({
-          address: STAKING_ADDRESS,
-          abi: AbrahamStakingAbi,
-          functionName: "unstake",
-          args: [amount],
-          account: userAddress,
-        });
+        let hash: `0x${string}`;
+
+        // In Mini App, use provider directly (host controls chain)
+        if (isMiniApp && eip1193Provider) {
+          const data = encodeFunctionData({
+            abi: AbrahamStakingAbi,
+            functionName: "unstake",
+            args: [amount],
+          });
+          hash = (await eip1193Provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                from: userAddress,
+                to: STAKING_ADDRESS,
+                data,
+              },
+            ],
+          })) as `0x${string}`;
+        } else {
+          // Regular Privy wallet flow
+          hash = await walletClient.writeContract({
+            address: STAKING_ADDRESS,
+            abi: AbrahamStakingAbi,
+            functionName: "unstake",
+            args: [amount],
+            account: userAddress,
+          });
+        }
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
