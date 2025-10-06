@@ -17,9 +17,11 @@ export interface CuratorData {
   id: string; // address
   totalLinked: string;
   praisesGiven: number;
+  praisesReceived: number;
   blessingsGiven: number;
   totalPoints: string;
   rank: number;
+  maxStakeDays: number;
 }
 
 interface LeaderboardResponse {
@@ -138,16 +140,16 @@ export default function LeaderboardPage() {
     const pointsBigInt = BigInt(points);
     if (pointsBigInt === BigInt(0)) return "0";
 
-    // Convert from wei-like units to readable format
-    const formatted = formatEther(pointsBigInt);
-    const num = Number.parseFloat(formatted);
+    // Points are now a composite score, not wei
+    // Display as a simple number
+    const num = Number(pointsBigInt);
 
     if (num >= 1000000) {
       return `${(num / 1000000).toFixed(1)}M`;
     } else if (num >= 1000) {
       return `${(num / 1000).toFixed(1)}K`;
     } else {
-      return num.toFixed(2);
+      return num.toFixed(0);
     }
   };
 
@@ -235,10 +237,13 @@ export default function LeaderboardPage() {
           <h1 className="text-4xl font-bold text-foreground mb-3 text-balance">
             Curator Leaderboard
           </h1>
-          <p className="text-muted-foreground text-lg leading-relaxed">
-            Top curators ranked by accumulated points, staked tokens, praises,
-            and blessings
+          <p className="text-muted-foreground text-lg leading-relaxed mb-3">
+            Top curators ranked by activity and stake commitment over time
           </p>
+          <div className="text-sm text-muted-foreground/80 bg-muted/30 rounded-lg p-4 border border-border/50">
+            <span className="font-medium">Scoring:</span> Blessings (20 pts) +
+            Praises given (10 pts) + Praises received (5 pts) + (Stake × Days)
+          </div>
         </div>
 
         {/* Leaderboard */}
@@ -285,22 +290,13 @@ export default function LeaderboardPage() {
                     </div>
 
                     {/* Stats grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-x-4 gap-y-2">
                       <div className="flex flex-col">
                         <span className="text-xs text-muted-foreground mb-0.5">
-                          Points
+                          Score
                         </span>
                         <span className="text-sm font-semibold text-foreground">
                           {formatPoints(curator.totalPoints)}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col">
-                        <span className="text-xs text-muted-foreground mb-0.5">
-                          Staked
-                        </span>
-                        <span className="text-sm font-semibold text-foreground">
-                          {formatStake(curator.totalLinked)}
                         </span>
                       </div>
 
@@ -315,10 +311,37 @@ export default function LeaderboardPage() {
 
                       <div className="flex flex-col">
                         <span className="text-xs text-muted-foreground mb-0.5">
+                          Received
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {curator.praisesReceived}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground mb-0.5">
                           Blessings
                         </span>
                         <span className="text-sm font-semibold text-foreground">
                           {curator.blessingsGiven}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground mb-0.5">
+                          Staked
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {formatStake(curator.totalLinked)}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground mb-0.5">
+                          Max Days
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {curator.maxStakeDays}
                         </span>
                       </div>
                     </div>
