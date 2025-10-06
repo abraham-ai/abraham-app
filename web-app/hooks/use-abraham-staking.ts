@@ -27,7 +27,8 @@ export function useAbrahamStaking() {
   const { mode, isMiniApp } = useTxMode();
   const { user } = usePrivy();
   const { client: smartWalletClient } = useSmartWallets();
-  const { transferAndCall, getAllowance, approve } = useAbrahamToken();
+  const { transferAndCall, getAllowance, approve, balance, fetchBalance } =
+    useAbrahamToken();
 
   const [stakedBalance, setStakedBalance] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -110,6 +111,12 @@ export function useAbrahamStaking() {
       try {
         setStaking(true);
 
+        // Check if user has enough ABRAHAM tokens
+        const currentBalance = balance ? parseEther(balance) : BigInt(0);
+        if (currentBalance < amount) {
+          throw new Error("Insufficient ABRAHAM balance");
+        }
+
         // Use transferAndCall to stake directly
         const hash = await transferAndCall(STAKING_ADDRESS, amount);
 
@@ -132,7 +139,7 @@ export function useAbrahamStaking() {
         setStaking(false);
       }
     },
-    [userAddress, transferAndCall, fetchStakedBalance]
+    [userAddress, transferAndCall, fetchStakedBalance, balance]
   );
 
   // Unstake tokens
@@ -144,6 +151,14 @@ export function useAbrahamStaking() {
 
       try {
         setUnstaking(true);
+
+        // Check if user has enough staked balance
+        const currentStaked = stakedBalance
+          ? parseEther(stakedBalance)
+          : BigInt(0);
+        if (currentStaked < amount) {
+          throw new Error("Insufficient staked balance");
+        }
 
         let accounts = await walletClient.getAddresses();
         if (!accounts?.length) {
@@ -180,7 +195,7 @@ export function useAbrahamStaking() {
         setUnstaking(false);
       }
     },
-    [walletClient, userAddress, publicClient, fetchStakedBalance]
+    [walletClient, userAddress, publicClient, fetchStakedBalance, stakedBalance]
   );
 
   // Get available balance to unstake (same as staked balance)

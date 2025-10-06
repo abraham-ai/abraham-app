@@ -45,11 +45,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
 import { useTxMode } from "@/context/tx-mode-context";
-import { useAbrahamToken } from "@/hooks/use-abraham-token";
-import { useAbrahamStaking } from "@/hooks/use-abraham-staking";
+import { useAbrahamToken, TOKEN_ADDRESS } from "@/hooks/use-abraham-token";
+import {
+  useAbrahamStaking,
+  STAKING_ADDRESS,
+} from "@/hooks/use-abraham-staking";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 import { Switch } from "@/components/ui/switch";
 import SendAbrahamTokens from "@/components/account/SendAbrahamTokens";
+import { AbrahamTokenAbi } from "@/lib/abis/AbrahamToken";
+import { AbrahamStakingAbi } from "@/lib/abis/AbrahamStaking";
 
 const publicClient = createPublicClient({
   chain: baseSepolia,
@@ -80,7 +85,7 @@ export default function AccountMenu() {
   const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
 
-  // ABRAHAM token and staking hooks
+  // ABRAHAM token and staking hooks (for active address)
   const {
     balance: abrahamBalance,
     loading: abrahamLoading,
@@ -91,6 +96,50 @@ export default function AccountMenu() {
     loading: stakingLoading,
     fetchStakedBalance,
   } = useAbrahamStaking();
+
+  // Separate state for smart wallet ABRAHAM balances
+  const [smartAbrahamBalance, setSmartAbrahamBalance] = useState<string | null>(
+    null
+  );
+  const [smartStakedBalance, setSmartStakedBalance] = useState<string | null>(
+    null
+  );
+  const [smartAbrahamLoading, setSmartAbrahamLoading] = useState(false);
+
+  // Separate state for EOA ABRAHAM balances
+  const [eoaAbrahamBalance, setEoaAbrahamBalance] = useState<string | null>(
+    null
+  );
+  const [eoaStakedBalance, setEoaStakedBalance] = useState<string | null>(null);
+  const [eoaAbrahamLoading, setEoaAbrahamLoading] = useState(false);
+
+  // Fetch ABRAHAM balances for a specific address
+  const fetchAbrahamBalanceFor = useCallback(async (address: `0x${string}`) => {
+    try {
+      const [tokenBalance, stakedBalance] = await Promise.all([
+        publicClient.readContract({
+          address: TOKEN_ADDRESS,
+          abi: AbrahamTokenAbi,
+          functionName: "balanceOf",
+          args: [address],
+        }),
+        publicClient.readContract({
+          address: STAKING_ADDRESS,
+          abi: AbrahamStakingAbi,
+          functionName: "stakedBalance",
+          args: [address],
+        }),
+      ]);
+
+      return {
+        balance: formatEther(tokenBalance as bigint),
+        staked: formatEther(stakedBalance as bigint),
+      };
+    } catch (error) {
+      console.error("Error fetching ABRAHAM balances for", address, error);
+      return { balance: "0", staked: "0" };
+    }
+  }, []);
 
   // Active EOA: pick wallet matching authState.walletAddress, else first
   const activeWallet = useMemo(() => {
@@ -208,23 +257,46 @@ export default function AccountMenu() {
           address: smartWalletAddress,
         });
         setSmartEth(formatEther(b));
+
+        // Fetch ABRAHAM balances for smart wallet
+        setSmartAbrahamLoading(true);
+        const smartAbraham = await fetchAbrahamBalanceFor(smartWalletAddress);
+        setSmartAbrahamBalance(smartAbraham.balance);
+        setSmartStakedBalance(smartAbraham.staked);
+        setSmartAbrahamLoading(false);
       } else {
         setSmartEth(null);
+        setSmartAbrahamBalance(null);
+        setSmartStakedBalance(null);
       }
+
       if (activeAddress) {
         const b = await publicClient.getBalance({ address: activeAddress });
         setActiveEth(formatEther(b));
+
+        // Fetch ABRAHAM balances for EOA (only when not in Mini App and not using smart wallet)
+        if (!isMiniApp && fundingWalletAddress) {
+          setEoaAbrahamLoading(true);
+          const eoaAbraham = await fetchAbrahamBalanceFor(fundingWalletAddress);
+          setEoaAbrahamBalance(eoaAbraham.balance);
+          setEoaStakedBalance(eoaAbraham.staked);
+          setEoaAbrahamLoading(false);
+        }
       } else {
         setActiveEth(null);
+        setEoaAbrahamBalance(null);
+        setEoaStakedBalance(null);
       }
 
-      // Refresh ABRAHAM token balances
+      // Refresh ABRAHAM token balances (for the active address based on mode)
       if (activeAddress) {
         await fetchAbrahamBalance();
         await fetchStakedBalance();
       }
     } catch (e) {
       console.error(e);
+      setSmartAbrahamLoading(false);
+      setEoaAbrahamLoading(false);
     } finally {
       setRefreshing(false);
     }
@@ -232,8 +304,10 @@ export default function AccountMenu() {
     isMiniApp,
     smartWalletAddress,
     activeAddress,
+    fundingWalletAddress,
     fetchAbrahamBalance,
     fetchStakedBalance,
+    fetchAbrahamBalanceFor,
   ]);
 
   useEffect(() => {
@@ -521,12 +595,12 @@ export default function AccountMenu() {
 
                   <DropdownMenuSeparator />
 
-                  {/* ABRAHAM Token Balance Section */}
-                  {activeAddress && (
+                  {/* ABRAHAM Token Balance Section for Smart Wallet */}
+                  {smartWalletAddress && (
                     <div className="px-3 py-2">
                       <div className="flex items-center gap-2 text-sm font-medium mb-2">
                         <CoinsIcon className="w-4 h-4" />
-                        <span>ABRAHAM Token</span>
+                        <span>ABRAHAM Token (Smart Wallet)</span>
                       </div>
 
                       <div className="space-y-2">
@@ -534,11 +608,11 @@ export default function AccountMenu() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Balance:</span>
                           <span className="font-mono">
-                            {abrahamLoading ? (
+                            {smartAbrahamLoading ? (
                               <Loader2Icon className="w-4 h-4 animate-spin" />
-                            ) : abrahamBalance !== null ? (
+                            ) : smartAbrahamBalance !== null ? (
                               `${Number(
-                                abrahamBalance
+                                smartAbrahamBalance
                               ).toLocaleString()} $ABRAHAM`
                             ) : (
                               "—"
@@ -550,52 +624,17 @@ export default function AccountMenu() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Staked:</span>
                           <span className="font-mono">
-                            {stakingLoading ? (
+                            {smartAbrahamLoading ? (
                               <Loader2Icon className="w-4 h-4 animate-spin" />
-                            ) : stakedBalance !== null ? (
+                            ) : smartStakedBalance !== null ? (
                               `${Number(
-                                stakedBalance
+                                smartStakedBalance
                               ).toLocaleString()} $ABRAHAM`
                             ) : (
                               "—"
                             )}
                           </span>
                         </div>
-
-                        {/* Total (Balance + Staked) */}
-                        {abrahamBalance !== null && stakedBalance !== null && (
-                          <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-200">
-                            <span className="font-medium">Total:</span>
-                            <span className="font-mono font-medium">
-                              {(
-                                Number(abrahamBalance) + Number(stakedBalance)
-                              ).toLocaleString()}{" "}
-                              $ABRAHAM
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Send Button */}
-                        {abrahamBalance !== null &&
-                          Number(abrahamBalance) > 0 && (
-                            <div className="pt-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSendTokensOpen(true)}
-                                className="w-full flex items-center gap-2"
-                                disabled={isMiniApp} // Disable in Mini App as MetaMask might not be available
-                              >
-                                <SendIcon className="w-4 h-4" />
-                                Send Tokens
-                              </Button>
-                              {isMiniApp && (
-                                <p className="text-xs text-gray-500 mt-1 text-center">
-                                  Sending tokens not available in Mini Apps
-                                </p>
-                              )}
-                            </div>
-                          )}
                       </div>
                     </div>
                   )}
@@ -636,11 +675,11 @@ export default function AccountMenu() {
                       )}
                     </div>
 
-                    {/* ABRAHAM Token Balance for Mini App */}
+                    {/* ABRAHAM Token Balance for EOA/Mini App */}
                     <div className="mt-3 pt-2 border-t border-gray-200">
                       <div className="flex items-center gap-2 text-sm font-medium mb-2">
                         <CoinsIcon className="w-4 h-4" />
-                        <span>ABRAHAM Token</span>
+                        <span>ABRAHAM Token {isMiniApp ? "" : "(EOA)"}</span>
                       </div>
 
                       <div className="space-y-1">
@@ -648,11 +687,21 @@ export default function AccountMenu() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Balance:</span>
                           <span className="font-mono text-xs">
-                            {abrahamLoading ? (
+                            {isMiniApp ? (
+                              abrahamLoading ? (
+                                <Loader2Icon className="w-3 h-3 animate-spin" />
+                              ) : abrahamBalance !== null ? (
+                                `${Number(
+                                  abrahamBalance
+                                ).toLocaleString()} $ABRAHAM`
+                              ) : (
+                                "—"
+                              )
+                            ) : eoaAbrahamLoading ? (
                               <Loader2Icon className="w-3 h-3 animate-spin" />
-                            ) : abrahamBalance !== null ? (
+                            ) : eoaAbrahamBalance !== null ? (
                               `${Number(
-                                abrahamBalance
+                                eoaAbrahamBalance
                               ).toLocaleString()} $ABRAHAM`
                             ) : (
                               "—"
@@ -664,17 +713,47 @@ export default function AccountMenu() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Staked:</span>
                           <span className="font-mono text-xs">
-                            {stakingLoading ? (
+                            {isMiniApp ? (
+                              stakingLoading ? (
+                                <Loader2Icon className="w-3 h-3 animate-spin" />
+                              ) : stakedBalance !== null ? (
+                                `${Number(
+                                  stakedBalance
+                                ).toLocaleString()} $ABRAHAM`
+                              ) : (
+                                "—"
+                              )
+                            ) : eoaAbrahamLoading ? (
                               <Loader2Icon className="w-3 h-3 animate-spin" />
-                            ) : stakedBalance !== null ? (
+                            ) : eoaStakedBalance !== null ? (
                               `${Number(
-                                stakedBalance
+                                eoaStakedBalance
                               ).toLocaleString()} $ABRAHAM`
                             ) : (
                               "—"
                             )}
                           </span>
                         </div>
+                        {abrahamBalance !== null &&
+                          Number(abrahamBalance) > 0 && (
+                            <div className="pt-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSendTokensOpen(true)}
+                                className="w-full flex items-center gap-2"
+                                disabled={isMiniApp} // Disable in Mini App as MetaMask might not be available
+                              >
+                                <SendIcon className="w-4 h-4" />
+                                Send Tokens
+                              </Button>
+                              {isMiniApp && (
+                                <p className="text-xs text-gray-500 mt-1 text-center">
+                                  Sending tokens not available in Mini Apps
+                                </p>
+                              )}
+                            </div>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -693,14 +772,6 @@ export default function AccountMenu() {
               <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* SEND ABRAHAM TOKENS DIALOG */}
-          <SendAbrahamTokens
-            open={sendTokensOpen}
-            onOpenChange={setSendTokensOpen}
-            currentBalance={abrahamBalance ? Number(abrahamBalance) : null}
-            onTransactionComplete={refreshAllBalances}
-          />
 
           {/* SEND ABRAHAM TOKENS DIALOG */}
           <SendAbrahamTokens

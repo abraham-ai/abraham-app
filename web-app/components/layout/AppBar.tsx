@@ -34,11 +34,11 @@ export default function AppBar() {
             </div>
           </Link>
 
-          <Link href="/leaderboard">
+          {/* <Link href="/leaderboard">
             <div className="flex items-center cursor-pointer">
               <p className="text-base">Curatorboard</p>
             </div>
-          </Link>
+          </Link> */}
 
           <Link href="/covenant">
             <div className="flex items-center cursor-pointer">
