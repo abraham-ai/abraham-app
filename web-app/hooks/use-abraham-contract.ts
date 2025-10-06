@@ -204,10 +204,25 @@ export function useAbrahamContract() {
     actionType: "praise" | "bless"
   ) => {
     const sender = await requireWallet();
+    console.log("[Contract] ensureStaking called:", {
+      sender,
+      requiredAmount: formatEther(requiredAmount),
+      actionType,
+      isMiniApp,
+    });
+
     const availableStake = await getAvailableStake(sender);
+    console.log("[Contract] Available stake:", {
+      available: formatEther(availableStake),
+      required: formatEther(requiredAmount),
+    });
 
     if (availableStake < requiredAmount) {
       const deficit = requiredAmount - availableStake;
+      console.log(
+        "[Contract] Insufficient stake, need to stake:",
+        formatEther(deficit)
+      );
 
       // Inform user about staking requirement and proceed automatically
       showWarningToast(
@@ -222,19 +237,26 @@ export function useAbrahamContract() {
       );
 
       try {
+        console.log("[Contract] Calling stake function...");
         await stake(deficit);
         await fetchStakedBalance();
+        console.log("[Contract] Staking completed successfully");
         showSuccessToast(
           "Staking Complete",
           `Successfully staked ${formatEther(deficit)} ABRAHAM`
         );
       } catch (error: any) {
+        console.error("[Contract] Staking error:", error);
         // If staking fails, show error and re-throw
         if (!error?.message?.toLowerCase().includes("user rejected")) {
           showErrorToast(error, "Staking failed. Cannot proceed with action.");
         }
         throw error;
       }
+    } else {
+      console.log(
+        "[Contract] Sufficient stake available, proceeding with action"
+      );
     }
   };
 
