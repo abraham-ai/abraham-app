@@ -1,13 +1,13 @@
 "use client";
 import { PrivyProvider, PrivyClientConfig } from "@privy-io/react-auth";
-import { sepolia } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 
 const privyConfig: PrivyClientConfig = {
   embeddedWallets: {
     createOnLogin: "users-without-wallets",
   },
   loginMethods: ["wallet", "email", "google", "discord", "twitter"],
-  supportedChains: [sepolia],
+  supportedChains: [baseSepolia],
   appearance: { showWalletLoginFirst: true, theme: "light" },
 };
 
