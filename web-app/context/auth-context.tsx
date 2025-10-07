@@ -125,17 +125,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!cancelled) setEipProvider(eth ?? null);
         if (eth && !cancelled) {
           try {
+            // Check current chain
+            const chainId = await eth.request?.({ method: "eth_chainId" });
+            console.log("[Auth] Mini App chain detected:", {
+              chainId,
+              expected: "0x14a34", // Base Sepolia (84532)
+              isBaseSepolia: chainId === "0x14a34",
+            });
+
             const accounts: readonly `0x${string}`[] = await eth.request?.({
               method: "eth_accounts",
             });
             if (accounts && accounts[0]) {
+              console.log("[Auth] Mini App account connected:", accounts[0]);
               setAuthState((s) => ({
                 ...s,
                 walletAddress: accounts[0] as `0x${string}`,
                 username: s.username ?? accounts[0],
               }));
             }
-          } catch {}
+          } catch (err) {
+            console.error("[Auth] Error getting Mini App chain/accounts:", err);
+          }
 
           const onAccounts = (accs: readonly `0x${string}`[]) => {
             setAuthState((s) => ({
