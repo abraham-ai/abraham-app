@@ -45,84 +45,98 @@ abstract contract ReentrancyGuard {
 }
 
 /* ------------------- external staking iface --------------- */
-interface IAbrahamStakingView {
-    function stakedBalance(address user) external view returns (uint256);
+/**
+ * Real staking contract we READ ONLY.
+ * We only need stakedAmount. ABI you provided returns (stakedAmount, lockedUntil).
+ */
+interface IStakingPool {
+    struct StakingInfo { uint256 stakedAmount; uint256 lockedUntil; }
+    function getStakingInfo(address staker) external view returns (StakingInfo memory stakingInfo);
 }
 
 /**
- * Abraham: creations + linking logic (uses external staking vault).
- * - Users stake globally in AbrahamStaking.
- * - On bless / praise, this contract:
- *    1) accrues points for (user, session) up to now,
- *    2) increases that session's linked amount by Δ (X or N),
- *    3) checks global constraint: totalLinked[user] <= staking.stakedBalance(user),
- *    4) records the action (message or praise).
- * - Past actions are permanent; linked amounts never decrease.
+ * Abraham Creations:
+ * - Users stake in an external staking pool (not controlled here).
+ * - This contract links portions of that stake to specific creations (sessionId) when:
+ *     • making a **commandment** (user-authored message, formerly "bless"), or
+ *     • making a **blessing** (endorse a message, formerly "praise").
+ * - Linked stake accrues time-weighted curation points per (user, session).
+ * - Daily action limits are enforced by **tiers** based on the user's stakedAmount in the external pool.
  */
 contract Abraham is Ownable, ReentrancyGuard {
-    constructor(address staking_) Ownable(msg.sender) ReentrancyGuard() {
-        require(staking_ != address(0), "staking=0");
-        staking = IAbrahamStakingView(staking_);
+    constructor(address stakingPool_) Ownable(msg.sender) ReentrancyGuard() {
+        require(stakingPool_ != address(0), "staking=0");
+        stakingPool = IStakingPool(stakingPool_);
     }
 
-    IAbrahamStakingView public immutable staking;
+    /*──────────────── external staking ───────────────*/
+    IStakingPool public immutable stakingPool;
 
-    /*──────── parameters ────────*/
-    uint256 public praiseRequirement = 10e18; // N
-    uint256 public blessRequirement  = 20e18; // X
+    /*──────────────── requirements (link deltas per action) ─────────*/
+    uint256 public blessingRequirement    = 10e18; // per single blessing (endorsement)
+    uint256 public commandmentRequirement = 20e18; // per single commandment (user-authored message)
 
-    /*──────── structs ───────────*/
+    /*──────────────── daily limits via tiers ─────────*/
+    struct Tier {
+        uint256 minStake;           // inclusive minimum stakedAmount in external pool
+        uint32  maxBlessingsPerDay; // per-address daily cap
+        uint32  maxCommandmentsPerDay;
+    }
+    Tier[] public tiers; // sorted ascending by minStake
+
+    /*──────────────── data model ─────────*/
     struct Message {
-        string   id;
+        string   id;         // per-session message id
         address  author;
-        string   cid;
-        uint256  praiseCount;
+        string   cid;        // IPFS JSON
+        uint256  blessingCount; // endorsements received
     }
 
     struct Session {
-        string   id;
-        string[] messageIds;
+        string   id;               // sessionId string (UUID)
+        string[] messageIds;       // ordering
         uint256  messageCount;
-        uint256  totalBlessings;
-        uint256  totalPraises;
+        uint256  totalCommandments; // user-authored messages count
+        uint256  totalBlessings;    // total endorsements count
         bool     closed;
-        uint256  linkedTotal;  // sum of all users' linked amounts for this session
+        uint256  linkedTotal;       // sum of linked stake for this session
     }
 
     struct OwnerMsg { string messageId; string cid; }
     struct CreateItem { string sessionId; string firstMessageId; string cid; }
     struct UpdateItem { string sessionId; string messageId; string cid; bool closed; }
 
-    struct UserUsage {
-        uint64 praisesMade;
-        uint64 blessingsMade;
+    struct UserDaily {
+        uint64 day;               // day index (unix/1 day)
+        uint32 blessingsToday;    // endorsements made today
+        uint32 commandmentsToday; // commandments made today
     }
 
     struct LinkInfo {
-        uint256 linkedAmount;   // current linked for this (user, session)
+        uint256 linkedAmount;   // current linked for (user, session)
         uint256 lastUpdate;     // last accrual timestamp
-        uint256 pointsAccrued;  // token-wei-seconds on linkedAmount
+        uint256 pointsAccrued;  // token-wei-seconds
     }
 
-    /*──────── storage ───────────*/
+    /*──────────────── storage ─────────*/
     mapping(string => Session) private sessions;                    // sessionId → Session
     mapping(string => mapping(string => Message)) private messages; // sessionId → messageId → Message
-    mapping(string => mapping(address => UserUsage)) private usage; // sessionId → user → usage
-    mapping(string => mapping(address => LinkInfo)) private links;  // sessionId → user → link info
-    mapping(address => uint256) private totalLinkedByUser;          // aggregate across all sessions
+    mapping(string => mapping(address => LinkInfo)) private links;  // sessionId → user → LinkInfo
+    mapping(address => uint256) private totalLinkedByUser;          // across all sessions
+    mapping(address => UserDaily) private daily;                    // per-address rolling window
     uint256 public sessionTotal;
 
-    /*──────── events ────────────*/
+    /*──────────────── events ─────────*/
     event SessionCreated(string sessionId);
     event SessionClosed(string sessionId);
     event SessionReopened(string sessionId);
     event MessageAdded(string sessionId, string messageId, address author, string cid);
-    event Praised(string sessionId, string messageId, address praiser);
+    event Blessed(string sessionId, string messageId, address blesser); // endorsement made
 
-    // linking (for subgraph)
-    event LinkedStake(address indexed user, string indexed sessionId, uint256 delta, uint256 userSessionLinked, uint256 sessionLinkedTotal);
+    // Non-indexed sessionId so subgraph gets the actual string (simpler id)
+    event LinkedStake(address indexed user, string sessionId, uint256 delta, uint256 userSessionLinked, uint256 sessionLinkedTotal);
 
-    /*──────── modifiers ─────────*/
+    /*──────────────── modifiers ───────*/
     modifier sessionExists(string memory sessionId) {
         require(bytes(sessions[sessionId].id).length != 0, "Session not found");
         _;
@@ -136,10 +150,18 @@ contract Abraham is Ownable, ReentrancyGuard {
         _;
     }
 
-    /*──────── public/external ───*/
+    /*──────────────── public/external ─────────*/
 
-    function createSession(string calldata sessionId, string calldata firstMessageId, string calldata cid)
-        external onlyOwner uniqueSession(sessionId) uniqueMessage(sessionId, firstMessageId)
+    /// Create a new session with its first owner message (CID).
+    function createSession(
+        string calldata sessionId,
+        string calldata firstMessageId,
+        string calldata cid
+    )
+        external
+        onlyOwner
+        uniqueSession(sessionId)
+        uniqueMessage(sessionId, firstMessageId)
     {
         _requireCID(cid);
 
@@ -147,39 +169,66 @@ contract Abraham is Ownable, ReentrancyGuard {
         s.id = sessionId;
         s.closed = false;
         s.messageCount = 0;
+        s.totalCommandments = 0;
         s.totalBlessings = 0;
-        s.totalPraises = 0;
         s.linkedTotal = 0;
 
-        _addMessageInternal(s, firstMessageId, msg.sender, cid, false);
+        _addMessageInternal(s, firstMessageId, msg.sender, cid, /*isCommandment*/ false);
 
         unchecked { ++sessionTotal; }
         emit SessionCreated(sessionId);
     }
 
-    function abrahamUpdate(string calldata sessionId, string calldata messageId, string calldata cid, bool closed)
-        external onlyOwner sessionExists(sessionId) uniqueMessage(sessionId, messageId)
+    /// Owner posts an update and toggles open/closed.
+    function abrahamUpdate(
+        string calldata sessionId,
+        string calldata messageId,
+        string calldata cid,
+        bool closed
+    )
+        external
+        onlyOwner
+        sessionExists(sessionId)
+        uniqueMessage(sessionId, messageId)
     {
         _requireCID(cid);
         Session storage s = sessions[sessionId];
         _abrahamUpdateInternal(s, messageId, cid, closed);
     }
 
-    function bless(string calldata sessionId, string calldata messageId, string calldata cid)
-        external nonReentrant sessionExists(sessionId) uniqueMessage(sessionId, messageId)
+    /// Make a COMMANDMENT (user-authored message), formerly "bless".
+    function commandment(
+        string calldata sessionId,
+        string calldata messageId,
+        string calldata cid
+    )
+        external
+        nonReentrant
+        sessionExists(sessionId)
+        uniqueMessage(sessionId, messageId)
     {
         Session storage s = sessions[sessionId];
         require(!s.closed, "Session closed");
         _requireCID(cid);
 
-        UserUsage storage u = usage[sessionId][msg.sender];
-        _linkAndAccrue(sessionId, msg.sender, u, /*delta*/ blessRequirement, /*isBless*/ true);
+        // daily limit check and bump
+        _checkAndBumpDaily(msg.sender, /*isBlessing*/ false, /*count*/ 1);
 
-        _addMessageInternal(s, messageId, msg.sender, cid, true);
+        // link stake for this action
+        _linkAndAccrue(sessionId, msg.sender, commandmentRequirement);
+
+        // write message
+        _addMessageInternal(s, messageId, msg.sender, cid, /*isCommandment*/ true);
     }
 
-    function praise(string calldata sessionId, string calldata messageId)
-        external nonReentrant sessionExists(sessionId)
+    /// Make a BLESSING (endorse a message), formerly "praise".
+    function blessing(
+        string calldata sessionId,
+        string calldata messageId
+    )
+        external
+        nonReentrant
+        sessionExists(sessionId)
     {
         Session storage s = sessions[sessionId];
         require(!s.closed, "Session closed");
@@ -187,49 +236,70 @@ contract Abraham is Ownable, ReentrancyGuard {
         Message storage m = messages[sessionId][messageId];
         require(bytes(m.id).length != 0, "Message not found");
 
-        UserUsage storage u = usage[sessionId][msg.sender];
-        _linkAndAccrue(sessionId, msg.sender, u, /*delta*/ praiseRequirement, /*isBless*/ false);
+        // daily limit check and bump
+        _checkAndBumpDaily(msg.sender, /*isBlessing*/ true, /*count*/ 1);
+
+        // link stake for this action
+        _linkAndAccrue(sessionId, msg.sender, blessingRequirement);
 
         unchecked {
-            ++u.praisesMade;
-            ++m.praiseCount;
-            ++s.totalPraises;
+            ++m.blessingCount;
+            ++s.totalBlessings;
         }
-        emit Praised(sessionId, messageId, msg.sender);
+
+        emit Blessed(sessionId, messageId, msg.sender);
     }
 
-    /*──────── batch (users) ─────*/
+    /*──────────────── batch (users) ───────*/
 
-    function batchPraise(string calldata sessionId, string[] calldata messageIds)
-        external nonReentrant sessionExists(sessionId)
+    /// Batch endorse multiple messages (BLESSINGS).
+    function batchBlessing(
+        string calldata sessionId,
+        string[] calldata messageIds
+    )
+        external
+        nonReentrant
+        sessionExists(sessionId)
     {
         Session storage s = sessions[sessionId];
         require(!s.closed, "Session closed");
-        uint256 n = messageIds.length; require(n > 0, "No items");
+
+        uint256 n = messageIds.length;
+        require(n > 0, "No items");
         for (uint256 i = 0; i < n; i++) {
             require(bytes(messages[sessionId][messageIds[i]].id).length != 0, "Message not found");
         }
 
-        UserUsage storage u = usage[sessionId][msg.sender];
-        _linkAndAccrue(sessionId, msg.sender, u, praiseRequirement * n, false);
+        _checkAndBumpDaily(msg.sender, /*isBlessing*/ true, /*count*/ n);
+
+        // link stake for all
+        _linkAndAccrue(sessionId, msg.sender, blessingRequirement * n);
 
         for (uint256 i = 0; i < n; i++) {
             Message storage m = messages[sessionId][messageIds[i]];
             unchecked {
-                ++u.praisesMade;
-                ++m.praiseCount;
-                ++s.totalPraises;
+                ++m.blessingCount;
+                ++s.totalBlessings;
             }
-            emit Praised(sessionId, messageIds[i], msg.sender);
+            emit Blessed(sessionId, messageIds[i], msg.sender);
         }
     }
 
-    function batchBless(string calldata sessionId, string[] calldata messageIds, string[] calldata cids)
-        external nonReentrant sessionExists(sessionId)
+    /// Batch create COMMANDMENTS (user-authored messages).
+    function batchCommandment(
+        string calldata sessionId,
+        string[] calldata messageIds,
+        string[] calldata cids
+    )
+        external
+        nonReentrant
+        sessionExists(sessionId)
     {
         Session storage s = sessions[sessionId];
         require(!s.closed, "Session closed");
-        uint256 n = messageIds.length; require(n > 0, "No items");
+
+        uint256 n = messageIds.length;
+        require(n > 0, "No items");
         require(n == cids.length, "Length mismatch");
 
         for (uint256 i = 0; i < n; i++) {
@@ -238,28 +308,39 @@ contract Abraham is Ownable, ReentrancyGuard {
             _requireCID(cids[i]);
         }
 
-        UserUsage storage u = usage[sessionId][msg.sender];
-        _linkAndAccrue(sessionId, msg.sender, u, blessRequirement * n, true);
+        _checkAndBumpDaily(msg.sender, /*isBlessing*/ false, /*count*/ n);
+
+        // link stake for all
+        _linkAndAccrue(sessionId, msg.sender, commandmentRequirement * n);
 
         for (uint256 i = 0; i < n; i++) {
-            _addMessageInternal(s, messageIds[i], msg.sender, cids[i], true);
-            unchecked { ++u.blessingsMade; }
+            _addMessageInternal(s, messageIds[i], msg.sender, cids[i], /*isCommandment*/ true);
         }
     }
 
-    /*──── owner batch (single/cross session) ────*/
+    /*──────────── owner batch (single/cross session) ───────────*/
 
-    function abrahamBatchUpdate(string calldata sessionId, OwnerMsg[] calldata items, bool closedAfter)
-        external onlyOwner sessionExists(sessionId)
+    function abrahamBatchUpdate(
+        string calldata sessionId,
+        OwnerMsg[] calldata items,
+        bool closedAfter
+    )
+        external
+        onlyOwner
+        sessionExists(sessionId)
     {
-        uint256 n = items.length; require(n > 0, "No items");
+        uint256 n = items.length;
+        require(n > 0, "No items");
+
         Session storage s = sessions[sessionId];
+
         for (uint256 i = 0; i < n; i++) {
             OwnerMsg calldata it = items[i];
             require(bytes(messages[sessionId][it.messageId].id).length == 0, "Message exists");
             _requireCID(it.cid);
-            _addMessageInternal(s, it.messageId, msg.sender, it.cid, false);
+            _addMessageInternal(s, it.messageId, msg.sender, it.cid, /*isCommandment*/ false);
         }
+
         if (s.closed != closedAfter) {
             s.closed = closedAfter;
             if (closedAfter) emit SessionClosed(sessionId); else emit SessionReopened(sessionId);
@@ -267,9 +348,12 @@ contract Abraham is Ownable, ReentrancyGuard {
     }
 
     function abrahamBatchCreate(CreateItem[] calldata items) external onlyOwner {
-        uint256 n = items.length; require(n > 0, "No items");
+        uint256 n = items.length;
+        require(n > 0, "No items");
+
         for (uint256 i = 0; i < n; i++) {
             CreateItem calldata it = items[i];
+
             require(bytes(sessions[it.sessionId].id).length == 0, "Session exists");
             require(bytes(messages[it.sessionId][it.firstMessageId].id).length == 0, "Message exists");
             _requireCID(it.cid);
@@ -278,11 +362,11 @@ contract Abraham is Ownable, ReentrancyGuard {
             s.id = it.sessionId;
             s.closed = false;
             s.messageCount = 0;
+            s.totalCommandments = 0;
             s.totalBlessings = 0;
-            s.totalPraises = 0;
             s.linkedTotal = 0;
 
-            _addMessageInternal(s, it.firstMessageId, msg.sender, it.cid, false);
+            _addMessageInternal(s, it.firstMessageId, msg.sender, it.cid, /*isCommandment*/ false);
 
             unchecked { ++sessionTotal; }
             emit SessionCreated(it.sessionId);
@@ -290,15 +374,20 @@ contract Abraham is Ownable, ReentrancyGuard {
     }
 
     function abrahamBatchUpdateAcrossSessions(UpdateItem[] calldata items) external onlyOwner {
-        uint256 n = items.length; require(n > 0, "No items");
+        uint256 n = items.length;
+        require(n > 0, "No items");
+
         for (uint256 i = 0; i < n; i++) {
             UpdateItem calldata it = items[i];
+
             require(bytes(sessions[it.sessionId].id).length != 0, "Session not found");
             require(bytes(messages[it.sessionId][it.messageId].id).length == 0, "Message exists");
             _requireCID(it.cid);
 
             Session storage s = sessions[it.sessionId];
-            _addMessageInternal(s, it.messageId, msg.sender, it.cid, false);
+
+            _addMessageInternal(s, it.messageId, msg.sender, it.cid, /*isCommandment*/ false);
+
             if (s.closed != it.closed) {
                 s.closed = it.closed;
                 if (it.closed) emit SessionClosed(it.sessionId); else emit SessionReopened(it.sessionId);
@@ -306,14 +395,23 @@ contract Abraham is Ownable, ReentrancyGuard {
         }
     }
 
-    /*──────── views ─────────────*/
+    /*──────────────── views ───────────*/
 
-    function getMessage(string calldata sessionId, string calldata messageId)
-        external view returns (address author, string memory cid, uint256 praiseCount)
+    function getMessage(
+        string calldata sessionId,
+        string calldata messageId
+    )
+        external
+        view
+        returns (
+            address author,
+            string memory cid,
+            uint256 blessingCount
+        )
     {
         Message storage m = messages[sessionId][messageId];
         require(bytes(m.id).length != 0, "Message not found");
-        return (m.author, m.cid, m.praiseCount);
+        return (m.author, m.cid, m.blessingCount);
     }
 
     function getMessageIds(string calldata sessionId) external view returns (string[] memory) {
@@ -325,23 +423,19 @@ contract Abraham is Ownable, ReentrancyGuard {
     }
 
     function getSessionStats(string calldata sessionId)
-        external view
-        returns (uint256 messageCount, uint256 totalBlessings, uint256 totalPraises, bool closed, uint256 linkedTotal)
+        external
+        view
+        returns (uint256 messageCount, uint256 totalCommandments, uint256 totalBlessings, bool closed, uint256 linkedTotal)
     {
         Session storage s = sessions[sessionId];
         require(bytes(s.id).length != 0, "Session not found");
-        return (s.messageCount, s.totalBlessings, s.totalPraises, s.closed, s.linkedTotal);
-    }
-
-    function getUserUsage(string calldata sessionId, address user)
-        external view returns (uint64 praisesMade_, uint64 blessingsMade_)
-    {
-        UserUsage storage u = usage[sessionId][user];
-        return (u.praisesMade, u.blessingsMade);
+        return (s.messageCount, s.totalCommandments, s.totalBlessings, s.closed, s.linkedTotal);
     }
 
     function getUserLinkInfo(string calldata sessionId, address user)
-        external view returns (uint256 linkedAmount, uint256 lastUpdate, uint256 pointsAccrued)
+        external
+        view
+        returns (uint256 linkedAmount, uint256 lastUpdate, uint256 pointsAccrued)
     {
         LinkInfo storage li = links[sessionId][user];
         return (li.linkedAmount, li.lastUpdate, li.pointsAccrued);
@@ -351,71 +445,148 @@ contract Abraham is Ownable, ReentrancyGuard {
         return totalLinkedByUser[user];
     }
 
-    /*──────── admin ─────────────*/
-
-    function setRequirements(uint256 newPraiseRequirement, uint256 newBlessRequirement) external onlyOwner {
-        require(newPraiseRequirement > 0 && newBlessRequirement > 0, "invalid req");
-        praiseRequirement = newPraiseRequirement;
-        blessRequirement  = newBlessRequirement;
+    /// Returns the active tier for a user (based on current external staked amount)
+    function getUserTier(address user)
+        public
+        view
+        returns (uint32 maxBlessings, uint32 maxCommandments)
+    {
+        uint256 stake = _stakedBalance(user);
+        uint256 best = 0;
+        uint32 b = 0;
+        uint32 c = 0;
+        for (uint256 i = 0; i < tiers.length; i++) {
+            if (stake >= tiers[i].minStake && tiers[i].minStake >= best) {
+                best = tiers[i].minStake;
+                b = tiers[i].maxBlessingsPerDay;
+                c = tiers[i].maxCommandmentsPerDay;
+            }
+        }
+        return (b, c);
     }
 
-    /*──────── internals ────────*/
+    /// Returns today's usage counters for a user.
+    function getUserDaily(address user) external view returns (uint64 day, uint32 blessingsToday, uint32 commandmentsToday) {
+        UserDaily storage d = daily[user];
+        return (d.day, d.blessingsToday, d.commandmentsToday);
+    }
+
+    /*──────────────── admin ──────────*/
+
+    function setRequirements(uint256 newBlessingRequirement, uint256 newCommandmentRequirement) external onlyOwner {
+        require(newBlessingRequirement > 0 && newCommandmentRequirement > 0, "invalid req");
+        blessingRequirement    = newBlessingRequirement;
+        commandmentRequirement = newCommandmentRequirement;
+    }
+
+    /// Replace all tiers (sorted ascending by minStake).
+    function setTiers(Tier[] calldata newTiers) external onlyOwner {
+        delete tiers;
+        for (uint256 i = 0; i < newTiers.length; i++) {
+            tiers.push(newTiers[i]);
+        }
+    }
+
+    /*──────────────── internals ──────*/
 
     function _requireCID(string calldata cid) private pure {
         require(bytes(cid).length > 0, "CID required");
     }
 
-    function _addMessageInternal(Session storage s, string memory messageId, address author, string memory cid, bool isBlessing) private {
-        messages[s.id][messageId] = Message({ id: messageId, author: author, cid: cid, praiseCount: 0 });
+    function _addMessageInternal(
+        Session storage s,
+        string memory messageId,
+        address author,
+        string memory cid,
+        bool isCommandment
+    ) private {
+        messages[s.id][messageId] = Message({
+            id: messageId,
+            author: author,
+            cid: cid,
+            blessingCount: 0
+        });
+
         s.messageIds.push(messageId);
         unchecked {
             ++s.messageCount;
-            if (isBlessing) ++s.totalBlessings;
+            if (isCommandment) ++s.totalCommandments;
         }
+
         emit MessageAdded(s.id, messageId, author, cid);
     }
 
-    function _abrahamUpdateInternal(Session storage s, string memory messageId, string memory cid, bool closed) private {
-        _addMessageInternal(s, messageId, msg.sender, cid, false);
+    function _abrahamUpdateInternal(
+        Session storage s,
+        string memory messageId,
+        string memory cid,
+        bool closed
+    ) private {
+        _addMessageInternal(s, messageId, msg.sender, cid, /*isCommandment*/ false);
         if (s.closed != closed) {
             s.closed = closed;
             if (closed) emit SessionClosed(s.id); else emit SessionReopened(s.id);
         }
     }
 
+    function _currentDay() private view returns (uint64) {
+        return uint64(block.timestamp / 1 days);
+    }
+
+    function _stakedBalance(address user) private view returns (uint256) {
+        IStakingPool.StakingInfo memory info = stakingPool.getStakingInfo(user);
+        return info.stakedAmount;
+    }
+
+    /// Checks and bumps daily usage against the user's tier caps.
+    function _checkAndBumpDaily(address user, bool isBlessing, uint256 count) private {
+        (uint32 maxB, uint32 maxC) = getUserTier(user);
+        require(maxB > 0 || maxC > 0, "no tier");
+
+        UserDaily storage d = daily[user];
+        uint64 today = _currentDay();
+        if (d.day != today) {
+            d.day = today;
+            d.blessingsToday = 0;
+            d.commandmentsToday = 0;
+        }
+
+        if (isBlessing) {
+            require(d.blessingsToday + count <= maxB, "blessing/day cap");
+            d.blessingsToday += uint32(count);
+        } else {
+            require(d.commandmentsToday + count <= maxC, "commandment/day cap");
+            d.commandmentsToday += uint32(count);
+        }
+    }
+
     /**
-     * Accrue points for (user, session), then try to increase link by delta.
+     * Accrue points for (user, session), then increase link by delta.
      * Revert if user's global staked < new total linked across all sessions.
      */
-    function _linkAndAccrue(string calldata sessionId, address user, UserUsage storage u, uint256 delta, bool isBless) private {
-        // accrue existing link up to now
+    function _linkAndAccrue(string calldata sessionId, address user, uint256 delta) private {
         LinkInfo storage li = links[sessionId][user];
         if (li.lastUpdate == 0) {
             li.lastUpdate = block.timestamp;
-        } else if (li.linkedAmount > 0) {
-            li.pointsAccrued += li.linkedAmount * (block.timestamp - li.lastUpdate);
-            li.lastUpdate = block.timestamp;
         } else {
+            if (li.linkedAmount > 0) {
+                li.pointsAccrued += li.linkedAmount * (block.timestamp - li.lastUpdate);
+            }
             li.lastUpdate = block.timestamp;
         }
 
-        // compute new totals (cross-session) to enforce capacity
         uint256 newTotalLinked = totalLinkedByUser[user] + delta;
-        uint256 globallyStaked = staking.stakedBalance(user);
-        require(globallyStaked >= newTotalLinked, "insufficient global stake");
+        require(_stakedBalance(user) >= newTotalLinked, "insufficient global stake");
 
-        // apply link increases
         li.linkedAmount += delta;
-        if (isBless) {
-            unchecked { ++u.blessingsMade; }
-        }
-        sessions[sessionId].linkedTotal += delta;
+        Session storage s = sessions[sessionId];
+        s.linkedTotal += delta;
         totalLinkedByUser[user] = newTotalLinked;
 
-        emit LinkedStake(user, sessionId, delta, li.linkedAmount, sessions[sessionId].linkedTotal);
+        emit LinkedStake(user, sessionId, delta, li.linkedAmount, s.linkedTotal);
     }
 
-    /* receive/fallback harmless */
+    /* receive/fallback */
     receive() external payable {}
     fallback() external payable {}
 }

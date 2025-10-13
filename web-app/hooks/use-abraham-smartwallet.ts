@@ -35,7 +35,7 @@ export const TOKEN_ADDRESS =
 
 export const STAKING_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_STAKING_ADDRESS as `0x${string}`) ??
-  "0xDFF0A23e74cBA6A1B37e082FDa2e241c8271CEBb";
+  "0xA8f867fA115f64F9728Fc4fd4Ce959f12442a86E";
 
 type BatchedCall = {
   to: `0x${string}`;

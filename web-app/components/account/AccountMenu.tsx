@@ -54,7 +54,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
 import { Switch } from "@/components/ui/switch";
 import SendAbrahamTokens from "@/components/account/SendAbrahamTokens";
 import { AbrahamTokenAbi } from "@/lib/abis/AbrahamToken";
-import { AbrahamStakingAbi } from "@/lib/abis/AbrahamStaking";
+import { StakingAbi } from "@/lib/abis/Staking";
 
 const publicClient = createPublicClient({
   chain: baseSepolia,
@@ -116,7 +116,7 @@ export default function AccountMenu() {
   // Fetch ABRAHAM balances for a specific address
   const fetchAbrahamBalanceFor = useCallback(async (address: `0x${string}`) => {
     try {
-      const [tokenBalance, stakedBalance] = await Promise.all([
+      const [tokenBalance, stakingInfo] = await Promise.all([
         publicClient.readContract({
           address: TOKEN_ADDRESS,
           abi: AbrahamTokenAbi,
@@ -125,15 +125,16 @@ export default function AccountMenu() {
         }),
         publicClient.readContract({
           address: STAKING_ADDRESS,
-          abi: AbrahamStakingAbi,
-          functionName: "stakedBalance",
+          abi: StakingAbi,
+          functionName: "getStakingInfo",
           args: [address],
         }),
       ]);
 
+      const stakedAmount = (stakingInfo as any)?.stakedAmount as bigint;
       return {
         balance: formatEther(tokenBalance as bigint),
-        staked: formatEther(stakedBalance as bigint),
+        staked: formatEther(stakedAmount ?? BigInt(0)),
       };
     } catch (error) {
       console.error("Error fetching ABRAHAM balances for", address, error);
