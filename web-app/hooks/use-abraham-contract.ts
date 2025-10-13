@@ -12,7 +12,7 @@ import {
   type PublicClient,
   type WalletClient,
 } from "viem";
-import { baseSepolia } from "@/lib/base-sepolia";
+import { getPreferredChain } from "@/lib/chains";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { useAuth } from "@/context/auth-context";
 import { useTxMode } from "@/context/tx-mode-context";
@@ -45,8 +45,8 @@ export function useAbrahamContract() {
   const publicClient: PublicClient = useMemo(
     () =>
       createPublicClient({
-        chain: baseSepolia,
-        transport: http(baseSepolia.rpcUrls.default.http[0]),
+        chain: getPreferredChain(),
+        transport: http(getPreferredChain().rpcUrls.default.http[0]),
       }),
     []
   );
@@ -60,7 +60,7 @@ export function useAbrahamContract() {
     }
     setWalletClient(
       createWalletClient({
-        chain: baseSepolia,
+        chain: getPreferredChain(),
         transport: custom(eip1193Provider),
       })
     );
@@ -114,7 +114,9 @@ export function useAbrahamContract() {
 
   const ensureChain = async () => {
     try {
-      await (walletClient as any)?.switchChain?.({ id: baseSepolia.id });
+      await (walletClient as any)?.switchChain?.({
+        id: getPreferredChain().id,
+      });
     } catch {}
   };
 
@@ -313,7 +315,7 @@ export function useAbrahamContract() {
           abi: AbrahamAbi,
           functionName: "praise",
           args: [sessionUuid, messageUuid],
-          chain: baseSepolia,
+          chain: getPreferredChain(),
         });
         await waitAndToast(hash, "Praise sent! 🙌");
         return hash;
@@ -388,7 +390,7 @@ export function useAbrahamContract() {
           functionName: "bless",
           args: [sessionUuid, msgUuid, cid],
           account: sender,
-          chain: baseSepolia,
+          chain: getPreferredChain(),
         });
         await waitAndToast(hash, "Blessing sent!");
         return { msgUuid };

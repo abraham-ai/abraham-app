@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import { PrivyProvider, usePrivy, useCreateWallet } from "@privy-io/react-auth";
-import { baseSepolia } from "viem/chains";
+import { getPreferredChain, baseSepolia, ethSepolia } from "@/lib/chains";
 import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 
 type Props = { children: React.ReactNode };
@@ -48,8 +48,8 @@ export default function Providers({ children }: Props) {
           accentColor: "#676FFF",
           showWalletLoginFirst: !isMiniApp,
         },
-        defaultChain: baseSepolia,
-        supportedChains: [baseSepolia],
+        defaultChain: getPreferredChain(),
+        supportedChains: [ethSepolia, baseSepolia],
         embeddedWallets: {
           // In Mini App, avoid auto-creating embedded wallets (host may manage provider)
           ethereum: { createOnLogin: isMiniApp ? "off" : "all-users" },

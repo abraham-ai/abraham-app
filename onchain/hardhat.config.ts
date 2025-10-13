@@ -20,6 +20,20 @@ module.exports = {
     hardhat: {
       chainId: 1337,
     },
+    ethereum: {
+      chainId: 1,
+      url:
+        process.env.ETHEREUM_RPC_URL || `https://eth-mainnet.g.alchemy.com/v2`,
+      accounts: privateKey ? [privateKey] : [],
+      gasPrice: "auto",
+    },
+    sepolia: {
+      chainId: 11155111,
+      url: process.env.ETH_SEPOLIA_RPC_URL || `https://1rpc.io/sepolia`,
+      accounts: privateKey ? [privateKey] : [],
+      gasPrice: 1000000000,
+    },
+    //Base
 
     basemainnet: {
       url: "https://mainnet.base.org",

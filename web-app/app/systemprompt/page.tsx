@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { formatEther, createPublicClient, http } from "viem";
 import { buildPatch } from "@/lib/patch";
-import { baseSepolia } from "@/lib/base-sepolia";
+import { getPreferredChain } from "@/lib/chains";
 import AppBar from "@/components/layout/AppBar";
 
 // Import all the new components
@@ -35,8 +35,8 @@ export default function SystemPrompt() {
 
   // Create public client for balance checking
   const publicClient = createPublicClient({
-    chain: baseSepolia,
-    transport: http(baseSepolia.rpcUrls.default.http[0]),
+    chain: getPreferredChain(),
+    transport: http(getPreferredChain().rpcUrls.default.http[0]),
   });
 
   // one-shot load

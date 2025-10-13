@@ -10,7 +10,7 @@ import {
   formatEther,
   encodeFunctionData,
 } from "viem";
-import { baseSepolia } from "viem/chains";
+import { getPreferredChain } from "@/lib/chains";
 import { useAuth } from "@/context/auth-context";
 import { useTxMode } from "@/context/tx-mode-context";
 import { usePrivy } from "@privy-io/react-auth";
@@ -21,19 +21,21 @@ import { showSuccessToast, showErrorToast } from "@/lib/error-utils";
 
 export const STAKING_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_STAKING_ADDRESS as `0x${string}`) ??
-  "0xA8f867fA115f64F9728Fc4fd4Ce959f12442a86E";
+  "0xb823C0Eec6Dc6155DE3288695eD132eC2F8e477a";
+
+// Default locking period: 1 week (minimum required by contract)
+const DEFAULT_LOCKING_PERIOD = 7 * 24 * 60 * 60; // 1 week in seconds
 
 export function useAbrahamStaking() {
   const { eip1193Provider, authState } = useAuth();
   const { mode, isMiniApp } = useTxMode();
   const { user } = usePrivy();
   const { client: smartWalletClient } = useSmartWallets();
-  const { transferAndCall, getAllowance, approve, balance, fetchBalance } =
-    useAbrahamToken();
+  const { getAllowance, approve, balance, fetchBalance } = useAbrahamToken();
 
   const [stakedBalance, setStakedBalance] = useState<string | null>(null);
+  const [lockedUntil, setLockedUntil] = useState<bigint | null>(null);
   const [loading, setLoading] = useState(false);
-  const [lockedUntil, setLockedUntil] = useState<string | null>(null);
   const [staking, setStaking] = useState(false);
   const [unstaking, setUnstaking] = useState(false);
 
@@ -41,8 +43,8 @@ export function useAbrahamStaking() {
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: baseSepolia,
-        transport: http(baseSepolia.rpcUrls.default.http[0]),
+        chain: getPreferredChain(),
+        transport: http(getPreferredChain().rpcUrls.default.http[0]),
       }),
     []
   );
@@ -56,104 +58,12 @@ export function useAbrahamStaking() {
     } else if (eip1193Provider) {
       setWalletClient(
         createWalletClient({
-          chain: baseSepolia,
+          chain: getPreferredChain(),
           transport: custom(eip1193Provider),
         })
       );
     }
   }, [mode, smartWalletClient, eip1193Provider]);
-
-  // Ensure the connected wallet/provider is on Base Sepolia before any write
-  const ensureBaseSepolia = useCallback(async () => {
-    try {
-      // Mini app path: use raw provider switching
-      if (isMiniApp && eip1193Provider?.request) {
-        const chainIdHex = (await eip1193Provider.request({
-          method: "eth_chainId",
-        })) as string;
-        const currentId = Number(chainIdHex);
-        if (currentId !== baseSepolia.id) {
-          try {
-            await eip1193Provider.request({
-              method: "wallet_switchEthereumChain",
-              params: [{ chainId: `0x${baseSepolia.id.toString(16)}` }],
-            });
-          } catch (err: any) {
-            // If chain not added, try adding
-            if (err?.code === 4902) {
-              await eip1193Provider.request({
-                method: "wallet_addEthereumChain",
-                params: [
-                  {
-                    chainId: `0x${baseSepolia.id.toString(16)}`,
-                    chainName: baseSepolia.name,
-                    nativeCurrency: baseSepolia.nativeCurrency,
-                    rpcUrls: baseSepolia.rpcUrls.default.http,
-                    blockExplorerUrls: [
-                      baseSepolia.blockExplorers?.default?.url || "",
-                    ].filter(Boolean),
-                  },
-                ],
-              });
-              // retry switch
-              await eip1193Provider.request({
-                method: "wallet_switchEthereumChain",
-                params: [{ chainId: `0x${baseSepolia.id.toString(16)}` }],
-              });
-            } else {
-              throw err;
-            }
-          }
-        }
-        return;
-      }
-
-      // Regular wallet clients (including Privy wallets)
-      if (walletClient?.getChainId) {
-        const currentId = await walletClient.getChainId();
-        if (currentId !== baseSepolia.id) {
-          if (walletClient?.switchChain) {
-            await walletClient.switchChain({ id: baseSepolia.id });
-          } else if (eip1193Provider?.request) {
-            try {
-              await eip1193Provider.request({
-                method: "wallet_switchEthereumChain",
-                params: [{ chainId: `0x${baseSepolia.id.toString(16)}` }],
-              });
-            } catch (err: any) {
-              if (err?.code === 4902) {
-                await eip1193Provider.request({
-                  method: "wallet_addEthereumChain",
-                  params: [
-                    {
-                      chainId: `0x${baseSepolia.id.toString(16)}`,
-                      chainName: baseSepolia.name,
-                      nativeCurrency: baseSepolia.nativeCurrency,
-                      rpcUrls: baseSepolia.rpcUrls.default.http,
-                      blockExplorerUrls: [
-                        baseSepolia.blockExplorers?.default?.url || "",
-                      ].filter(Boolean),
-                    },
-                  ],
-                });
-                await eip1193Provider.request({
-                  method: "wallet_switchEthereumChain",
-                  params: [{ chainId: `0x${baseSepolia.id.toString(16)}` }],
-                });
-              } else {
-                throw err;
-              }
-            }
-          } else {
-            throw new Error("Wrong network. Please switch to Base Sepolia.");
-          }
-        }
-      }
-    } catch (err) {
-      console.error("[Network] Failed to ensure Base Sepolia:", err);
-      throw err;
-    }
-  }, [walletClient, eip1193Provider, isMiniApp]);
 
   // Get user address - prioritize authState in wallet mode for miniapp compatibility
   const userAddress = useMemo(() => {
@@ -166,9 +76,10 @@ export function useAbrahamStaking() {
     return authState.walletAddress as `0x${string}` | undefined;
   }, [mode, user, authState.walletAddress]);
 
-  // Fetch staked balance from the real Staking contract
+  // Fetch staked balance using getStakingInfo
   const fetchStakedBalance = useCallback(async () => {
     if (!userAddress) {
+      console.log("[Staking] No user address, skipping fetch");
       setStakedBalance(null);
       setLockedUntil(null);
       return;
@@ -176,20 +87,42 @@ export function useAbrahamStaking() {
 
     try {
       setLoading(true);
-      // New contract exposes getStakingInfo(address) -> (stakedAmount, lockedUntil)
-      const stakingInfo = (await publicClient.readContract({
+
+      console.log("[Staking] Fetching staked balance for:", userAddress);
+      console.log("[Staking] Using staking address:", STAKING_ADDRESS);
+
+      // Use getStakingInfo() to read staked amount
+      const stakingInfo = await publicClient.readContract({
         address: STAKING_ADDRESS,
         abi: StakingAbi,
         functionName: "getStakingInfo",
         args: [userAddress],
-      })) as { stakedAmount: bigint; lockedUntil: bigint };
+      });
 
-      const amount = stakingInfo?.stakedAmount ?? BigInt(0);
-      const locked = stakingInfo?.lockedUntil ?? BigInt(0);
-      setStakedBalance(formatEther(amount));
-      setLockedUntil(locked > BigInt(0) ? String(locked) : null);
-    } catch (error) {
-      console.error("Error fetching staked balance:", error);
+      console.log("[Staking] Raw stakingInfo:", stakingInfo);
+
+      // StakingInfo struct: { stakedAmount: uint256, lockedUntil: uint256 }
+      const { stakedAmount, lockedUntil: locked } = stakingInfo as {
+        stakedAmount: bigint;
+        lockedUntil: bigint;
+      };
+
+      console.log("[Staking] Parsed stakedAmount:", stakedAmount.toString());
+      console.log("[Staking] Parsed lockedUntil:", locked.toString());
+      console.log(
+        "[Staking] Formatted staked balance:",
+        formatEther(stakedAmount)
+      );
+
+      setStakedBalance(formatEther(stakedAmount));
+      setLockedUntil(locked);
+    } catch (error: any) {
+      console.error("[Staking] Error fetching staked balance:", error);
+      console.error("[Staking] Error details:", {
+        message: error?.message,
+        code: error?.code,
+        data: error?.data,
+      });
       setStakedBalance("0");
       setLockedUntil(null);
     } finally {
@@ -202,15 +135,18 @@ export function useAbrahamStaking() {
     fetchStakedBalance();
   }, [fetchStakedBalance]);
 
-  // Stake tokens using transferAndCall
+  // Stake tokens (proper approve + stake flow)
   const stake = useCallback(
-    async (amount: bigint) => {
-      if (!userAddress) {
+    async (amount: bigint, lockingPeriod?: number) => {
+      if (!walletClient || !userAddress) {
         throw new Error("Wallet not connected");
       }
 
+      const period = lockingPeriod || DEFAULT_LOCKING_PERIOD;
+
       console.log("[Staking] Stake called:", {
         amount: formatEther(amount),
+        lockingPeriod: period,
         userAddress,
         balance,
         isMiniApp,
@@ -219,29 +155,94 @@ export function useAbrahamStaking() {
       try {
         setStaking(true);
 
-        // Enforce Base Sepolia before sending a transaction
-        await ensureBaseSepolia();
-
         // Check if user has enough ABRAHAM tokens
         const currentBalance = balance ? parseEther(balance) : BigInt(0);
         if (currentBalance < amount) {
           throw new Error("Insufficient ABRAHAM balance");
         }
 
-        console.log("[Staking] Calling transferAndCall...");
-        // Use transferAndCall to stake directly
-        const hash = await transferAndCall(STAKING_ADDRESS, amount);
-        console.log("[Staking] TransferAndCall successful:", hash);
-
-        showSuccessToast(
-          "Staking Successful",
-          `Staked ${formatEther(amount)} ABRAHAM`
+        // Step 1: Check allowance
+        const currentAllowance = await getAllowance(STAKING_ADDRESS);
+        console.log(
+          "[Staking] Current allowance:",
+          formatEther(currentAllowance)
         );
 
-        // Refresh staked balance
-        await fetchStakedBalance();
+        // Step 2: Approve if needed
+        if (currentAllowance < amount) {
+          console.log("[Staking] Approving tokens...");
+          await approve(STAKING_ADDRESS, amount);
+          console.log("[Staking] Approval successful");
+        }
 
-        return hash;
+        // Step 3: Stake with locking period
+        console.log("[Staking] Calling stake function...");
+        let hash: `0x${string}`;
+
+        // In Mini App, use provider directly (host controls chain)
+        if (isMiniApp && eip1193Provider) {
+          const data = encodeFunctionData({
+            abi: StakingAbi,
+            functionName: "stake",
+            args: [amount, period],
+          });
+          hash = (await eip1193Provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                from: userAddress,
+                to: STAKING_ADDRESS,
+                data,
+              },
+            ],
+          })) as `0x${string}`;
+        } else {
+          // Regular Privy wallet flow
+          // Pre-flight simulate the call to get revert reasons (if any)
+          try {
+            await publicClient.simulateContract({
+              address: STAKING_ADDRESS,
+              abi: StakingAbi,
+              functionName: "stake",
+              args: [amount, period],
+              account: userAddress,
+            });
+          } catch (simErr: any) {
+            console.error("[Staking] Simulation failed:", simErr);
+            // Bubble a clearer message to the UI
+            const message =
+              simErr?.shortMessage || simErr?.message || String(simErr);
+            throw new Error(`Pre-flight simulation failed: ${message}`);
+          }
+
+          hash = await walletClient.writeContract({
+            address: STAKING_ADDRESS,
+            abi: StakingAbi,
+            functionName: "stake",
+            args: [amount, period],
+            account: userAddress,
+            chain: getPreferredChain(),
+          });
+        }
+
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+        if (receipt.status === "success") {
+          showSuccessToast(
+            "Staking Successful",
+            `Staked ${formatEther(amount)} ABRAHAM for ${Math.floor(
+              period / 86400
+            )} days`
+          );
+
+          // Refresh balances
+          await fetchStakedBalance();
+          await fetchBalance();
+
+          return hash;
+        } else {
+          throw new Error("Transaction failed");
+        }
       } catch (error: any) {
         console.error("[Staking] Stake error:", error);
         if (error?.message?.toLowerCase().includes("user rejected")) {
@@ -254,16 +255,20 @@ export function useAbrahamStaking() {
       }
     },
     [
+      walletClient,
       userAddress,
-      transferAndCall,
+      publicClient,
+      getAllowance,
+      approve,
       fetchStakedBalance,
+      fetchBalance,
       balance,
       isMiniApp,
-      ensureBaseSepolia,
+      eip1193Provider,
     ]
   );
 
-  // Unstake tokens
+  // Unstake tokens (with lock period validation)
   const unstake = useCallback(
     async (amount: bigint) => {
       if (!walletClient || !userAddress) {
@@ -273,15 +278,23 @@ export function useAbrahamStaking() {
       try {
         setUnstaking(true);
 
-        // Enforce Base Sepolia before sending a transaction
-        await ensureBaseSepolia();
-
         // Check if user has enough staked balance
         const currentStaked = stakedBalance
           ? parseEther(stakedBalance)
           : BigInt(0);
         if (currentStaked < amount) {
           throw new Error("Insufficient staked balance");
+        }
+
+        // Check if tokens are still locked
+        if (
+          lockedUntil &&
+          lockedUntil > BigInt(Math.floor(Date.now() / 1000))
+        ) {
+          const unlockDate = new Date(Number(lockedUntil) * 1000);
+          throw new Error(
+            `Tokens are locked until ${unlockDate.toLocaleString()}`
+          );
         }
 
         let hash: `0x${string}`;
@@ -311,7 +324,6 @@ export function useAbrahamStaking() {
             functionName: "unstake",
             args: [amount],
             account: userAddress,
-            chain: baseSepolia,
           });
         }
 
@@ -322,7 +334,10 @@ export function useAbrahamStaking() {
             "Unstaking Successful",
             `Unstaked ${formatEther(amount)} ABRAHAM`
           );
+
           await fetchStakedBalance();
+          await fetchBalance();
+
           return hash;
         } else {
           throw new Error("Transaction failed");
@@ -337,16 +352,48 @@ export function useAbrahamStaking() {
         setUnstaking(false);
       }
     },
-    [walletClient, userAddress, publicClient, fetchStakedBalance, stakedBalance]
+    [
+      walletClient,
+      userAddress,
+      publicClient,
+      fetchStakedBalance,
+      fetchBalance,
+      stakedBalance,
+      lockedUntil,
+      isMiniApp,
+      eip1193Provider,
+    ]
   );
 
-  // Get available balance to unstake (same as staked balance)
+  // Get available balance to unstake (checks lock period)
   const getAvailableToUnstake = useCallback(() => {
-    return stakedBalance ? parseEther(stakedBalance) : BigInt(0);
-  }, [stakedBalance]);
+    if (!stakedBalance) return BigInt(0);
+
+    const staked = parseEther(stakedBalance);
+
+    // Check if still locked
+    if (lockedUntil && lockedUntil > BigInt(Math.floor(Date.now() / 1000))) {
+      return BigInt(0); // Still locked
+    }
+
+    return staked;
+  }, [stakedBalance, lockedUntil]);
+
+  // Check if tokens are currently locked
+  const isLocked = useCallback(() => {
+    if (!lockedUntil) return false;
+    return lockedUntil > BigInt(Math.floor(Date.now() / 1000));
+  }, [lockedUntil]);
+
+  // Get unlock date
+  const getUnlockDate = useCallback(() => {
+    if (!lockedUntil) return null;
+    return new Date(Number(lockedUntil) * 1000);
+  }, [lockedUntil]);
 
   return {
     stakedBalance,
+    lockedUntil,
     loading,
     staking,
     unstaking,
@@ -355,7 +402,8 @@ export function useAbrahamStaking() {
     stake,
     unstake,
     getAvailableToUnstake,
+    isLocked,
+    getUnlockDate,
     stakingAddress: STAKING_ADDRESS,
-    lockedUntil,
   };
 }

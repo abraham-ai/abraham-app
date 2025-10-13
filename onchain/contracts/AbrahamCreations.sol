@@ -1,76 +1,41 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/* --------------------- minimal Ownable --------------------- */
-abstract contract Ownable {
-    address private _owner;
+/* --------------------- OpenZeppelin Imports --------------------- */
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-    error OwnableUnauthorizedAccount(address account);
-    error OwnableInvalidOwner(address owner);
-
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-    constructor(address initialOwner) {
-        if (initialOwner == address(0)) revert OwnableInvalidOwner(address(0));
-        _owner = initialOwner;
-        emit OwnershipTransferred(address(0), initialOwner);
-    }
-
-    modifier onlyOwner() {
-        if (msg.sender != _owner) revert OwnableUnauthorizedAccount(msg.sender);
-        _;
-    }
-
-    function owner() public view returns (address) { return _owner; }
-
-    function transferOwnership(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert OwnableInvalidOwner(address(0));
-        emit OwnershipTransferred(_owner, newOwner);
-        _owner = newOwner;
-    }
-}
-
-/* ------------------ minimal ReentrancyGuard ---------------- */
-abstract contract ReentrancyGuard {
-    uint256 private constant _NOT_ENTERED = 1;
-    uint256 private constant _ENTERED     = 2;
-    uint256 private _status;
-    constructor() { _status = _NOT_ENTERED; }
-    modifier nonReentrant() {
-        require(_status != _ENTERED, "REENTRANCY");
-        _status = _ENTERED;
-        _;
-        _status = _NOT_ENTERED;
-    }
-}
-
-/* ------------------- external staking iface --------------- */
-/**
- * Real staking contract we READ ONLY.
- * We only need stakedAmount. ABI you provided returns (stakedAmount, lockedUntil).
- */
+/* --------------------- External Interface --------------------- */
 interface IStakingPool {
     struct StakingInfo { uint256 stakedAmount; uint256 lockedUntil; }
     function getStakingInfo(address staker) external view returns (StakingInfo memory stakingInfo);
 }
 
 /**
- * Abraham Creations:
- * - Users stake in an external staking pool (not controlled here).
- * - This contract links portions of that stake to specific creations (sessionId) when:
- *     • making a **commandment** (user-authored message, formerly "bless"), or
- *     • making a **blessing** (endorse a message, formerly "praise").
- * - Linked stake accrues time-weighted curation points per (user, session).
- * - Daily action limits are enforced by **tiers** based on the user's stakedAmount in the external pool.
+ * @title Abraham Creations
+ * @notice Manages user-generated content sessions with stake-based permissions
+ * @dev Uses OpenZeppelin's Ownable and ReentrancyGuard for security
+ * 
+ * Users stake in an external staking pool (not controlled here).
+ * This contract links portions of that stake to specific creations (sessionId) when:
+ *   • making a **commandment** (user-authored message), or
+ *   • making a **blessing** (endorse a message).
+ * Linked stake accrues time-weighted curation points per (user, session).
+ * Daily action limits are enforced by **tiers** based on the user's stakedAmount in the external pool.
+ * 
+ * StakingPool address is configurable (not immutable)
+ * Abraham token address is a configurable parameter
+ * Owner can update both addresses to support multiple networks
  */
-contract Abraham is Ownable, ReentrancyGuard {
-    constructor(address stakingPool_) Ownable(msg.sender) ReentrancyGuard() {
-        require(stakingPool_ != address(0), "staking=0");
-        stakingPool = IStakingPool(stakingPool_);
-    }
+contract AbrahamCreations is Ownable, ReentrancyGuard {
+    
+    /*──────────────── external staking (CONFIGURABLE) ───────────────*/
+    IStakingPool public stakingPool;
+    address public abrahamToken;
 
-    /*──────────────── external staking ───────────────*/
-    IStakingPool public immutable stakingPool;
+    /*──────────────── events for configuration changes ─────────*/
+    event StakingPoolUpdated(address indexed previousPool, address indexed newPool);
+    event AbrahamTokenUpdated(address indexed previousToken, address indexed newToken);
 
     /*──────────────── requirements (link deltas per action) ─────────*/
     uint256 public blessingRequirement    = 10e18; // per single blessing (endorsement)
@@ -150,6 +115,51 @@ contract Abraham is Ownable, ReentrancyGuard {
         _;
     }
 
+    /*──────────────── constructor ─────────*/
+    
+    /**
+     * @notice Initialize the Abraham contract
+     * @param stakingPool_ Address of the StakingPool contract
+     * @param abrahamToken_ Address of the Abraham token
+     */
+    constructor(
+        address stakingPool_,
+        address abrahamToken_
+    ) Ownable(msg.sender) ReentrancyGuard() {
+        require(stakingPool_ != address(0), "staking=0");
+        require(abrahamToken_ != address(0), "token=0");
+        stakingPool = IStakingPool(stakingPool_);
+        abrahamToken = abrahamToken_;
+        emit StakingPoolUpdated(address(0), stakingPool_);
+        emit AbrahamTokenUpdated(address(0), abrahamToken_);
+    }
+
+    /*──────────────── owner functions to update addresses ─────────*/
+    
+    /**
+     * @notice Update the StakingPool contract address
+     * @dev Only callable by owner. Allows switching between networks or upgrading the staking pool.
+     * @param newStakingPool The new StakingPool contract address
+     */
+    function setStakingPool(address newStakingPool) external onlyOwner {
+        require(newStakingPool != address(0), "staking=0");
+        address oldPool = address(stakingPool);
+        stakingPool = IStakingPool(newStakingPool);
+        emit StakingPoolUpdated(oldPool, newStakingPool);
+    }
+
+    /**
+     * @notice Update the Abraham token address
+     * @dev Only callable by owner. Allows switching between networks or token versions.
+     * @param newAbrahamToken The new Abraham token address
+     */
+    function setAbrahamToken(address newAbrahamToken) external onlyOwner {
+        require(newAbrahamToken != address(0), "token=0");
+        address oldToken = abrahamToken;
+        abrahamToken = newAbrahamToken;
+        emit AbrahamTokenUpdated(oldToken, newAbrahamToken);
+    }
+
     /*──────────────── public/external ─────────*/
 
     /// Create a new session with its first owner message (CID).
@@ -196,7 +206,7 @@ contract Abraham is Ownable, ReentrancyGuard {
         _abrahamUpdateInternal(s, messageId, cid, closed);
     }
 
-    /// Make a COMMANDMENT (user-authored message), formerly "bless".
+    /// Make a COMMANDMENT (user-authored message).
     function commandment(
         string calldata sessionId,
         string calldata messageId,
@@ -221,7 +231,7 @@ contract Abraham is Ownable, ReentrancyGuard {
         _addMessageInternal(s, messageId, msg.sender, cid, /*isCommandment*/ true);
     }
 
-    /// Make a BLESSING (endorse a message), formerly "praise".
+    /// Make a BLESSING (endorse a message).
     function blessing(
         string calldata sessionId,
         string calldata messageId
@@ -465,21 +475,17 @@ contract Abraham is Ownable, ReentrancyGuard {
         return (b, c);
     }
 
-    /// Returns today's usage counters for a user.
-    function getUserDaily(address user) external view returns (uint64 day, uint32 blessingsToday, uint32 commandmentsToday) {
-        UserDaily storage d = daily[user];
-        return (d.day, d.blessingsToday, d.commandmentsToday);
+    function getTierCount() external view returns (uint256) {
+        return tiers.length;
     }
 
-    /*──────────────── admin ──────────*/
+    /*──────────────── owner config ─────────*/
 
-    function setRequirements(uint256 newBlessingRequirement, uint256 newCommandmentRequirement) external onlyOwner {
-        require(newBlessingRequirement > 0 && newCommandmentRequirement > 0, "invalid req");
-        blessingRequirement    = newBlessingRequirement;
-        commandmentRequirement = newCommandmentRequirement;
+    function setRequirements(uint256 blessingReq, uint256 commandmentReq) external onlyOwner {
+        blessingRequirement = blessingReq;
+        commandmentRequirement = commandmentReq;
     }
 
-    /// Replace all tiers (sorted ascending by minStake).
     function setTiers(Tier[] calldata newTiers) external onlyOwner {
         delete tiers;
         for (uint256 i = 0; i < newTiers.length; i++) {
@@ -487,10 +493,10 @@ contract Abraham is Ownable, ReentrancyGuard {
         }
     }
 
-    /*──────────────── internals ──────*/
+    /*──────────────── internal ─────────*/
 
-    function _requireCID(string calldata cid) private pure {
-        require(bytes(cid).length > 0, "CID required");
+    function _requireCID(string memory cid) private pure {
+        require(bytes(cid).length > 0, "empty cid");
     }
 
     function _addMessageInternal(
@@ -533,6 +539,12 @@ contract Abraham is Ownable, ReentrancyGuard {
         return uint64(block.timestamp / 1 days);
     }
 
+    /**
+     * @notice Reads the staked amount for a user from the external StakingPool
+     * @dev This is the key integration point with the StakingPool contract
+     * @param user The address to check
+     * @return The amount of Abraham tokens staked by the user
+     */
     function _stakedBalance(address user) private view returns (uint256) {
         IStakingPool.StakingInfo memory info = stakingPool.getStakingInfo(user);
         return info.stakedAmount;
@@ -590,3 +602,4 @@ contract Abraham is Ownable, ReentrancyGuard {
     receive() external payable {}
     fallback() external payable {}
 }
+

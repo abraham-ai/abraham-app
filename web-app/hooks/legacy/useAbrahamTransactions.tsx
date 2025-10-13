@@ -12,8 +12,10 @@ import {
   formatUnits,
 } from "viem";
 import { Chain } from "viem/chains";
+import { getPreferredChain } from "@/lib/chains";
 
-// Your chain config for Base Sepolia
+// Legacy Base Sepolia config (kept for reference). Clients created below will
+// use the runtime-preferred chain so the app can default to Ethereum Sepolia.
 const baseSepolia = {
   id: 84532,
   name: "Base Sepolia",
@@ -49,12 +51,13 @@ export function useAbrahamTransactions() {
   // Initialize Public and Wallet Clients
   useEffect(() => {
     if (provider) {
+      const chain = getPreferredChain();
       const pc = createPublicClient({
-        chain: baseSepolia,
+        chain,
         transport: custom(provider),
       });
       const wc = createWalletClient({
-        chain: baseSepolia,
+        chain,
         transport: custom(provider),
       });
       setPublicClient(pc);

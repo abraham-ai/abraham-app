@@ -129,7 +129,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const chainId = await eth.request?.({ method: "eth_chainId" });
             console.log("[Auth] Mini App chain detected:", {
               chainId,
-              expected: "0x14a34", // Base Sepolia (84532)
+              // Note: previously this app used Base Sepolia (0x14a34 / 84532).
+              // We now default to the runtime-preferred chain but still log the
+              // detected chain for diagnostics.
               isBaseSepolia: chainId === "0x14a34",
             });
 

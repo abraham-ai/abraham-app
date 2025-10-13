@@ -3,7 +3,12 @@ export const AbrahamAbi = [
     inputs: [
       {
         internalType: "address",
-        name: "staking_",
+        name: "stakingPool_",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "abrahamToken_",
         type: "address",
       },
     ],
@@ -33,6 +38,55 @@ export const AbrahamAbi = [
     type: "error",
   },
   {
+    inputs: [],
+    name: "ReentrancyGuardReentrantCall",
+    type: "error",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "previousToken",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "newToken",
+        type: "address",
+      },
+    ],
+    name: "AbrahamTokenUpdated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "string",
+        name: "sessionId",
+        type: "string",
+      },
+      {
+        indexed: false,
+        internalType: "string",
+        name: "messageId",
+        type: "string",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "blesser",
+        type: "address",
+      },
+    ],
+    name: "Blessed",
+    type: "event",
+  },
+  {
     anonymous: false,
     inputs: [
       {
@@ -42,7 +96,7 @@ export const AbrahamAbi = [
         type: "address",
       },
       {
-        indexed: true,
+        indexed: false,
         internalType: "string",
         name: "sessionId",
         type: "string",
@@ -128,31 +182,6 @@ export const AbrahamAbi = [
         name: "sessionId",
         type: "string",
       },
-      {
-        indexed: false,
-        internalType: "string",
-        name: "messageId",
-        type: "string",
-      },
-      {
-        indexed: false,
-        internalType: "address",
-        name: "praiser",
-        type: "address",
-      },
-    ],
-    name: "Praised",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "string",
-        name: "sessionId",
-        type: "string",
-      },
     ],
     name: "SessionClosed",
     type: "event",
@@ -184,6 +213,25 @@ export const AbrahamAbi = [
     type: "event",
   },
   {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "previousPool",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "newPool",
+        type: "address",
+      },
+    ],
+    name: "StakingPoolUpdated",
+    type: "event",
+  },
+  {
     stateMutability: "payable",
     type: "fallback",
   },
@@ -207,7 +255,7 @@ export const AbrahamAbi = [
             type: "string",
           },
         ],
-        internalType: "struct Abraham.CreateItem[]",
+        internalType: "struct AbrahamCreations.CreateItem[]",
         name: "items",
         type: "tuple[]",
       },
@@ -237,7 +285,7 @@ export const AbrahamAbi = [
             type: "string",
           },
         ],
-        internalType: "struct Abraham.OwnerMsg[]",
+        internalType: "struct AbrahamCreations.OwnerMsg[]",
         name: "items",
         type: "tuple[]",
       },
@@ -277,7 +325,7 @@ export const AbrahamAbi = [
             type: "bool",
           },
         ],
-        internalType: "struct Abraham.UpdateItem[]",
+        internalType: "struct AbrahamCreations.UpdateItem[]",
         name: "items",
         type: "tuple[]",
       },
@@ -285,6 +333,19 @@ export const AbrahamAbi = [
     name: "abrahamBatchUpdateAcrossSessions",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "abrahamToken",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -327,13 +388,8 @@ export const AbrahamAbi = [
         name: "messageIds",
         type: "string[]",
       },
-      {
-        internalType: "string[]",
-        name: "cids",
-        type: "string[]",
-      },
     ],
-    name: "batchBless",
+    name: "batchBlessing",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -350,10 +406,46 @@ export const AbrahamAbi = [
         name: "messageIds",
         type: "string[]",
       },
+      {
+        internalType: "string[]",
+        name: "cids",
+        type: "string[]",
+      },
     ],
-    name: "batchPraise",
+    name: "batchCommandment",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "sessionId",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "messageId",
+        type: "string",
+      },
+    ],
+    name: "blessing",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "blessingRequirement",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -374,14 +466,14 @@ export const AbrahamAbi = [
         type: "string",
       },
     ],
-    name: "bless",
+    name: "commandment",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [],
-    name: "blessRequirement",
+    name: "commandmentRequirement",
     outputs: [
       {
         internalType: "uint256",
@@ -442,7 +534,7 @@ export const AbrahamAbi = [
       },
       {
         internalType: "uint256",
-        name: "praiseCount",
+        name: "blessingCount",
         type: "uint256",
       },
     ],
@@ -485,12 +577,12 @@ export const AbrahamAbi = [
       },
       {
         internalType: "uint256",
-        name: "totalBlessings",
+        name: "totalCommandments",
         type: "uint256",
       },
       {
         internalType: "uint256",
-        name: "totalPraises",
+        name: "totalBlessings",
         type: "uint256",
       },
       {
@@ -501,6 +593,19 @@ export const AbrahamAbi = [
       {
         internalType: "uint256",
         name: "linkedTotal",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getTierCount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
         type: "uint256",
       },
     ],
@@ -549,12 +654,17 @@ export const AbrahamAbi = [
         type: "address",
       },
     ],
-    name: "getUserTotalLinked",
+    name: "getUserTier",
     outputs: [
       {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
+        internalType: "uint32",
+        name: "maxBlessings",
+        type: "uint32",
+      },
+      {
+        internalType: "uint32",
+        name: "maxCommandments",
+        type: "uint32",
       },
     ],
     stateMutability: "view",
@@ -563,27 +673,17 @@ export const AbrahamAbi = [
   {
     inputs: [
       {
-        internalType: "string",
-        name: "sessionId",
-        type: "string",
-      },
-      {
         internalType: "address",
         name: "user",
         type: "address",
       },
     ],
-    name: "getUserUsage",
+    name: "getUserTotalLinked",
     outputs: [
       {
-        internalType: "uint64",
-        name: "praisesMade_",
-        type: "uint64",
-      },
-      {
-        internalType: "uint64",
-        name: "blessingsMade_",
-        type: "uint64",
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
@@ -622,34 +722,10 @@ export const AbrahamAbi = [
     type: "function",
   },
   {
-    inputs: [
-      {
-        internalType: "string",
-        name: "sessionId",
-        type: "string",
-      },
-      {
-        internalType: "string",
-        name: "messageId",
-        type: "string",
-      },
-    ],
-    name: "praise",
+    inputs: [],
+    name: "renounceOwnership",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "praiseRequirement",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
     type: "function",
   },
   {
@@ -668,13 +744,26 @@ export const AbrahamAbi = [
   {
     inputs: [
       {
+        internalType: "address",
+        name: "newAbrahamToken",
+        type: "address",
+      },
+    ],
+    name: "setAbrahamToken",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
         internalType: "uint256",
-        name: "newPraiseRequirement",
+        name: "blessingReq",
         type: "uint256",
       },
       {
         internalType: "uint256",
-        name: "newBlessRequirement",
+        name: "commandmentReq",
         type: "uint256",
       },
     ],
@@ -684,13 +773,85 @@ export const AbrahamAbi = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "address",
+        name: "newStakingPool",
+        type: "address",
+      },
+    ],
+    name: "setStakingPool",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        components: [
+          {
+            internalType: "uint256",
+            name: "minStake",
+            type: "uint256",
+          },
+          {
+            internalType: "uint32",
+            name: "maxBlessingsPerDay",
+            type: "uint32",
+          },
+          {
+            internalType: "uint32",
+            name: "maxCommandmentsPerDay",
+            type: "uint32",
+          },
+        ],
+        internalType: "struct AbrahamCreations.Tier[]",
+        name: "newTiers",
+        type: "tuple[]",
+      },
+    ],
+    name: "setTiers",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
-    name: "staking",
+    name: "stakingPool",
     outputs: [
       {
-        internalType: "contract IAbrahamStakingView",
+        internalType: "contract IStakingPool",
         name: "",
         type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "tiers",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "minStake",
+        type: "uint256",
+      },
+      {
+        internalType: "uint32",
+        name: "maxBlessingsPerDay",
+        type: "uint32",
+      },
+      {
+        internalType: "uint32",
+        name: "maxCommandmentsPerDay",
+        type: "uint32",
       },
     ],
     stateMutability: "view",

@@ -9,7 +9,7 @@ import {
   parseEther,
   encodeFunctionData,
 } from "viem";
-import { baseSepolia } from "@/lib/base-sepolia";
+import { getPreferredChain } from "@/lib/chains";
 import { SystemPromptPayPatchAbi } from "@/lib/abis/SystemPromptPayPatch";
 import { buildPatch } from "@/lib/patch"; // diff ➜ binary ops
 import { useAuth } from "@/context/auth-context"; // gives eip1193Provider
@@ -30,8 +30,8 @@ export function usePromptContract() {
   /* read‑only client */
   const [publicClient] = useState(() =>
     createPublicClient({
-      chain: baseSepolia,
-      transport: http(baseSepolia.rpcUrls.default.http[0]),
+      chain: getPreferredChain(),
+      transport: http(getPreferredChain().rpcUrls.default.http[0]),
     })
   );
 
@@ -47,7 +47,7 @@ export function usePromptContract() {
     }
     setWalletClient(
       createWalletClient({
-        chain: baseSepolia,
+        chain: getPreferredChain(),
         transport: custom(eip1193Provider),
       })
     );
@@ -148,7 +148,7 @@ export function usePromptContract() {
           functionName: "applyPatch",
           args: [patch],
           value: fee,
-          chain: baseSepolia,
+          chain: getPreferredChain(),
         });
       }
 

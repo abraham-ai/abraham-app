@@ -9,7 +9,7 @@ import {
   formatEther,
   type PublicClient,
 } from "viem";
-import { baseSepolia } from "@/lib/base-sepolia";
+import { getPreferredChain } from "@/lib/chains";
 import { AbrahamAbi } from "@/lib/abis/Abraham";
 import { AbrahamTokenAbi } from "@/lib/abis/AbrahamToken";
 import { usePrivy } from "@privy-io/react-auth";
@@ -31,11 +31,11 @@ export const CONTRACT_ADDRESS =
 
 export const TOKEN_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_TOKEN_ADDRESS as `0x${string}`) ??
-  "0xa3189F7a118e797c91a1548C02E45F2ed5fB69a5";
+  "0x8e10Dee16186E7F2CEAE6ea0F02C88ab56D23722";
 
 export const STAKING_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_STAKING_ADDRESS as `0x${string}`) ??
-  "0xA8f867fA115f64F9728Fc4fd4Ce959f12442a86E";
+  "0xb823C0Eec6Dc6155DE3288695eD132eC2F8e477a";
 
 type BatchedCall = {
   to: `0x${string}`;
@@ -49,8 +49,8 @@ export function useAbrahamSmartWallet() {
   const publicClient: PublicClient = useMemo(
     () =>
       createPublicClient({
-        chain: baseSepolia,
-        transport: http(baseSepolia.rpcUrls.default.http[0]),
+        chain: getPreferredChain(),
+        transport: http(getPreferredChain().rpcUrls.default.http[0]),
       }),
     []
   );
@@ -64,7 +64,8 @@ export function useAbrahamSmartWallet() {
     (async () => {
       if (!client) return setSwClient(null);
       // Ensure we use Base Sepolia smart-wallet client when available
-      const c = (await getClientForChain?.({ id: baseSepolia.id })) ?? client;
+      const c =
+        (await getClientForChain?.({ id: getPreferredChain().id })) ?? client;
       setSwClient(c);
     })();
   }, [client, getClientForChain]);
