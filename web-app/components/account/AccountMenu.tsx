@@ -376,6 +376,14 @@ export default function AccountMenu() {
   // Send ABRAHAM tokens dialog
   const [sendTokensOpen, setSendTokensOpen] = useState(false);
 
+  // Stake dialog state
+  const [stakeOpen, setStakeOpen] = useState(false);
+  const [stakeAmount, setStakeAmount] = useState("0.0");
+  const [stakeLockDays, setStakeLockDays] = useState<number>(7);
+
+  // get stake function from hook (call dynamically to avoid TS errors if hook changes)
+  const { stake, staking } = useAbrahamStaking() as any;
+
   const doFund = async () => {
     if (!fundingWallet) {
       showErrorToast(
@@ -620,6 +628,14 @@ export default function AccountMenu() {
                           <ArrowDownToLineIcon className="w-4 h-4 mr-1" />
                           Fund
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStakeOpen(true)}
+                          disabled={!smartWalletAddress}
+                        >
+                          Stake
+                        </Button>
                       </div>
                     </div>
 
@@ -673,6 +689,20 @@ export default function AccountMenu() {
                                 "—"
                               )}
                             </span>
+                          </div>
+                          <div className="pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setStakeOpen(true)}
+                              className="w-full"
+                              disabled={
+                                !smartAbrahamBalance ||
+                                Number(smartAbrahamBalance) <= 0
+                              }
+                            >
+                              Stake ABRAHAM
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -787,6 +817,20 @@ export default function AccountMenu() {
                                 <SendIcon className="w-4 h-4" />
                                 Send Tokens
                               </Button>
+                              <div className="mt-2">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => setStakeOpen(true)}
+                                  className="w-full"
+                                  disabled={
+                                    !abrahamBalance ||
+                                    Number(abrahamBalance) <= 0
+                                  }
+                                >
+                                  Stake ABRAHAM
+                                </Button>
+                              </div>
                               {isMiniApp && (
                                 <p className="text-xs text-gray-500 mt-1 text-center">
                                   Sending tokens not available in Mini Apps
@@ -874,6 +918,75 @@ export default function AccountMenu() {
                     <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
                   )}
                   {funding ? "Sending…" : "Send"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* STAKE DIALOG */}
+          <Dialog open={stakeOpen} onOpenChange={setStakeOpen}>
+            <DialogContent className="bg-white">
+              <DialogHeader>
+                <DialogTitle>Stake ABRAHAM</DialogTitle>
+                <DialogDescription>
+                  Stake your ABRAHAM tokens into the staking pool. Enter an
+                  amount and desired lock period (days).
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="text-sm">
+                  <div className="text-gray-600 mb-1">Amount ($ABRAHAM)</div>
+                  <Input
+                    inputMode="decimal"
+                    pattern="[0-9]*[.,]?[0-9]*"
+                    value={stakeAmount}
+                    onChange={(e) => setStakeAmount(e.target.value)}
+                    placeholder="0.0"
+                  />
+                </div>
+
+                <div className="text-sm">
+                  <div className="text-gray-600 mb-1">Lock period (days)</div>
+                  <Input
+                    inputMode="numeric"
+                    value={String(stakeLockDays)}
+                    onChange={(e) => setStakeLockDays(Number(e.target.value))}
+                    placeholder="7"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setStakeOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      const amt = parseEther(stakeAmount || "0");
+                      const lockingSeconds = Math.max(
+                        0,
+                        Math.floor(stakeLockDays) * 24 * 60 * 60
+                      );
+                      await stake(amt, lockingSeconds);
+                      showSuccessToast(
+                        "Stake submitted",
+                        "Staking transaction sent"
+                      );
+                      setStakeOpen(false);
+                      setStakeAmount("0.0");
+                      setTimeout(() => refreshAllBalances(), 1200);
+                    } catch (e) {
+                      showErrorToast(e as Error, "Failed to stake");
+                    }
+                  }}
+                  disabled={staking}
+                >
+                  {staking && (
+                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                  )}
+                  {staking ? "Staking…" : "Stake"}
                 </Button>
               </DialogFooter>
             </DialogContent>
