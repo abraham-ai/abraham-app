@@ -14,8 +14,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
-import { useAbrahamActions } from "@/hooks/use-abraham-actions";
-import { useAbrahamEligibility } from "@/hooks/use-abraham-eligibility";
+import { useAbrahamActions } from "@/hooks/experimental/use-abraham-actions";
+import { useAbrahamEligibility } from "@/hooks/experimental/use-abraham-eligibility";
 import {
   Tooltip,
   TooltipContent,
@@ -55,7 +55,7 @@ export default function CreationsGrid() {
       skip: (pageNo * PAGE_SIZE).toString(),
       sort,
     });
-    const res = await fetch(`/api/creations?${params.toString()}`);
+    const res = await fetch(`/api/experimental/creations?${params.toString()}`);
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || res.statusText);

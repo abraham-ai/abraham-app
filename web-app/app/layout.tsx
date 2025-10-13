@@ -4,7 +4,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
 import { MiniKitProvider } from "@coinbase/onchainkit/minikit";
-import { baseSepolia } from "viem/chains";
+import { getPreferredChain } from "@/lib/chains";
 import Providers from "@/Providers";
 import { Toaster } from "@/components/ui/toaster";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -90,23 +90,18 @@ export default function RootLayout({
       >
         <MiniKitProvider
           apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-          chain={{
-            id: baseSepolia.id,
-            name: baseSepolia.name,
-            nativeCurrency: {
-              name: "ETH",
-              symbol: "ETH",
-              decimals: 18,
-            },
-            rpcUrls: {
-              default: {
-                http: [baseSepolia.rpcUrls.default.http[0]],
+          chain={(() => {
+            const c = getPreferredChain();
+            return {
+              id: c.id,
+              name: c.name,
+              nativeCurrency: c.nativeCurrency,
+              rpcUrls: {
+                default: { http: [c.rpcUrls.default.http[0]] },
+                public: { http: [c.rpcUrls.default.http[0]] },
               },
-              public: {
-                http: [baseSepolia.rpcUrls.default.http[0]],
-              },
-            },
-          }}
+            };
+          })()}
           config={{
             appearance: {
               mode: "auto",

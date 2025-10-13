@@ -1,7 +1,7 @@
 "use client";
 
 import { createPublicClient, http } from "viem";
-import { baseSepolia } from "@/lib/base-sepolia";
+import { getPreferredChain } from "@/lib/chains";
 import { useViemWalletClient } from "@/hooks/use-viem-wallet-client";
 
 /**
@@ -10,8 +10,8 @@ import { useViemWalletClient } from "@/hooks/use-viem-wallet-client";
  */
 export function usePrivyViemClients(eip1193Provider: any | null) {
   const publicClient = createPublicClient({
-    chain: baseSepolia,
-    transport: http(baseSepolia.rpcUrls.default.http[0]),
+    chain: getPreferredChain(),
+    transport: http(getPreferredChain().rpcUrls.default.http[0]),
   });
 
   const walletClient = useViemWalletClient(eip1193Provider);

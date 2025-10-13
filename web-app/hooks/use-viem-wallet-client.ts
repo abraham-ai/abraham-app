@@ -2,7 +2,7 @@
 
 import { createWalletClient, custom } from "viem";
 import { useEffect, useState } from "react";
-import { baseSepolia } from "@/lib/base-sepolia";
+import { getPreferredChain } from "@/lib/chains";
 
 /**
  * Convert an EIP‑1193 provider (e.g. from Privy) into a viem WalletClient.
@@ -20,7 +20,7 @@ export function useViemWalletClient(eip1193Provider: any | null) {
 
     setWalletClient(
       createWalletClient({
-        chain: baseSepolia,
+        chain: getPreferredChain(),
         transport: custom(eip1193Provider),
       })
     );

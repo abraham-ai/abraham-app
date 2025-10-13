@@ -10,7 +10,7 @@ import {
   formatEther,
   encodeFunctionData,
 } from "viem";
-import { baseSepolia } from "viem/chains";
+import { getPreferredChain } from "@/lib/chains";
 import { useAuth } from "@/context/auth-context";
 import { useTxMode } from "@/context/tx-mode-context";
 import { usePrivy } from "@privy-io/react-auth";
@@ -20,7 +20,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/error-utils";
 
 export const TOKEN_ADDRESS =
   (process.env.NEXT_PUBLIC_ABRAHAM_TOKEN_ADDRESS as `0x${string}`) ??
-  "0xa3189F7a118e797c91a1548C02E45F2ed5fB69a5";
+  "0x8e10Dee16186E7F2CEAE6ea0F02C88ab56D23722";
 
 export function useAbrahamToken() {
   const { eip1193Provider, authState } = useAuth();
@@ -36,8 +36,8 @@ export function useAbrahamToken() {
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: baseSepolia,
-        transport: http(baseSepolia.rpcUrls.default.http[0]),
+        chain: getPreferredChain(),
+        transport: http(getPreferredChain().rpcUrls.default.http[0]),
       }),
     []
   );
@@ -51,7 +51,7 @@ export function useAbrahamToken() {
     } else if (eip1193Provider) {
       setWalletClient(
         createWalletClient({
-          chain: baseSepolia,
+          chain: getPreferredChain(),
           transport: custom(eip1193Provider),
         })
       );
@@ -296,7 +296,7 @@ export function useAbrahamToken() {
             functionName: "transfer",
             args: [to, amount],
             account: userAddress,
-            chain: baseSepolia,
+            chain: getPreferredChain(),
           });
         }
 

@@ -9,7 +9,6 @@ import {
   WalletIcon,
   ArrowDownToLineIcon,
   CopyIcon,
-  ExternalLinkIcon,
   PlusIcon,
   SendIcon,
 } from "lucide-react";
@@ -22,7 +21,7 @@ import {
   http,
   parseEther,
 } from "viem";
-import { baseSepolia } from "viem/chains";
+import { getPreferredChain } from "@/lib/chains";
 
 import {
   DropdownMenu,
@@ -51,14 +50,13 @@ import {
   STAKING_ADDRESS,
 } from "@/hooks/use-abraham-staking";
 import { showErrorToast, showSuccessToast } from "@/lib/error-utils";
-import { Switch } from "@/components/ui/switch";
 import SendAbrahamTokens from "@/components/account/SendAbrahamTokens";
 import { AbrahamTokenAbi } from "@/lib/abis/AbrahamToken";
-import { AbrahamStakingAbi } from "@/lib/abis/AbrahamStaking";
+import { StakingAbi } from "@/lib/abis/Staking";
 
 const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(baseSepolia.rpcUrls.default.http[0]),
+  chain: getPreferredChain(),
+  transport: http(getPreferredChain().rpcUrls.default.http[0]),
 });
 
 async function copy(text: string) {
@@ -74,7 +72,7 @@ async function copy(text: string) {
 function labelForWalletType(t?: string) {
   if (!t) return "Wallet";
   if (t === "privy") return "Embedded Wallet";
-  return t.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()); // e.g. metamask -> Metamask
+  return t.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
 export default function AccountMenu() {
@@ -91,6 +89,7 @@ export default function AccountMenu() {
     loading: abrahamLoading,
     fetchBalance: fetchAbrahamBalance,
   } = useAbrahamToken();
+
   const {
     stakedBalance,
     loading: stakingLoading,
@@ -115,8 +114,12 @@ export default function AccountMenu() {
 
   // Fetch ABRAHAM balances for a specific address
   const fetchAbrahamBalanceFor = useCallback(async (address: `0x${string}`) => {
+    console.log("[AccountMenu] Fetching balances for address:", address);
+    console.log("[AccountMenu] TOKEN_ADDRESS:", TOKEN_ADDRESS);
+    console.log("[AccountMenu] STAKING_ADDRESS:", STAKING_ADDRESS);
+
     try {
-      const [tokenBalance, stakedBalance] = await Promise.all([
+      const [tokenBalance, stakingInfo] = await Promise.all([
         publicClient.readContract({
           address: TOKEN_ADDRESS,
           abi: AbrahamTokenAbi,
@@ -125,18 +128,45 @@ export default function AccountMenu() {
         }),
         publicClient.readContract({
           address: STAKING_ADDRESS,
-          abi: AbrahamStakingAbi,
-          functionName: "stakedBalance",
+          abi: StakingAbi,
+          functionName: "getStakingInfo",
           args: [address],
         }),
       ]);
 
+      console.log("[AccountMenu] Raw tokenBalance:", tokenBalance);
+      console.log("[AccountMenu] Raw stakingInfo:", stakingInfo);
+
+      const stakedAmount = (stakingInfo as any)?.stakedAmount as bigint;
+
+      console.log(
+        "[AccountMenu] Parsed stakedAmount:",
+        stakedAmount?.toString()
+      );
+      console.log(
+        "[AccountMenu] Formatted token balance:",
+        formatEther(tokenBalance as bigint)
+      );
+      console.log(
+        "[AccountMenu] Formatted staked balance:",
+        formatEther(stakedAmount ?? BigInt(0))
+      );
+
       return {
         balance: formatEther(tokenBalance as bigint),
-        staked: formatEther(stakedBalance as bigint),
+        staked: formatEther(stakedAmount ?? BigInt(0)),
       };
-    } catch (error) {
-      console.error("Error fetching ABRAHAM balances for", address, error);
+    } catch (error: any) {
+      console.error(
+        "[AccountMenu] Error fetching ABRAHAM balances for",
+        address,
+        error
+      );
+      console.error("[AccountMenu] Error details:", {
+        message: error?.message,
+        code: error?.code,
+        data: error?.data,
+      });
       return { balance: "0", staked: "0" };
     }
   }, []);
@@ -152,6 +182,7 @@ export default function AccountMenu() {
       (wallets[0] as any)
     );
   }, [isMiniApp, wallets, authState.walletAddress]);
+
   const fundingWallet = activeWallet ?? null;
   const fundingWalletAddress = fundingWallet?.address as
     | `0x${string}`
@@ -168,14 +199,14 @@ export default function AccountMenu() {
     [user]
   );
 
-  // Ensure the funding wallet is on Base Sepolia (don’t spam chain switches)
+  // Ensure the funding wallet is on the preferred chain
   useEffect(() => {
-    if (isMiniApp) return; // host controls chain
+    if (isMiniApp) return;
     const ensureChain = async () => {
       if (!fundingWallet) return;
       try {
-        if (fundingWallet.chainId !== `eip155:${baseSepolia.id}`) {
-          await fundingWallet.switchChain(baseSepolia.id);
+        if (fundingWallet.chainId !== `eip155:${getPreferredChain().id}`) {
+          await fundingWallet.switchChain(getPreferredChain().id);
         }
       } catch (err) {
         console.warn("Chain switch rejected/failed", err);
@@ -190,7 +221,7 @@ export default function AccountMenu() {
   const [refreshing, setRefreshing] = useState(false);
   const [providerLabel, setProviderLabel] = useState<string>("Wallet");
 
-  // Detect actual provider name in Mini App from the EIP-1193 provider
+  // Detect actual provider name in Mini App
   useEffect(() => {
     if (!isMiniApp) {
       setProviderLabel("Wallet");
@@ -247,8 +278,14 @@ export default function AccountMenu() {
     detect();
   }, [isMiniApp, eip1193Provider]);
 
-  // Refresh ABRAHAM token balances when other balances refresh
+  // Refresh all balances
   const refreshAllBalances = useCallback(async () => {
+    console.log("[AccountMenu] Refreshing all balances...");
+    console.log("[AccountMenu] isMiniApp:", isMiniApp);
+    console.log("[AccountMenu] smartWalletAddress:", smartWalletAddress);
+    console.log("[AccountMenu] activeAddress:", activeAddress);
+    console.log("[AccountMenu] fundingWalletAddress:", fundingWalletAddress);
+
     setRefreshing(true);
     try {
       // Refresh ETH balances
@@ -274,7 +311,7 @@ export default function AccountMenu() {
         const b = await publicClient.getBalance({ address: activeAddress });
         setActiveEth(formatEther(b));
 
-        // Fetch ABRAHAM balances for EOA (only when not in Mini App and not using smart wallet)
+        // Fetch ABRAHAM balances for EOA
         if (!isMiniApp && fundingWalletAddress) {
           setEoaAbrahamLoading(true);
           const eoaAbraham = await fetchAbrahamBalanceFor(fundingWalletAddress);
@@ -294,7 +331,7 @@ export default function AccountMenu() {
         await fetchStakedBalance();
       }
     } catch (e) {
-      console.error(e);
+      console.error("[AccountMenu] Error refreshing balances:", e);
       setSmartAbrahamLoading(false);
       setEoaAbrahamLoading(false);
     } finally {
@@ -324,20 +361,28 @@ export default function AccountMenu() {
     }
   }, [activeAddress, fetchAbrahamBalance, fetchStakedBalance]);
 
-  // In Mini App, when authState.walletAddress changes (e.g., after a bless), re-pull balances
+  // In Mini App, when authState.walletAddress changes, re-pull balances
   useEffect(() => {
     if (!isMiniApp) return;
     refreshAllBalances();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMiniApp, authState.walletAddress]);
 
-  // Fund smart wallet (Funding EOA -> Smart)
+  // Fund smart wallet dialog
   const [fundOpen, setFundOpen] = useState(false);
   const [amount, setAmount] = useState("0.01");
   const [funding, setFunding] = useState(false);
 
   // Send ABRAHAM tokens dialog
   const [sendTokensOpen, setSendTokensOpen] = useState(false);
+
+  // Stake dialog state
+  const [stakeOpen, setStakeOpen] = useState(false);
+  const [stakeAmount, setStakeAmount] = useState("0.0");
+  const [stakeLockDays, setStakeLockDays] = useState<number>(7);
+
+  // get stake function from hook (call dynamically to avoid TS errors if hook changes)
+  const { stake, staking } = useAbrahamStaking() as any;
 
   const doFund = async () => {
     if (!fundingWallet) {
@@ -364,7 +409,7 @@ export default function AccountMenu() {
     try {
       const provider = await (fundingWallet as any).getEthereumProvider();
       const walletClient = createWalletClient({
-        chain: baseSepolia,
+        chain: getPreferredChain(),
         transport: custom(provider),
       });
 
@@ -375,7 +420,7 @@ export default function AccountMenu() {
       const hash = await walletClient.sendTransaction({
         to: smartWalletAddress,
         value,
-        chain: baseSepolia,
+        chain: getPreferredChain(),
         account: fundingWalletAddress,
       });
 
@@ -392,7 +437,7 @@ export default function AccountMenu() {
     }
   };
 
-  // One-click create for users who don't have a smart wallet yet (provisions embedded signer)
+  // Create smart wallet
   const [creatingSmart, setCreatingSmart] = useState(false);
   const createSmartWalletNow = async () => {
     if (isMiniApp) {
@@ -461,10 +506,9 @@ export default function AccountMenu() {
 
               <DropdownMenuSeparator />
 
-              {/* In Mini App, skip Tx mode and Smart Wallet entirely */}
+              {/* Transaction Mode - Only show if not in Mini App */}
               {!isMiniApp && (
                 <>
-                  <DropdownMenuSeparator />
                   <div className="px-3 py-2">
                     <div className="text-sm font-medium mb-2">
                       Transaction Mode
@@ -483,18 +527,20 @@ export default function AccountMenu() {
                           setMode(mode === "smart" ? "wallet" : "smart")
                         }
                         className={`
-                        relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                        ${mode === "smart" ? "bg-blue-600" : "bg-gray-200"}
-                        cursor-pointer
-                      `}
+                          relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                          ${mode === "smart" ? "bg-blue-600" : "bg-gray-200"}
+                          cursor-pointer
+                        `}
                       >
                         <span
                           className={`
-                          inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                          ${
-                            mode === "smart" ? "translate-x-6" : "translate-x-1"
-                          }
-                        `}
+                            inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                            ${
+                              mode === "smart"
+                                ? "translate-x-6"
+                                : "translate-x-1"
+                            }
+                          `}
                         />
                       </button>
                     </div>
@@ -502,10 +548,13 @@ export default function AccountMenu() {
 
                   <DropdownMenuSeparator />
 
+                  {/* Smart Wallet Section */}
                   <div className="px-3 py-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <WalletIcon className="w-4 h-4" />
-                      <span>Smart Wallet (Base Sepolia)</span>
+                      <span>{`Smart Wallet (${
+                        getPreferredChain().name
+                      })`}</span>
                     </div>
                     <div className="mt-1 text-xs text-gray-600 break-all">
                       {smartWalletAddress ? (
@@ -579,10 +628,17 @@ export default function AccountMenu() {
                           <ArrowDownToLineIcon className="w-4 h-4 mr-1" />
                           Fund
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStakeOpen(true)}
+                          disabled={!smartWalletAddress}
+                        >
+                          Stake
+                        </Button>
                       </div>
                     </div>
 
-                    {/* Funding source tag */}
                     {fundingWallet && (
                       <p className="mt-1 text-[11px] text-gray-500">
                         Funding source:{" "}
@@ -595,55 +651,68 @@ export default function AccountMenu() {
 
                   <DropdownMenuSeparator />
 
-                  {/* ABRAHAM Token Balance Section for Smart Wallet */}
+                  {/* ABRAHAM Token Balance for Smart Wallet */}
                   {smartWalletAddress && (
-                    <div className="px-3 py-2">
-                      <div className="flex items-center gap-2 text-sm font-medium mb-2">
-                        <CoinsIcon className="w-4 h-4" />
-                        <span>ABRAHAM Token (Smart Wallet)</span>
-                      </div>
-
-                      <div className="space-y-2">
-                        {/* Token Balance */}
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Balance:</span>
-                          <span className="font-mono">
-                            {smartAbrahamLoading ? (
-                              <Loader2Icon className="w-4 h-4 animate-spin" />
-                            ) : smartAbrahamBalance !== null ? (
-                              `${Number(
-                                smartAbrahamBalance
-                              ).toLocaleString()} $ABRAHAM`
-                            ) : (
-                              "—"
-                            )}
-                          </span>
+                    <>
+                      <div className="px-3 py-2">
+                        <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                          <CoinsIcon className="w-4 h-4" />
+                          <span>ABRAHAM Token (Smart Wallet)</span>
                         </div>
 
-                        {/* Staked Balance */}
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Staked:</span>
-                          <span className="font-mono">
-                            {smartAbrahamLoading ? (
-                              <Loader2Icon className="w-4 h-4 animate-spin" />
-                            ) : smartStakedBalance !== null ? (
-                              `${Number(
-                                smartStakedBalance
-                              ).toLocaleString()} $ABRAHAM`
-                            ) : (
-                              "—"
-                            )}
-                          </span>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Balance:</span>
+                            <span className="font-mono">
+                              {smartAbrahamLoading ? (
+                                <Loader2Icon className="w-4 h-4 animate-spin" />
+                              ) : smartAbrahamBalance !== null ? (
+                                `${Number(
+                                  smartAbrahamBalance
+                                ).toLocaleString()} $ABRAHAM`
+                              ) : (
+                                "—"
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Staked:</span>
+                            <span className="font-mono">
+                              {smartAbrahamLoading ? (
+                                <Loader2Icon className="w-4 h-4 animate-spin" />
+                              ) : smartStakedBalance !== null ? (
+                                `${Number(
+                                  smartStakedBalance
+                                ).toLocaleString()} $ABRAHAM`
+                              ) : (
+                                "—"
+                              )}
+                            </span>
+                          </div>
+                          <div className="pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setStakeOpen(true)}
+                              className="w-full"
+                              disabled={
+                                !smartAbrahamBalance ||
+                                Number(smartAbrahamBalance) <= 0
+                              }
+                            >
+                              Stake ABRAHAM
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                      <DropdownMenuSeparator />
+                    </>
                   )}
                 </>
               )}
 
-              <DropdownMenuSeparator />
-
-              {/* Active EOA (currently selected) */}
+              {/* Active Wallet (EOA or Mini App) */}
               {activeAddress && (
                 <>
                   <div className="px-3 py-2">
@@ -734,6 +803,7 @@ export default function AccountMenu() {
                             )}
                           </span>
                         </div>
+
                         {abrahamBalance !== null &&
                           Number(abrahamBalance) > 0 && (
                             <div className="pt-2">
@@ -742,11 +812,25 @@ export default function AccountMenu() {
                                 size="sm"
                                 onClick={() => setSendTokensOpen(true)}
                                 className="w-full flex items-center gap-2"
-                                disabled={isMiniApp} // Disable in Mini App as MetaMask might not be available
+                                disabled={isMiniApp}
                               >
                                 <SendIcon className="w-4 h-4" />
                                 Send Tokens
                               </Button>
+                              <div className="mt-2">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => setStakeOpen(true)}
+                                  className="w-full"
+                                  disabled={
+                                    !abrahamBalance ||
+                                    Number(abrahamBalance) <= 0
+                                  }
+                                >
+                                  Stake ABRAHAM
+                                </Button>
+                              </div>
                               {isMiniApp && (
                                 <p className="text-xs text-gray-500 mt-1 text-center">
                                   Sending tokens not available in Mini Apps
@@ -760,8 +844,6 @@ export default function AccountMenu() {
                   <DropdownMenuSeparator />
                 </>
               )}
-
-              <DropdownMenuSeparator />
 
               <DropdownMenuItem asChild>
                 <Link href="/profile">Profile</Link>
@@ -793,7 +875,7 @@ export default function AccountMenu() {
                       (fundingWallet as any)?.walletClientType
                     )}
                   </strong>{" "}
-                  to your smart wallet on Base Sepolia.
+                  to your smart wallet on {getPreferredChain().name}.
                 </DialogDescription>
               </DialogHeader>
 
@@ -836,6 +918,75 @@ export default function AccountMenu() {
                     <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
                   )}
                   {funding ? "Sending…" : "Send"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* STAKE DIALOG */}
+          <Dialog open={stakeOpen} onOpenChange={setStakeOpen}>
+            <DialogContent className="bg-white">
+              <DialogHeader>
+                <DialogTitle>Stake ABRAHAM</DialogTitle>
+                <DialogDescription>
+                  Stake your ABRAHAM tokens into the staking pool. Enter an
+                  amount and desired lock period (days).
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="text-sm">
+                  <div className="text-gray-600 mb-1">Amount ($ABRAHAM)</div>
+                  <Input
+                    inputMode="decimal"
+                    pattern="[0-9]*[.,]?[0-9]*"
+                    value={stakeAmount}
+                    onChange={(e) => setStakeAmount(e.target.value)}
+                    placeholder="0.0"
+                  />
+                </div>
+
+                <div className="text-sm">
+                  <div className="text-gray-600 mb-1">Lock period (days)</div>
+                  <Input
+                    inputMode="numeric"
+                    value={String(stakeLockDays)}
+                    onChange={(e) => setStakeLockDays(Number(e.target.value))}
+                    placeholder="7"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setStakeOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      const amt = parseEther(stakeAmount || "0");
+                      const lockingSeconds = Math.max(
+                        0,
+                        Math.floor(stakeLockDays) * 24 * 60 * 60
+                      );
+                      await stake(amt, lockingSeconds);
+                      showSuccessToast(
+                        "Stake submitted",
+                        "Staking transaction sent"
+                      );
+                      setStakeOpen(false);
+                      setStakeAmount("0.0");
+                      setTimeout(() => refreshAllBalances(), 1200);
+                    } catch (e) {
+                      showErrorToast(e as Error, "Failed to stake");
+                    }
+                  }}
+                  disabled={staking}
+                >
+                  {staking && (
+                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                  )}
+                  {staking ? "Staking…" : "Stake"}
                 </Button>
               </DialogFooter>
             </DialogContent>
