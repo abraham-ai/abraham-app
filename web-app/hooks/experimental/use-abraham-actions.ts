@@ -1,8 +1,8 @@
 "use client";
 
 import { useTxMode } from "@/context/tx-mode-context";
-import { useAbrahamSmartWallet } from "@/hooks/use-abraham-smartwallet";
-import { useAbrahamContract } from "@/hooks/use-abraham-contract";
+import { useAbrahamSmartWallet } from "@/hooks/experimental/use-abraham-smartwallet";
+import { useAbrahamContract } from "@/hooks/experimental/use-abraham-contract";
 
 export function useAbrahamActions() {
   const { mode } = useTxMode();

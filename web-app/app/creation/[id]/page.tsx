@@ -30,7 +30,7 @@ export default function CreationPage({ params }: { params: { id: string } }) {
       setLoading(true);
       try {
         const { data } = await axios.get<CreationItem>(
-          `/api/creations/creation?creationId=${params.id}` // lite is default
+          `/api/experimental/creations/creation?creationId=${params.id}` // lite is default
         );
         if (!cancelled) {
           setCreation(data);

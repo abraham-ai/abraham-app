@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { parseEther } from "viem";
-import { useAbrahamToken } from "./use-abraham-token";
-import { useAbrahamStaking } from "./use-abraham-staking";
+import { useAbrahamToken } from "../use-abraham-token";
+import { useAbrahamStaking } from "../use-abraham-staking";
 
 /**
  * Hook to check if user has enough Abraham tokens (balance + stake) to perform actions.

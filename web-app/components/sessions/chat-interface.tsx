@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Send } from "lucide-react";
-import { useEdenSession } from "@/hooks/use-eden-session";
+import { useEdenSession } from "@/hooks/experimental/use-eden-session";
 import type { SessionV2 } from "@edenlabs/eden-sdk";
 
 type LocalMessage = {

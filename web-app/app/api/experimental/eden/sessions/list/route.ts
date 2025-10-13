@@ -1,7 +1,7 @@
 import {
   extractPaginationParams,
   handleAxiosServerError,
-} from "@/lib/eden-fetcher";
+} from "@/lib/experimental/eden-fetcher";
 import { EdenClient } from "@edenlabs/eden-sdk";
 import { NextRequest, NextResponse } from "next/server";
 

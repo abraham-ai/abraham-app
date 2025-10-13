@@ -2,7 +2,7 @@ import {
   NotFoundError,
   ServerError,
   UnauthorizedError,
-} from "@/lib/eden-errors";
+} from "@/lib/experimental/eden-errors";
 import {
   CursorPaginatedFeedQuery,
   CursorPaginatedRouteQueryParams,

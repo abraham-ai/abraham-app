@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePromptContract } from "@/hooks/use-prompt-contract";
+import { usePromptContract } from "@/hooks/experimental/use-prompt-contract";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";

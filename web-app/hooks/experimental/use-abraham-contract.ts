@@ -13,10 +13,10 @@ import {
   type WalletClient,
 } from "viem";
 import { getPreferredChain } from "@/lib/chains";
-import { AbrahamAbi } from "@/lib/abis/Abraham";
+import { AbrahamAbi } from "@/lib/abis/experimental/Abraham";
 import { useAuth } from "@/context/auth-context";
 import { useTxMode } from "@/context/tx-mode-context";
-import { useAbrahamStaking } from "./use-abraham-staking";
+import { useAbrahamStaking } from "../use-abraham-staking";
 import {
   showErrorToast,
   showSuccessToast,

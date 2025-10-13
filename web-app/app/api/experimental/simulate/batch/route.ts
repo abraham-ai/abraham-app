@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Wallet, JsonRpcProvider, Contract } from "ethers";
 import { PinataSDK } from "pinata-web3";
 import { randomUUID } from "crypto";
-import { AbrahamAbi } from "@/lib/abis/Abraham";
+import { AbrahamAbi } from "@/lib/abis/experimental/Abraham";
 import fetch from "node-fetch";
 
 /*────────────────── ENV VARS ──────────────────*/

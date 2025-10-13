@@ -10,7 +10,7 @@ import {
   encodeFunctionData,
 } from "viem";
 import { getPreferredChain } from "@/lib/chains";
-import { SystemPromptPayPatchAbi } from "@/lib/abis/SystemPromptPayPatch";
+import { SystemPromptPayPatchAbi } from "@/lib/abis/experimental/SystemPromptPayPatch";
 import { buildPatch } from "@/lib/patch"; // diff ➜ binary ops
 import { useAuth } from "@/context/auth-context"; // gives eip1193Provider
 import { useTxMode } from "@/context/tx-mode-context";

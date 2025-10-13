@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth-context";
-import { useAbrahamActions } from "@/hooks/use-abraham-actions";
-import { useAbrahamEligibility } from "@/hooks/use-abraham-eligibility";
+import { useAbrahamActions } from "@/hooks/experimental/use-abraham-actions";
+import { useAbrahamEligibility } from "@/hooks/experimental/use-abraham-eligibility";
 import { CreationItem } from "@/types/abraham";
 import { Loader2Icon } from "lucide-react";
 import { showErrorToast, showWarningToast } from "@/lib/error-utils";

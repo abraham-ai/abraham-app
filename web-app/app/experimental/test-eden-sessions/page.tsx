@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useEdenSession, SessionListResponse } from "@/hooks/use-eden-session";
+import {
+  useEdenSession,
+  SessionListResponse,
+} from "@/hooks/experimental/use-eden-session";
 import { SessionV2 } from "@edenlabs/eden-sdk";
 import { useToast } from "@/hooks/use-toast";
 import AppBar from "@/components/layout/AppBar";

@@ -1,4 +1,4 @@
-import { handleAxiosServerError } from "@/lib/eden-fetcher";
+import { handleAxiosServerError } from "@/lib/experimental/eden-fetcher";
 import { EdenClient } from "@edenlabs/eden-sdk";
 import { NextRequest, NextResponse } from "next/server";
 

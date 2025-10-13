@@ -10,11 +10,11 @@ import {
   type PublicClient,
 } from "viem";
 import { getPreferredChain } from "@/lib/chains";
-import { AbrahamAbi } from "@/lib/abis/Abraham";
+import { AbrahamAbi } from "@/lib/abis/experimental/Abraham";
 import { AbrahamTokenAbi } from "@/lib/abis/AbrahamToken";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
-import { useAbrahamStaking } from "./use-abraham-staking";
+import { useAbrahamStaking } from "../use-abraham-staking";
 import {
   showErrorToast,
   showInfoToast,

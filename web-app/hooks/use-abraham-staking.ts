@@ -16,7 +16,7 @@ import { useTxMode } from "@/context/tx-mode-context";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { StakingAbi } from "@/lib/abis/Staking";
-import { useAbrahamToken, TOKEN_ADDRESS } from "./use-abraham-token";
+import { useAbrahamToken } from "./use-abraham-token";
 import { showSuccessToast, showErrorToast } from "@/lib/error-utils";
 
 export const STAKING_ADDRESS =

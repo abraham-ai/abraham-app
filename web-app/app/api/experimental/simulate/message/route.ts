@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
-import { AbrahamAbi } from "@/lib/abis/Abraham";
+import { AbrahamAbi } from "@/lib/abis/experimental/Abraham";
 import { PinataSDK } from "pinata-web3";
 import fetch from "node-fetch";
 
