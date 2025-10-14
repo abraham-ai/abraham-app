@@ -89,7 +89,7 @@ export default function CreationDetailPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <AppBar />
-      <div className="max-w-4xl mx-auto px-4 py-10">
+      <div className="max-w-4xl mx-auto px-4 pt-24 pb-10">
         {posterImage && (
           <div className="relative w-full mb-6" style={{ aspectRatio: "6 / 4" }}>
             <Image

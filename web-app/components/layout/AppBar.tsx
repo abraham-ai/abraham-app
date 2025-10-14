@@ -23,6 +23,12 @@ export default function AppBar() {
             </div>
           </Link>
 
+          <Link href="/covenant">
+            <div className="flex items-center cursor-pointer">
+              <p className="text-base">Covenant</p>
+            </div>
+          </Link>
+
           <Link href="/seeds">
             <div className="flex items-center cursor-pointer">
               <p className="text-base">Seeds</p>
@@ -32,12 +38,6 @@ export default function AppBar() {
           <Link href="/creations">
             <div className="flex items-center cursor-pointer">
               <p className="text-base">Creations</p>
-            </div>
-          </Link>
-
-          <Link href="/covenant">
-            <div className="flex items-center cursor-pointer">
-              <p className="text-base">Covenant</p>
             </div>
           </Link>
 

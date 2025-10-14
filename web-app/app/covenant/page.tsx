@@ -12,7 +12,7 @@ export default function AboutPage() {
       <AppBar />
 
       {/* Main Content */}
-      <div className="relative flex flex-col items-center justify-center min-h-screen px-6 py-16">
+      <div className="relative flex flex-col items-center justify-center min-h-screen px-6 pt-24 pb-16">
         {/* Hero Section */}
         <div className="max-w-2xl text-left space-y-8 prose prose-lg">
           <section>
