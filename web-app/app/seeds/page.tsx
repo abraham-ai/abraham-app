@@ -37,7 +37,7 @@ export default function CreationsPage() {
   useEffect(() => {
     const fetchCreations = async () => {
       try {
-        const res = await fetch(`/api/creations?page=${page}&limit=20`);
+        const res = await fetch(`/api/covenant/creations?page=${page}&limit=20`);
         if (!res.ok) throw new Error("Failed to fetch creations");
         const data = await res.json();
         console.log("Fetched creations:", data);
@@ -54,18 +54,18 @@ export default function CreationsPage() {
     fetchCreations();
   }, [page]);
 
-  // Map AbrahamCreation data to GalleryItem format - only include items with creation.poster_image
+  // Map AbrahamCreation data to GalleryItem format - only include items with images
   const galleryItems: GalleryItem[] = creations
     .filter((creation) => {
-      console.log("Checking creation:", creation._id, "poster_image:", creation.creation?.poster_image);
-      return creation.creation?.poster_image;
+      console.log("Checking creation:", creation._id, "image:", creation.image);
+      return creation.image; // Only include creations with images
     })
     .map((creation) => ({
       id: creation._id,
-      title: creation.creation?.title || creation.title,
-      tagline: creation.creation?.tagline || creation.tagline || creation.proposal.substring(0, 60) + "...",
-      image: creation.creation!.poster_image!,
-      alt: creation.creation?.title || creation.title,
+      title: creation.title,
+      tagline: creation.tagline || creation.proposal.substring(0, 60) + "...",
+      image: creation.image!,
+      alt: creation.title,
       session_id: creation.session_id,
       cast_hash: creation.cast_hash,
       createdAt: creation.createdAt,
@@ -101,9 +101,8 @@ export default function CreationsPage() {
         <MinimalGallery
           items={galleryItems}
           persistBlessings
-          storageKey="abraham_full_creations_bless"
+          storageKey="abraham_creations_bless"
           aspectRatio="6 / 4"
-          basePath="/creations"
         />
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4 mt-8 px-4">

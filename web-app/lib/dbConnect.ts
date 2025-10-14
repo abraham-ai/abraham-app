@@ -4,6 +4,7 @@ declare global {
 }
 
 const MONGODB_URI = process.env.MONGODB_URI!;
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'eden-prod';
 
 if (!MONGODB_URI) {
   throw new Error(
@@ -24,6 +25,7 @@ async function dbConnect() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      dbName: MONGODB_DB_NAME,
     };
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
       return mongoose;

@@ -34,6 +34,14 @@ const nextConfig = {
         protocol: "https",
         hostname: "cloudflare-ipfs.com",
       },
+      {
+        protocol: "https",
+        hostname: "dtut5r9j4w7j4.cloudfront.net",
+      },
+      {
+        protocol: "https",
+        hostname: "d14i3advvh2bvd.cloudfront.net",
+      },
     ],
   },
 };

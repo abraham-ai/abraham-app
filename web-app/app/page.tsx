@@ -76,18 +76,23 @@ export default function AboutPage() {
             <FaXTwitter size={28} />
           </Link>
 
-          {/* TODO: Farcaster icon */}
-          {/* <Link 
-            href="https://warpcast.com/your-profile" 
+          <Link
+            href="https://farcaster.xyz/abraham-ai"
             target="_blank"
-            className="text-gray-600 hover:text-gray-900 transition-colors"
+            className="text-gray-600 hover:text-purple-600 transition-colors"
           >
-            <RiQuillPenLine size={28} />
-          </Link> */}
+            <svg width="28" height="28" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="1000" height="1000" rx="200" fill="#8A63D2"/>
+              <path d="M257.778 155.556H742.222V844.445H671.111V528.889H670.414C662.554 441.677 589.258 373.333 500 373.333C410.742 373.333 337.446 441.677 329.586 528.889H328.889V844.445H257.778V155.556Z" fill="white"/>
+              <path d="M128.889 253.333L128.889 155.556H100L100 253.333L128.889 253.333Z" fill="white"/>
+              <path d="M900 253.333L900 155.556H871.111L871.111 253.333L900 253.333Z" fill="white"/>
+            </svg>
+          </Link>
+
           <Link
             href="https://discord.gg/g8yG9bWH"
             target="_blank"
-            className="text-gray-600 hover:text-gray-900 transition-colors"
+            className="text-gray-600 hover:text-indigo-600 transition-colors"
           >
             <FaDiscord size={28} />
           </Link>

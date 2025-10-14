@@ -1,0 +1,183 @@
+"use client";
+import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+
+// If you have Next.js "next/image", leave this import.
+// If you DON'T, set useNextImage={false} when using the component.
+import NextImage from "next/image";
+
+export type GalleryItem = {
+  id: string;
+  title: string;
+  tagline: string;
+  image: string;
+  alt?: string;
+  session_id?: string;
+  cast_hash?: string;
+  createdAt?: string;
+};
+
+export type GalleryProps = {
+  items: GalleryItem[];
+  className?: string;
+  aspectRatio?: string;       // e.g., "4 / 3"
+  persistBlessings?: boolean; // if true, save to localStorage
+  storageKey?: string;        // localStorage key
+  useNextImage?: boolean;     // defaults to true if next/image import works
+  basePath?: string;          // base path for detail links, defaults to "/seeds"
+};
+
+// SSR-safe localStorage helpers
+function readBlessings(key: string): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeBlessings(key: string, data: Record<string, number>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+// Format timestamp to human-friendly format
+function formatTimestamp(dateString?: string): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function BlessButton({
+  count,
+  onBless,
+}: {
+  count: number;
+  onBless: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onBless}
+      className="shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+      aria-label="Bless this"
+      title="Bless (like)"
+    >
+      <span className="text-base leading-none">🙏</span>
+      <span className="tabular-nums">{count}</span>
+    </button>
+  );
+}
+
+export default function MinimalGallery({
+  items,
+  className = "",
+  aspectRatio = "4 / 3",
+  persistBlessings = false,
+  storageKey = "gallery_blessings",
+  useNextImage = true,
+  basePath = "/seeds",
+}: GalleryProps) {
+  const [blessings, setBlessings] = useState<Record<string, number>>({});
+
+  // hydrate from localStorage
+  useEffect(() => {
+    if (!persistBlessings) return;
+    setBlessings((prev) => ({ ...readBlessings(storageKey), ...prev }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistBlessings, storageKey]);
+
+  // write to localStorage on change
+  useEffect(() => {
+    if (!persistBlessings) return;
+    writeBlessings(storageKey, blessings);
+  }, [persistBlessings, storageKey, blessings]);
+
+  const bless = (id: string) =>
+    setBlessings((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+
+  return (
+    <section className={`w-full ${className}`}>
+      <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 px-4">
+        {items.map((item) => (
+          <div key={item.id} className="min-h-[240px]">
+            <article className="overflow-hidden border border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg transition-all">
+              <Link href={`${basePath}/${item.session_id}`} className="block">
+                <div
+                  className="relative overflow-hidden"
+                  style={{ aspectRatio }}
+                >
+                  {useNextImage ? (
+                    <NextImage
+                      src={item.image}
+                      alt={item.alt ?? item.title}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                      className="object-cover"
+                      priority={false}
+                    />
+                  ) : (
+                    <img
+                      src={item.image}
+                      alt={item.alt ?? item.title}
+                      loading="lazy"
+                      className="h-full w-full object-cover absolute inset-0"
+                    />
+                  )}
+                </div>
+                <div className="px-4 py-3 border-t border-gray-200">
+                  <div className="mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      {item.title}
+                    </h3>
+                    <p className="text-base text-gray-600 truncate">{item.tagline}</p>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div className="flex items-center gap-3">
+                      {item.createdAt && <span>{formatTimestamp(item.createdAt)}</span>}
+                      {item.cast_hash && (
+                        <a
+                          href={`https://farcaster.xyz/abraham-ai/${item.cast_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:opacity-80 flex items-center"
+                          title="View on Farcaster"
+                        >
+                          <svg width="20" height="20" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="1000" height="1000" rx="200" fill="#8A63D2"/>
+                            <path d="M257.778 155.556H742.222V844.445H671.111V528.889H670.414C662.554 441.677 589.258 373.333 500 373.333C410.742 373.333 337.446 441.677 329.586 528.889H328.889V844.445H257.778V155.556Z" fill="white"/>
+                            <path d="M128.889 253.333L128.889 155.556H100L100 253.333L128.889 253.333Z" fill="white"/>
+                            <path d="M900 253.333L900 155.556H871.111L871.111 253.333L900 253.333Z" fill="white"/>
+                          </svg>
+                        </a>
+                      )}
+                    </div>
+                    <BlessButton count={blessings[item.id] ?? 0} onBless={(e) => { e.preventDefault(); bless(item.id); }} />
+                  </div>
+                </div>
+              </Link>
+            </article>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

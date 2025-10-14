@@ -1,31 +1,30 @@
-//api/covenant/creations/route.ts
+//api/creations/route.ts
 import dbConnect from "@/lib/dbConnect";
-import AbrahamCreation, { IAbrahamCreation } from "@/models/AbrahamCreation";
+import AbrahamCreation from "@/models/AbrahamCreation";
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
-    const conn = await dbConnect();
-    console.log("Connected to database:", conn.connection.db.databaseName);
-    console.log("Querying collection:", AbrahamCreation.collection.name);
+    await dbConnect();
 
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
 
-    const creations = await AbrahamCreation.find()
+    // Filter by status="creation"
+    const query = { status: "creation" };
+
+    const creations = await AbrahamCreation.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const total = await AbrahamCreation.countDocuments();
+    const total = await AbrahamCreation.countDocuments(query);
 
-    console.log("Found creations:", creations.length, "of", total, "total");
-    console.log("Sample creation:", creations[0]);
-    console.log("All creations:", creations.map(c => ({ _id: c._id, title: c.title, image: c.image })));
+    console.log("Found creations with status='creation':", creations.length, "of", total, "total");
 
     return NextResponse.json({
       creations,
