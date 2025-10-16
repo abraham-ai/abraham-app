@@ -28,7 +28,9 @@ type AbrahamCreation = {
 function getOrigin(): string | null {
   const h = headers();
   const host = h.get("x-forwarded-host") || h.get("host");
-  const proto = h.get("x-forwarded-proto") || (host?.includes("localhost") ? "http" : "https");
+  const proto =
+    h.get("x-forwarded-proto") ||
+    (host?.includes("localhost") ? "http" : "https");
   return host ? `${proto}://${host}` : null;
 }
 
@@ -38,10 +40,16 @@ function truncate(text: string, max = 200): string {
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
-export async function generateMetadata({ params }: { params: { session_id: string } }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: { session_id: string };
+}): Promise<Metadata> {
   const origin = getOrigin();
   const base = origin ? new URL(origin) : undefined;
-  const apiUrl = origin ? `${origin}/api/seeds/${params.session_id}` : undefined;
+  const apiUrl = origin
+    ? `${origin}/api/seeds/${params.session_id}`
+    : undefined;
 
   let creation: AbrahamCreation | null = null;
   if (apiUrl) {
@@ -53,12 +61,25 @@ export async function generateMetadata({ params }: { params: { session_id: strin
     }
   }
 
-  const rawTitle = creation?.creation?.title || creation?.title || "Creation | Abraham";
+  const rawTitle =
+    creation?.creation?.title || creation?.title || "Creation | Abraham";
   const title = rawTitle;
-  const description = creation?.creation?.tagline || creation?.tagline || truncate(creation?.proposal || "An Autonomous Artificial Artist", 200);
+  const description =
+    creation?.creation?.tagline ||
+    creation?.tagline ||
+    truncate(creation?.proposal || "An Autonomous Artificial Artist", 200);
   const poster = creation?.creation?.poster_image || creation?.image;
-  const imageUrl = poster && origin ? (poster.startsWith("http") ? poster : `${origin}${poster}`) : origin ? `${origin}/abrahamlogo.png` : "/abrahamlogo.png";
-  const pageUrl = origin ? `${origin}/creations/${params.session_id}` : undefined;
+  const imageUrl =
+    poster && origin
+      ? poster.startsWith("http")
+        ? poster
+        : `${origin}${poster}`
+      : origin
+      ? `${origin}/abrahamlogo.png`
+      : "/abrahamlogo.png";
+  const pageUrl = origin
+    ? `${origin}/creations/${params.session_id}`
+    : undefined;
 
   return {
     metadataBase: base,
@@ -87,6 +108,10 @@ export async function generateMetadata({ params }: { params: { session_id: strin
   };
 }
 
-export default function CreationRouteLayout({ children }: { children: React.ReactNode }) {
+export default function CreationRouteLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return <>{children}</>;
 }
