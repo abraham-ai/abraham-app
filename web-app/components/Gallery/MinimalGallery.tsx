@@ -1,10 +1,9 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import Link from "next/link";
-
-// If you have Next.js "next/image", leave this import.
-// If you DON'T, set useNextImage={false} when using the component.
 import NextImage from "next/image";
+import { useBlessingQuota } from "@/hooks/use-blessing-quota";
+import BlessingLimitDialog from "@/components/Gallery/BlessingLimitDialog";
 
 export type GalleryItem = {
   id: string;
@@ -20,32 +19,12 @@ export type GalleryItem = {
 export type GalleryProps = {
   items: GalleryItem[];
   className?: string;
-  aspectRatio?: string;       // e.g., "4 / 3"
+  aspectRatio?: string; // e.g., "4 / 3"
   persistBlessings?: boolean; // if true, save to localStorage
-  storageKey?: string;        // localStorage key
-  useNextImage?: boolean;     // defaults to true if next/image import works
-  basePath?: string;          // base path for detail links, defaults to "/seeds"
+  storageKey?: string; // localStorage key
+  useNextImage?: boolean; // defaults to true if next/image import works
+  basePath?: string; // base path for detail links, defaults to "/seeds"
 };
-
-// SSR-safe localStorage helpers
-function readBlessings(key: string): Record<string, number> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeBlessings(key: string, data: Record<string, number>) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(data));
-  } catch {
-    // ignore
-  }
-}
 
 // Format timestamp to human-friendly format
 function formatTimestamp(dateString?: string): string {
@@ -95,26 +74,35 @@ export default function MinimalGallery({
   useNextImage = true,
   basePath = "/seeds",
 }: GalleryProps) {
-  const [blessings, setBlessings] = useState<Record<string, number>>({});
-
-  // hydrate from localStorage
-  useEffect(() => {
-    if (!persistBlessings) return;
-    setBlessings((prev) => ({ ...readBlessings(storageKey), ...prev }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persistBlessings, storageKey]);
-
-  // write to localStorage on change
-  useEffect(() => {
-    if (!persistBlessings) return;
-    writeBlessings(storageKey, blessings);
-  }, [persistBlessings, storageKey, blessings]);
-
-  const bless = (id: string) =>
-    setBlessings((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+  const {
+    tokensPerBless,
+    windowMs,
+    resetLabel,
+    stakedBalance,
+    fetchStakedBalance,
+    allowance,
+    used,
+    left,
+    remainingMs,
+    blessings,
+    limitOpen,
+    setLimitOpen,
+    bless,
+  } = useBlessingQuota({ persistBlessings, storageKey });
 
   return (
     <section className={`w-full ${className}`}>
+      <BlessingLimitDialog
+        open={limitOpen}
+        onOpenChange={setLimitOpen}
+        dailyUsed={used}
+        dailyAllowance={allowance}
+        stakedBalance={stakedBalance}
+        tokensPerBless={tokensPerBless}
+        resetLabel={resetLabel}
+        remainingMs={remainingMs}
+        onRefreshStake={() => fetchStakedBalance?.()}
+      />
       <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 px-4">
         {items.map((item) => (
           <div key={item.id} className="min-h-[240px]">
@@ -147,11 +135,15 @@ export default function MinimalGallery({
                     <h3 className="text-lg font-semibold text-gray-900 truncate">
                       {item.title}
                     </h3>
-                    <p className="text-base text-gray-600 truncate">{item.tagline}</p>
+                    <p className="text-base text-gray-600 truncate">
+                      {item.tagline}
+                    </p>
                   </div>
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <div className="flex items-center gap-3">
-                      {item.createdAt && <span>{formatTimestamp(item.createdAt)}</span>}
+                      {item.createdAt && (
+                        <span>{formatTimestamp(item.createdAt)}</span>
+                      )}
                       {item.cast_hash && (
                         <a
                           href={`https://farcaster.xyz/abraham-ai/${item.cast_hash}`}
@@ -161,16 +153,49 @@ export default function MinimalGallery({
                           className="hover:opacity-80 flex items-center"
                           title="View on Farcaster"
                         >
-                          <svg width="20" height="20" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="1000" height="1000" rx="200" fill="#8A63D2"/>
-                            <path d="M257.778 155.556H742.222V844.445H671.111V528.889H670.414C662.554 441.677 589.258 373.333 500 373.333C410.742 373.333 337.446 441.677 329.586 528.889H328.889V844.445H257.778V155.556Z" fill="white"/>
-                            <path d="M128.889 253.333L128.889 155.556H100L100 253.333L128.889 253.333Z" fill="white"/>
-                            <path d="M900 253.333L900 155.556H871.111L871.111 253.333L900 253.333Z" fill="white"/>
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 1000 1000"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <rect
+                              width="1000"
+                              height="1000"
+                              rx="200"
+                              fill="#8A63D2"
+                            />
+                            <path
+                              d="M257.778 155.556H742.222V844.445H671.111V528.889H670.414C662.554 441.677 589.258 373.333 500 373.333C410.742 373.333 337.446 441.677 329.586 528.889H328.889V844.445H257.778V155.556Z"
+                              fill="white"
+                            />
+                            <path
+                              d="M128.889 253.333L128.889 155.556H100L100 253.333L128.889 253.333Z"
+                              fill="white"
+                            />
+                            <path
+                              d="M900 253.333L900 155.556H871.111L871.111 253.333L900 253.333Z"
+                              fill="white"
+                            />
                           </svg>
                         </a>
                       )}
                     </div>
-                    <BlessButton count={blessings[item.id] ?? 0} onBless={(e) => { e.preventDefault(); bless(item.id); }} />
+                    <div className="flex items-center gap-2">
+                      {allowance > 0 && (
+                        <span className="text-xs text-gray-500">
+                          {left}/{allowance} left
+                        </span>
+                      )}
+                      <BlessButton
+                        count={blessings[item.id] ?? 0}
+                        onBless={(e) => {
+                          e.preventDefault();
+                          bless(item.id);
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </Link>
