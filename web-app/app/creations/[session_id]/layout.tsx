@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import React from "react";
+import { normalizeImageUrl } from "@/lib/socialembeds";
 
 type AbrahamCreation = {
   _id: string;
@@ -69,14 +70,9 @@ export async function generateMetadata({
     creation?.tagline ||
     truncate(creation?.proposal || "An Autonomous Artificial Artist", 200);
   const poster = creation?.creation?.poster_image || creation?.image;
+  const normalized = normalizeImageUrl(poster, origin);
   const imageUrl =
-    poster && origin
-      ? poster.startsWith("http")
-        ? poster
-        : `${origin}${poster}`
-      : origin
-      ? `${origin}/abrahamlogo.png`
-      : "/abrahamlogo.png";
+    normalized || (origin ? `${origin}/abrahamlogo.png` : "/abrahamlogo.png");
   const pageUrl = origin
     ? `${origin}/creations/${params.session_id}`
     : undefined;

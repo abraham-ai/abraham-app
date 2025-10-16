@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import React from "react";
+import { normalizeImageUrl } from "@/lib/socialembeds";
 
 type AbrahamSeed = {
   _id: string;
@@ -30,6 +31,8 @@ function truncate(text: string, max = 200): string {
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
+// normalizeImageUrl moved to @/lib/og
+
 export async function generateMetadata({
   params,
 }: {
@@ -55,14 +58,9 @@ export async function generateMetadata({
   const description =
     seed?.tagline ||
     truncate(seed?.proposal || "An Autonomous Artificial Artist", 200);
+  const normalized = normalizeImageUrl(seed?.image, origin);
   const imageUrl =
-    seed?.image && origin
-      ? seed.image.startsWith("http")
-        ? seed.image
-        : `${origin}${seed.image}`
-      : origin
-      ? `${origin}/abrahamlogo.png`
-      : "/abrahamlogo.png";
+    normalized || (origin ? `${origin}/abrahamlogo.png` : "/abrahamlogo.png");
   const pageUrl = origin ? `${origin}/seeds/${params.session_id}` : undefined;
 
   return {
