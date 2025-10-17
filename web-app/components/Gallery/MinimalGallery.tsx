@@ -14,6 +14,7 @@ export type GalleryItem = {
   session_id?: string;
   cast_hash?: string;
   createdAt?: string;
+  blessingsCount?: number;
 };
 
 export type GalleryProps = {
@@ -84,11 +85,15 @@ export default function MinimalGallery({
     used,
     left,
     remainingMs,
-    blessings,
     limitOpen,
     setLimitOpen,
     bless,
   } = useBlessingQuota({ persistBlessings, storageKey });
+
+  // Optimistic UI increments for total blessings shown on the button
+  const [optimisticAdds, setOptimisticAdds] = React.useState<
+    Record<string, number>
+  >({});
 
   return (
     <section className={`w-full ${className}`}>
@@ -189,10 +194,22 @@ export default function MinimalGallery({
                         </span>
                       )}
                       <BlessButton
-                        count={blessings[item.id] ?? 0}
-                        onBless={(e) => {
+                        count={
+                          (item.blessingsCount ?? 0) +
+                          (optimisticAdds[item.id] ?? 0)
+                        }
+                        onBless={async (e) => {
                           e.preventDefault();
-                          bless(item.id);
+                          const res = await bless(item.id, {
+                            creationId: item.id,
+                            sessionId: item.session_id,
+                          });
+                          if (res?.ok) {
+                            setOptimisticAdds((prev) => ({
+                              ...prev,
+                              [item.id]: (prev[item.id] ?? 0) + 1,
+                            }));
+                          }
                         }}
                       />
                     </div>

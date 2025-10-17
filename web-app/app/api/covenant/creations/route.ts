@@ -25,7 +25,15 @@ export async function GET(request: NextRequest) {
 
     console.log("Found creations:", creations.length, "of", total, "total");
     console.log("Sample creation:", creations[0]);
-    console.log("All creations:", creations.map(c => ({ _id: c._id, title: c.title, image: c.image })));
+    console.log(
+      "All creations:",
+      creations.map((c) => ({
+        _id: c._id,
+        title: c.title,
+        image: c.image,
+        blessingsCount: c.blessingsCount,
+      }))
+    );
 
     return NextResponse.json({
       creations,
@@ -33,8 +41,8 @@ export async function GET(request: NextRequest) {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error("Error fetching creations:", error);
