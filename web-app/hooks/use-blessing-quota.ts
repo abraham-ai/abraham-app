@@ -3,7 +3,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAbrahamStaking } from "@/hooks/use-abraham-staking";
 import { usePrivy } from "@privy-io/react-auth";
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
+import {
+  createPublicClient,
+  createWalletClient,
+  custom,
+  encodeFunctionData,
+  http,
+} from "viem";
+import { getPreferredChain } from "@/lib/chains";
 import { BLESS_TOKENS_PER_UNIT, BLESS_WINDOW_MS } from "@/lib/curation";
+import {
+  AbrahamCuration,
+  readRemainingCredits,
+  readIsDelegateApproved,
+} from "@/lib/abraham-curation";
+import {
+  showErrorToast,
+  showInfoToast,
+  showSuccessToast,
+} from "@/lib/error-utils";
+import { useAuth } from "@/context/auth-context";
 
 export type BlessingsMap = Record<string, number>;
 
@@ -54,6 +74,17 @@ export function useBlessingQuota({
   const { stakedBalance, userAddress, fetchStakedBalance } =
     useAbrahamStaking();
   const { user } = usePrivy();
+  const { eip1193Provider } = useAuth();
+  const { client: smartWalletClient, getClientForChain } = useSmartWallets();
+
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: getPreferredChain(),
+        transport: http(getPreferredChain().rpcUrls.default.http[0]),
+      }),
+    []
+  );
 
   // Config
   const TOKENS_PER_BLESS = BLESS_TOKENS_PER_UNIT;
@@ -143,39 +174,185 @@ export function useBlessingQuota({
       setLimitOpen(true);
       return { ok: false as const, reason: "limit" as const };
     }
-    const nextBlessings = { ...blessings, [id]: (blessings[id] ?? 0) + 1 };
-    setBlessings(nextBlessings);
-    if (persistBlessings) writeLocal(storageKey, nextBlessings);
+    // Determine addresses
+    const linked = (user as any)?.linkedAccounts as any[] | undefined;
+    const eoa = linked?.find((a: any) => a.type === "wallet" && a.address)
+      ?.address as `0x${string}` | undefined;
+    const smart = linked?.find(
+      (a: any) => a.type === "smart_wallet" && a.address
+    )?.address as `0x${string}` | undefined;
 
-    const nextUsed = used + 1;
-    setUsed(nextUsed);
-    writeUsed(nextUsed);
-
-    // Attempt to record blessing in backend (best-effort; non-blocking UI)
+    // Build and send on-chain bless using smart wallet by default
     try {
-      const linked = (user as any)?.linkedAccounts as any[] | undefined;
-      const eoa = linked?.find(
-        (a: any) => a.type === "wallet" && a.address
-      )?.address;
-      const smart = linked?.find(
-        (a: any) => a.type === "smart_wallet" && a.address
-      )?.address;
-      await fetch("/api/covenant/blessings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          creationId: opts?.creationId,
-          session_id: opts?.sessionId,
-          blesserEoa: eoa ?? null,
-          blesserSmartWallet: smart ?? null,
-          onchainRef: opts?.onchainRef ?? null,
-        }),
-      });
-    } catch (e) {
-      console.warn("[useBlessingQuota] Failed to persist blessing:", e);
-    }
+      if (!smart && !eoa) {
+        showErrorToast("No wallet linked", "Connect a wallet to bless.");
+        return { ok: false as const, reason: "no-wallet" as const };
+      }
 
-    return { ok: true as const };
+      // Check on-chain credits for both addresses (friendly precheck)
+      const [smartCredits, eoaCredits] = await Promise.all([
+        smart
+          ? readRemainingCredits(publicClient, smart)
+              .then((r) => r.credits)
+              .catch(() => BigInt(0))
+          : Promise.resolve(BigInt(0)),
+        eoa
+          ? readRemainingCredits(publicClient, eoa)
+              .then((r) => r.credits)
+              .catch(() => BigInt(0))
+          : Promise.resolve(BigInt(0)),
+      ]);
+
+      let txHash: `0x${string}` | null = null;
+
+      // Path 1: Smart wallet has credits → send from smart wallet using its own stake
+      if (smart && smartCredits > BigInt(0)) {
+        const data = encodeFunctionData({
+          abi: AbrahamCuration.abi,
+          functionName: "bless",
+          args: [opts?.sessionId ?? "", id, smart],
+        });
+        const swClient =
+          (await getClientForChain?.({ id: getPreferredChain().id })) ||
+          smartWalletClient;
+        if (!swClient) {
+          showErrorToast("Smart wallet not ready", "Try again in a moment.");
+          return { ok: false as const, reason: "no-smart" as const };
+        }
+        showInfoToast("Sending blessing", "Submitting on-chain transaction...");
+        txHash = await swClient.sendTransaction(
+          { calls: [{ to: AbrahamCuration.address, data }] },
+          { uiOptions: { showWalletUIs: false } }
+        );
+      }
+      // Path 2: EOA has credits → prefer smart wallet caller with EOA as stakeHolder if delegated; otherwise fallback to EOA wallet
+      else if (eoa && eoaCredits > BigInt(0)) {
+        if (smart) {
+          const approved = await readIsDelegateApproved(
+            publicClient,
+            eoa,
+            smart
+          ).catch(() => false);
+          if (approved) {
+            const data = encodeFunctionData({
+              abi: AbrahamCuration.abi,
+              functionName: "bless",
+              args: [opts?.sessionId ?? "", id, eoa],
+            });
+            const swClient =
+              (await getClientForChain?.({ id: getPreferredChain().id })) ||
+              smartWalletClient;
+            if (!swClient) {
+              showErrorToast(
+                "Smart wallet not ready",
+                "Try again in a moment."
+              );
+              return { ok: false as const, reason: "no-smart" as const };
+            }
+            showInfoToast(
+              "Sending blessing",
+              "Submitting on-chain transaction..."
+            );
+            txHash = await swClient.sendTransaction(
+              { calls: [{ to: AbrahamCuration.address, data }] },
+              { uiOptions: { showWalletUIs: false } }
+            );
+          } else {
+            showErrorToast(
+              "Approval required",
+              "Your EOA must approve your smart wallet as a delegate to bless using EOA stake."
+            );
+            return { ok: false as const, reason: "delegate-required" as const };
+          }
+        } else {
+          // No smart wallet available; try direct EOA wallet flow
+          if (!eip1193Provider) {
+            showErrorToast(
+              "Wallet not ready",
+              "Connect your wallet to send the blessing."
+            );
+            return { ok: false as const, reason: "no-wallet-client" as const };
+          }
+          const walletClient = createWalletClient({
+            chain: getPreferredChain(),
+            transport: custom(eip1193Provider),
+          });
+          const data = encodeFunctionData({
+            abi: AbrahamCuration.abi,
+            functionName: "bless",
+            args: [opts?.sessionId ?? "", id, eoa],
+          });
+          showInfoToast(
+            "Sending blessing",
+            "Submitting on-chain transaction..."
+          );
+          txHash = await (walletClient as any).sendTransaction?.({
+            to: AbrahamCuration.address,
+            data,
+            account: eoa,
+          });
+          if (!txHash) {
+            // Fallback to viem writeContract if provider supports
+            txHash = await (walletClient as any).writeContract?.({
+              address: AbrahamCuration.address,
+              abi: AbrahamCuration.abi,
+              functionName: "bless",
+              args: [opts?.sessionId ?? "", id, eoa],
+              account: eoa,
+              chain: getPreferredChain(),
+            });
+          }
+        }
+      } else {
+        showErrorToast(
+          "No staking capacity",
+          "Stake more ABRAHAM to gain blessing credits."
+        );
+        return { ok: false as const, reason: "no-credits" as const };
+      }
+
+      // Wait for tx receipt
+      const rcpt = await publicClient.waitForTransactionReceipt({
+        hash: txHash!,
+      });
+      if (rcpt.status !== "success") {
+        showErrorToast("Transaction failed", "Blessing failed on-chain");
+        return { ok: false as const, reason: "tx-failed" as const };
+      }
+
+      showSuccessToast("Blessed on-chain", "Recording off-chain...");
+
+      // Only now update local usage and optimistic counts
+      const nextBlessings = { ...blessings, [id]: (blessings[id] ?? 0) + 1 };
+      setBlessings(nextBlessings);
+      if (persistBlessings) writeLocal(storageKey, nextBlessings);
+      const nextUsed = used + 1;
+      setUsed(nextUsed);
+      writeUsed(nextUsed);
+
+      // Persist to backend with onchainRef
+      try {
+        await fetch("/api/covenant/blessings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            creationId: opts?.creationId,
+            session_id: opts?.sessionId,
+            blesserEoa: eoa ?? null,
+            blesserSmartWallet: smart ?? null,
+            onchainRef: txHash!,
+          }),
+        });
+      } catch (e) {
+        console.warn("[useBlessingQuota] Failed to persist blessing:", e);
+      }
+
+      return { ok: true as const, txHash: txHash! } as const;
+    } catch (e: any) {
+      console.error("[useBlessingQuota] On-chain bless failed:", e);
+      showErrorToast(e, "Blessing failed");
+      return { ok: false as const, reason: "onchain-error" as const };
+    }
   };
 
   return {

@@ -22,6 +22,12 @@ import {
   parseEther,
 } from "viem";
 import { getPreferredChain } from "@/lib/chains";
+import {
+  ABRAHAM_CURATION_ADDRESS,
+  readIsDelegateApproved,
+  readRemainingCredits,
+} from "@/lib/abraham-curation";
+import { AbrahamCurationAbi } from "@/lib/abis/AbrahamCuration";
 
 import {
   DropdownMenu,
@@ -221,6 +227,20 @@ export default function AccountMenu() {
   const [refreshing, setRefreshing] = useState(false);
   const [providerLabel, setProviderLabel] = useState<string>("Wallet");
 
+  // Curation credits and delegation status
+  const [curSmartCredits, setCurSmartCredits] = useState<{
+    credits: bigint;
+    capacity: bigint;
+  } | null>(null);
+  const [curEoaCredits, setCurEoaCredits] = useState<{
+    credits: bigint;
+    capacity: bigint;
+  } | null>(null);
+  const [delegationApproved, setDelegationApproved] = useState<boolean | null>(
+    null
+  );
+  const [delegationBusy, setDelegationBusy] = useState(false);
+
   // Detect actual provider name in Mini App
   useEffect(() => {
     if (!isMiniApp) {
@@ -329,6 +349,42 @@ export default function AccountMenu() {
       if (activeAddress) {
         await fetchAbrahamBalance();
         await fetchStakedBalance();
+      }
+
+      // Refresh curation credits and delegation status (if addresses available)
+      try {
+        if (smartWalletAddress) {
+          const r = await readRemainingCredits(
+            publicClient,
+            smartWalletAddress
+          );
+          setCurSmartCredits(r);
+        } else {
+          setCurSmartCredits(null);
+        }
+        if (fundingWalletAddress) {
+          const r = await readRemainingCredits(
+            publicClient,
+            fundingWalletAddress
+          );
+          setCurEoaCredits(r);
+        } else {
+          setCurEoaCredits(null);
+        }
+        if (smartWalletAddress && fundingWalletAddress) {
+          const approved = await readIsDelegateApproved(
+            publicClient,
+            fundingWalletAddress,
+            smartWalletAddress
+          );
+          setDelegationApproved(approved);
+        } else {
+          setDelegationApproved(null);
+        }
+      } catch (e) {
+        // Non-fatal; keep balances but clear curation extras on error
+        setCurSmartCredits((prev) => prev);
+        setCurEoaCredits((prev) => prev);
       }
     } catch (e) {
       console.error("[AccountMenu] Error refreshing balances:", e);
@@ -459,6 +515,59 @@ export default function AccountMenu() {
       showErrorToast(e as Error, "Failed to create embedded wallet");
     } finally {
       setCreatingSmart(false);
+    }
+  };
+
+  // EOA -> approve or revoke smart wallet as delegate for curation
+  const setCurationDelegation = async (approved: boolean) => {
+    if (!fundingWallet || !fundingWalletAddress || !smartWalletAddress) {
+      showErrorToast(new Error("missing"), "Missing wallet addresses");
+      return;
+    }
+    setDelegationBusy(true);
+    try {
+      const provider = await (fundingWallet as any).getEthereumProvider();
+      const walletClient = createWalletClient({
+        chain: getPreferredChain(),
+        transport: custom(provider),
+      });
+      const hash = await (walletClient as any).writeContract?.({
+        address: ABRAHAM_CURATION_ADDRESS,
+        abi: AbrahamCurationAbi,
+        functionName: "approveDelegate",
+        args: [smartWalletAddress, approved],
+        account: fundingWalletAddress,
+        chain: getPreferredChain(),
+      });
+      const txHash =
+        hash ||
+        (await (walletClient as any).sendTransaction?.({
+          to: ABRAHAM_CURATION_ADDRESS,
+          data: await (async () => {
+            const { encodeFunctionData } = await import("viem");
+            return encodeFunctionData({
+              abi: AbrahamCurationAbi,
+              functionName: "approveDelegate",
+              args: [smartWalletAddress, approved],
+            });
+          })(),
+          account: fundingWalletAddress,
+        }));
+
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      showSuccessToast(
+        approved ? "Delegation approved" : "Delegation revoked",
+        approved
+          ? "Your smart wallet may now use your EOA staking credits."
+          : "Smart wallet delegation has been revoked."
+      );
+      setDelegationApproved(approved);
+      // Refresh credits (delegate may affect remaining path)
+      refreshAllBalances();
+    } catch (e) {
+      showErrorToast(e as Error, "Delegation update failed");
+    } finally {
+      setDelegationBusy(false);
     }
   };
 
@@ -646,6 +755,17 @@ export default function AccountMenu() {
                           (fundingWallet as any).walletClientType
                         )}
                       </p>
+                    )}
+
+                    {/* Curation credits for Smart Wallet */}
+                    {smartWalletAddress && curSmartCredits && (
+                      <div className="mt-2 text-xs text-gray-700">
+                        <div className="font-medium">Curation Credits</div>
+                        <div>
+                          Smart Wallet: {String(curSmartCredits.credits)}/
+                          {String(curSmartCredits.capacity)} per period
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -840,9 +960,68 @@ export default function AccountMenu() {
                           )}
                       </div>
                     </div>
+
+                    {/* Curation credits for EOA */}
+                    {fundingWalletAddress && curEoaCredits && (
+                      <div className="mt-2 text-xs text-gray-700">
+                        <div>
+                          EOA Credits: {String(curEoaCredits.credits)}/
+                          {String(curEoaCredits.capacity)} per period
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <DropdownMenuSeparator />
                 </>
+              )}
+
+              {/* Curation Delegation controls (EOA -> Smart Wallet) */}
+              {smartWalletAddress && fundingWalletAddress && (
+                <div className="px-3 py-2">
+                  <div className="text-sm font-medium mb-2">
+                    Curation Delegation
+                  </div>
+                  <p className="text-xs text-gray-600 mb-2">
+                    Allow your smart wallet to use your EOA staking capacity for
+                    on-chain blessings.
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs">
+                      Status:{" "}
+                      {delegationApproved === null
+                        ? "—"
+                        : delegationApproved
+                        ? "Approved"
+                        : "Not approved"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={delegationBusy || delegationApproved === true}
+                        onClick={() => setCurationDelegation(true)}
+                      >
+                        {delegationBusy && (
+                          <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
+                        )}
+                        Approve
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={
+                          delegationBusy || delegationApproved === false
+                        }
+                        onClick={() => setCurationDelegation(false)}
+                      >
+                        {delegationBusy && (
+                          <Loader2Icon className="w-4 h-4 animate-spin mr-1" />
+                        )}
+                        Revoke
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               )}
 
               <DropdownMenuItem asChild>

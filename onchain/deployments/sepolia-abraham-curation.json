@@ -1,0 +1,10 @@
+{
+  "contract": "AbrahamCuration",
+  "address": "0x685e9920314A5E6d052191c12420143F46834cA5",
+  "stakingPool": "0x31eC8e59C11bd78f1057Dd9123b43C708Be76856",
+  "owner": "0x641f5ffC5F6239A0873Bd00F9975091FB035aAFC",
+  "network": "sepolia",
+  "chainId": "11155111",
+  "deployer": "0x641f5ffC5F6239A0873Bd00F9975091FB035aAFC",
+  "timestamp": "2025-10-17T12:07:37.893Z"
+}

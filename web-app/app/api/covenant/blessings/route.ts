@@ -31,6 +31,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!onchainRef) {
+      return NextResponse.json(
+        { error: "onchainRef (tx hash) is required" },
+        { status: 400 }
+      );
+    }
+
     // Create blessing record
     const blessing = await Blessing.create({
       creationId,

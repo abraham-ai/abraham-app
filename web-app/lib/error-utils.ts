@@ -61,7 +61,8 @@ export const CONTRACT_ERRORS: Record<string, ContractError> = {
   "Insufficient staked balance": {
     code: "INSUFFICIENT_STAKED_BALANCE",
     message: "Insufficient staked balance",
-    userMessage: "You do not have enough staked ABRAHAM to unstake this amount.",
+    userMessage:
+      "You do not have enough staked ABRAHAM to unstake this amount.",
     recovery: "Please reduce the amount you wish to unstake.",
   },
   // Common blockchain errors
@@ -70,6 +71,27 @@ export const CONTRACT_ERRORS: Record<string, ContractError> = {
     message: "insufficient funds",
     userMessage: "Insufficient funds in your wallet.",
     recovery: "Please add more ETH to your wallet and try again.",
+  },
+  // Curation contract specific (AbrahamCuration)
+  "insufficient-credits": {
+    code: "INSUFFICIENT_CREDITS",
+    message: "insufficient-credits",
+    userMessage: "You’ve run out of blessing credits for this period.",
+    recovery: "Stake more ABRAHAM or wait for credits to refill.",
+  },
+  "no-stake-capacity": {
+    code: "NO_STAKE_CAPACITY",
+    message: "no-stake-capacity",
+    userMessage: "No staking capacity available to bless.",
+    recovery: "Stake ABRAHAM tokens to get blessing credits.",
+  },
+  "delegate-not-approved": {
+    code: "DELEGATE_NOT_APPROVED",
+    message: "delegate-not-approved",
+    userMessage:
+      "Your smart wallet isn’t approved by your EOA to use its credits.",
+    recovery:
+      "Approve your smart wallet as a delegate in Account → Curation Delegation.",
   },
   "user rejected": {
     code: "USER_REJECTED",
