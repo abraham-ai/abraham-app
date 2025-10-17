@@ -4,6 +4,7 @@ import Link from "next/link";
 import NextImage from "next/image";
 import { useBlessingQuota } from "@/hooks/use-blessing-quota";
 import BlessingLimitDialog from "@/components/Gallery/BlessingLimitDialog";
+import { Loader2Icon } from "lucide-react";
 
 export type GalleryItem = {
   id: string;
@@ -48,19 +49,32 @@ function formatTimestamp(dateString?: string): string {
 function BlessButton({
   count,
   onBless,
+  isLoading,
+  disabled,
 }: {
   count: number;
   onBless: (e: React.MouseEvent) => void;
+  isLoading?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onBless}
-      className="shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+      disabled={disabled || isLoading}
+      className={`shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs ${
+        disabled || isLoading
+          ? "text-gray-400 cursor-not-allowed"
+          : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+      }`}
       aria-label="Bless this"
       title="Bless (like)"
     >
-      <span className="text-base leading-none">🙏</span>
+      {isLoading ? (
+        <Loader2Icon className="h-4 w-4 animate-spin" />
+      ) : (
+        <span className="text-base leading-none">🙏</span>
+      )}
       <span className="tabular-nums">{count}</span>
     </button>
   );
@@ -90,10 +104,12 @@ export default function MinimalGallery({
     bless,
   } = useBlessingQuota({ persistBlessings, storageKey });
 
-  // Optimistic UI increments for total blessings shown on the button
-  const [optimisticAdds, setOptimisticAdds] = React.useState<
-    Record<string, number>
-  >({});
+  // Pending state per item to show spinner while tx is in-flight
+  const [pendingById, setPendingById] = React.useState<Record<string, boolean>>(
+    {}
+  );
+  // Local increments applied after on-chain success
+  const [localAdds, setLocalAdds] = React.useState<Record<string, number>>({});
 
   return (
     <section className={`w-full ${className}`}>
@@ -195,20 +211,27 @@ export default function MinimalGallery({
                       )}
                       <BlessButton
                         count={
-                          (item.blessingsCount ?? 0) +
-                          (optimisticAdds[item.id] ?? 0)
+                          (item.blessingsCount ?? 0) + (localAdds[item.id] ?? 0)
                         }
+                        isLoading={!!pendingById[item.id]}
+                        disabled={!!pendingById[item.id]}
                         onBless={async (e) => {
                           e.preventDefault();
-                          const res = await bless(item.id, {
-                            creationId: item.id,
-                            sessionId: item.session_id,
-                          });
-                          if (res?.ok) {
-                            setOptimisticAdds((prev) => ({
-                              ...prev,
-                              [item.id]: (prev[item.id] ?? 0) + 1,
-                            }));
+                          if (pendingById[item.id]) return;
+                          setPendingById((p) => ({ ...p, [item.id]: true }));
+                          try {
+                            const res = await bless(item.id, {
+                              creationId: item.id,
+                              sessionId: item.session_id,
+                            });
+                            if (res?.ok) {
+                              setLocalAdds((prev) => ({
+                                ...prev,
+                                [item.id]: (prev[item.id] ?? 0) + 1,
+                              }));
+                            }
+                          } finally {
+                            setPendingById((p) => ({ ...p, [item.id]: false }));
                           }
                         }}
                       />
