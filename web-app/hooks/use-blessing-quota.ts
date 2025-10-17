@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAbrahamStaking } from "@/hooks/use-abraham-staking";
+import { usePrivy } from "@privy-io/react-auth";
 import { BLESS_TOKENS_PER_UNIT, BLESS_WINDOW_MS } from "@/lib/curation";
 
 export type BlessingsMap = Record<string, number>;
@@ -52,6 +53,7 @@ export function useBlessingQuota({
 }) {
   const { stakedBalance, userAddress, fetchStakedBalance } =
     useAbrahamStaking();
+  const { user } = usePrivy();
 
   // Config
   const TOKENS_PER_BLESS = BLESS_TOKENS_PER_UNIT;
@@ -133,7 +135,10 @@ export function useBlessingQuota({
   const [limitOpen, setLimitOpen] = useState(false);
 
   // Bless action
-  const bless = (id: string) => {
+  const bless = async (
+    id: string,
+    opts?: { creationId?: string; sessionId?: string; onchainRef?: string }
+  ) => {
     if (left <= 0) {
       setLimitOpen(true);
       return { ok: false as const, reason: "limit" as const };
@@ -145,6 +150,30 @@ export function useBlessingQuota({
     const nextUsed = used + 1;
     setUsed(nextUsed);
     writeUsed(nextUsed);
+
+    // Attempt to record blessing in backend (best-effort; non-blocking UI)
+    try {
+      const linked = (user as any)?.linkedAccounts as any[] | undefined;
+      const eoa = linked?.find(
+        (a: any) => a.type === "wallet" && a.address
+      )?.address;
+      const smart = linked?.find(
+        (a: any) => a.type === "smart_wallet" && a.address
+      )?.address;
+      await fetch("/api/covenant/blessings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          creationId: opts?.creationId,
+          session_id: opts?.sessionId,
+          blesserEoa: eoa ?? null,
+          blesserSmartWallet: smart ?? null,
+          onchainRef: opts?.onchainRef ?? null,
+        }),
+      });
+    } catch (e) {
+      console.warn("[useBlessingQuota] Failed to persist blessing:", e);
+    }
 
     return { ok: true as const };
   };

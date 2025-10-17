@@ -17,6 +17,7 @@ export interface IAbrahamCreation extends mongoose.Document {
     ipfs_hash?: string;
     explorer_url?: string;
   };
+  blessingsCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +38,7 @@ const AbrahamCreationSchema = new mongoose.Schema<IAbrahamCreation>(
       type: mongoose.Schema.Types.Mixed,
       required: false,
     },
+    blessingsCount: { type: Number, default: 0, index: true },
   },
   {
     collection: "abraham_seeds",

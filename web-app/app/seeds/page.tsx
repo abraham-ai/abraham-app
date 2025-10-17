@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import AppBar from "@/components/layout/AppBar";
-import MinimalGallery, { type GalleryItem } from "@/components/Gallery/MinimalGallery";
+import MinimalGallery, {
+  type GalleryItem,
+} from "@/components/Gallery/MinimalGallery";
 
 interface AbrahamCreation {
   _id: string;
@@ -37,7 +39,9 @@ export default function CreationsPage() {
   useEffect(() => {
     const fetchCreations = async () => {
       try {
-        const res = await fetch(`/api/covenant/creations?page=${page}&limit=20`);
+        const res = await fetch(
+          `/api/covenant/creations?page=${page}&limit=20`
+        );
         if (!res.ok) throw new Error("Failed to fetch creations");
         const data = await res.json();
         console.log("Fetched creations:", data);
@@ -69,6 +73,7 @@ export default function CreationsPage() {
       session_id: creation.session_id,
       cast_hash: creation.cast_hash,
       createdAt: creation.createdAt,
+      blessingsCount: (creation as any).blessingsCount ?? 0,
     }));
 
   if (loading)
@@ -107,7 +112,7 @@ export default function CreationsPage() {
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4 mt-8 px-4">
             <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
@@ -117,7 +122,7 @@ export default function CreationsPage() {
               Page {page} of {totalPages}
             </span>
             <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
