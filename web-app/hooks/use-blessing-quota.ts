@@ -320,7 +320,10 @@ export function useBlessingQuota({
         return { ok: false as const, reason: "tx-failed" as const };
       }
 
-      showSuccessToast("Blessed on-chain", "Recording off-chain...");
+      showSuccessToast(
+        "Blessed on-chain",
+        "Your blessing has been recorded onchain..."
+      );
 
       // Only now update local usage and optimistic counts
       const nextBlessings = { ...blessings, [id]: (blessings[id] ?? 0) + 1 };
