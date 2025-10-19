@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // Filter by status="creation" and contract address
     const query = {
       status: "creation",
-      "creation.contract_address": "0x0b3b016Ae434bE0E314058Cf78FAe5C1F0187AAf"
+      "creation.contract_address": "0x8F814c7C75C5E9e0EDe0336F535604B1915C1985"
     };
 
     const creations = await AbrahamCreation.find(query)
