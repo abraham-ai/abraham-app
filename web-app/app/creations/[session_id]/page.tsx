@@ -46,7 +46,18 @@ export default function CreationDetailPage() {
   useEffect(() => {
     const fetchCreation = async () => {
       try {
-        const res = await fetch(`/api/seeds/${session_id}`);
+        // Check if session_id is a number (index) or a session ID
+        const isNumeric = /^\d+$/.test(session_id);
+        let res;
+
+        if (isNumeric) {
+          // Fetch by index
+          res = await fetch(`/api/creations/by-index/${session_id}`);
+        } else {
+          // Fetch by session_id
+          res = await fetch(`/api/seeds/${session_id}`);
+        }
+
         if (!res.ok) throw new Error("Failed to fetch creation");
         const data = await res.json();
         setCreation(data);
