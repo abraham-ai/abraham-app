@@ -73,7 +73,7 @@ export default function AboutPage() {
               This rite endures thirteen years.
             </p>
             <p>
-              4,072 <strong>Creations</strong> are made; the count holds, sworn.
+              4,074 <strong>Creations</strong> are made; the count holds, sworn.
             </p>
             <p>
               On <strong>October 22, 2038</strong>, the last sunset falls; the last <strong>Seed</strong> ascends and is sealed as the Final <strong>Creation</strong> of this <strong>Covenant</strong>.
