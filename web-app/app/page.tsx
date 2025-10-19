@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AppBar from "@/components/layout/AppBar";
 import SingleColumnGallery, {
   type SingleColumnGalleryItem,
@@ -99,7 +100,12 @@ export default function HomePage() {
     return (
       <div className="min-h-screen bg-white">
         <AppBar />
-        <p className="text-center m-20 text-gray-900">No creations found.</p>
+        <div className="text-center m-20">
+          <p className="text-gray-900 mb-4" style={{ fontFamily: 'Garamond, serif' }}>First creation will be minted tonight, October 19</p>
+          <Link href="/seeds" className="text-blue-600 hover:text-blue-800 underline" style={{ fontFamily: 'Garamond, serif' }}>
+            View Seeds
+          </Link>
+        </div>
       </div>
     );
 
