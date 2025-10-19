@@ -78,7 +78,7 @@ export default function HomePage() {
         "",
       image: creation.creation!.poster_image!,
       alt: creation.creation?.title || creation.title,
-      session_id: String(creation.creation?.index ?? 0),
+      session_id: creation.session_id,
       createdAt: creation.creation?.minted_at || creation.createdAt,
     }));
 
@@ -115,7 +115,7 @@ export default function HomePage() {
       <section className="w-full py-10 sm:py-12 lg:py-16">
         <SingleColumnGallery
           items={galleryItems}
-          basePath="/creation"
+          basePath="/creations"
         />
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4 mt-8 px-4">
