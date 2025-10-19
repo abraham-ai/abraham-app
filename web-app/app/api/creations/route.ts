@@ -13,8 +13,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
 
-    // Filter by status="creation"
-    const query = { status: "creation" };
+    // Filter by status="creation" and contract address
+    const query = {
+      status: "creation",
+      "creation.contract_address": "0xBCf5120B39abeeE176A7c03f786f61CF52EbE5FA"
+    };
 
     const creations = await AbrahamCreation.find(query)
       .sort({ createdAt: -1 })

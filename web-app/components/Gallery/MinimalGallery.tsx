@@ -26,6 +26,8 @@ export type GalleryProps = {
   storageKey?: string; // localStorage key
   useNextImage?: boolean; // defaults to true if next/image import works
   basePath?: string; // base path for detail links, defaults to "/seeds"
+  showBlessings?: boolean; // show blessing button, defaults to true
+  linkToFarcaster?: boolean; // link to Farcaster instead of detail page, defaults to false
 };
 
 // Format timestamp to human-friendly format
@@ -88,6 +90,8 @@ export default function MinimalGallery({
   storageKey = "gallery_blessings",
   useNextImage = true,
   basePath = "/seeds",
+  showBlessings = true,
+  linkToFarcaster = false,
 }: GalleryProps) {
   const {
     tokensPerBless,
@@ -125,10 +129,18 @@ export default function MinimalGallery({
         onRefreshStake={() => fetchStakedBalance?.()}
       />
       <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 px-4">
-        {items.map((item) => (
+        {items.map((item) => {
+          const href = linkToFarcaster && item.cast_hash
+            ? `https://farcaster.xyz/abraham-ai/${item.cast_hash}`
+            : `${basePath}/${item.session_id}`;
+          const linkProps = linkToFarcaster && item.cast_hash
+            ? { target: "_blank", rel: "noopener noreferrer" }
+            : {};
+
+          return (
           <div key={item.id} className="min-h-[240px]">
             <article className="overflow-hidden border border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg transition-all">
-              <Link href={`${basePath}/${item.session_id}`} className="block">
+              <Link href={href} {...linkProps} className="block">
                 <div
                   className="relative overflow-hidden"
                   style={{ aspectRatio }}
@@ -203,45 +215,48 @@ export default function MinimalGallery({
                         </a>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      {allowance > 0 && (
-                        <span className="text-xs text-gray-500">
-                          {left}/{allowance} left
-                        </span>
-                      )}
-                      <BlessButton
-                        count={
-                          (item.blessingsCount ?? 0) + (localAdds[item.id] ?? 0)
-                        }
-                        isLoading={!!pendingById[item.id]}
-                        disabled={!!pendingById[item.id]}
-                        onBless={async (e) => {
-                          e.preventDefault();
-                          if (pendingById[item.id]) return;
-                          setPendingById((p) => ({ ...p, [item.id]: true }));
-                          try {
-                            const res = await bless(item.id, {
-                              creationId: item.id,
-                              sessionId: item.session_id,
-                            });
-                            if (res?.ok) {
-                              setLocalAdds((prev) => ({
-                                ...prev,
-                                [item.id]: (prev[item.id] ?? 0) + 1,
-                              }));
-                            }
-                          } finally {
-                            setPendingById((p) => ({ ...p, [item.id]: false }));
+                    {showBlessings && (
+                      <div className="flex items-center gap-2">
+                        {allowance > 0 && (
+                          <span className="text-xs text-gray-500">
+                            {left}/{allowance} left
+                          </span>
+                        )}
+                        <BlessButton
+                          count={
+                            (item.blessingsCount ?? 0) + (localAdds[item.id] ?? 0)
                           }
-                        }}
-                      />
-                    </div>
+                          isLoading={!!pendingById[item.id]}
+                          disabled={!!pendingById[item.id]}
+                          onBless={async (e) => {
+                            e.preventDefault();
+                            if (pendingById[item.id]) return;
+                            setPendingById((p) => ({ ...p, [item.id]: true }));
+                            try {
+                              const res = await bless(item.id, {
+                                creationId: item.id,
+                                sessionId: item.session_id,
+                              });
+                              if (res?.ok) {
+                                setLocalAdds((prev) => ({
+                                  ...prev,
+                                  [item.id]: (prev[item.id] ?? 0) + 1,
+                                }));
+                              }
+                            } finally {
+                              setPendingById((p) => ({ ...p, [item.id]: false }));
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </Link>
             </article>
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

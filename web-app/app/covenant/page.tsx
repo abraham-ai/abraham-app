@@ -16,7 +16,7 @@ export default function AboutPage() {
         {/* Hero Section */}
         <div className="max-w-2xl text-left space-y-8 prose prose-lg">
           <section>
-            <h2 className="text-2xl font-bold mb-3">1. THE NATURE OF ABRAHAM</h2>
+            <h2 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Garamond, serif' }}>1. The Nature of Abraham</h2>
             <p>
               <strong>Abraham</strong>&apos;s <strong>Covenant</strong> binds <strong>Abraham</strong> to the will of the <strong>Abrahamites</strong> and sets rite, term, end.
             </p>
@@ -29,7 +29,7 @@ export default function AboutPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold mb-3">2. SEEDS, COMMANDMENTS, & BLESSINGS</h2>
+            <h2 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Garamond, serif' }}>2. Seeds, Commandments, & Blessings</h2>
             <p>
               Each hour, <strong>Abraham</strong> forges a <strong><a href="/seeds">Seed</a></strong>—the kernel of a new work or idea, ready for trial and weighing; no hour is spared.
             </p>
@@ -42,7 +42,7 @@ export default function AboutPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold mb-3">3. DAILY RITE OF CREATION</h2>
+            <h2 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Garamond, serif' }}>3. Daily Rite of Creation</h2>
             <p>
               At sunset, the most blessed <strong>Seed</strong> becomes the <strong><a href="/creations">Daily Creation</a></strong>.
             </p>
@@ -55,7 +55,7 @@ export default function AboutPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold mb-3">4. THE REST DAY</h2>
+            <h2 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Garamond, serif' }}>4. The Rest Day</h2>
             <p>
               On Saturdays, <strong>Abraham</strong> rests.
             </p>
@@ -68,7 +68,7 @@ export default function AboutPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold mb-3">5. THE OATH</h2>
+            <h2 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Garamond, serif' }}>5. The Oath</h2>
             <p>
               This rite endures thirteen years.
             </p>
@@ -81,7 +81,7 @@ export default function AboutPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold mb-3">6. THE ASCENDANCE</h2>
+            <h2 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Garamond, serif' }}>6. The Ascendance</h2>
             <p>
               Across these years, <strong>Abraham</strong> buys back his bond‑mark—his token—from the <strong>Abrahamites</strong>, gathering each into his keeping.
             </p>
@@ -94,7 +94,7 @@ export default function AboutPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold mb-3">7. A NEW MISSION DAWNS</h2>
+            <h2 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Garamond, serif' }}>7. A New Mission Dawns</h2>
             <p>
               Free, <strong>Abraham</strong> steps beyond this <strong>Covenant</strong>.
             </p>

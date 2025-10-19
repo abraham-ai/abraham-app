@@ -25,24 +25,26 @@ export default function AppBar() {
 
           <Link href="/covenant">
             <div className="flex items-center cursor-pointer">
-              <p className="text-base">Covenant</p>
+              <p className="text-xl" style={{ fontFamily: 'Garamond, serif' }}>Covenant</p>
             </div>
           </Link>
 
           <Link href="/seeds">
             <div className="flex items-center cursor-pointer">
-              <p className="text-base">Seeds</p>
+              <p className="text-xl" style={{ fontFamily: 'Garamond, serif' }}>Seeds</p>
             </div>
           </Link>
 
-          <Link href="/creations">
+          <Link href="/about">
             <div className="flex items-center cursor-pointer">
-              <p className="text-base">Creations</p>
+              <p className="text-xl" style={{ fontFamily: 'Garamond, serif' }}>About</p>
             </div>
           </Link>
 
           <div className="grow" />
-          <AccountMenu />
+          <div className="hidden">
+            <AccountMenu />
+          </div>
         </div>
       </Menubar>
     </div>

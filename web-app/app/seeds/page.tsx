@@ -80,7 +80,7 @@ export default function CreationsPage() {
     return (
       <div className="min-h-screen bg-white">
         <AppBar />
-        <p className="text-center m-20 text-gray-900">Loading creations...</p>
+        <p className="text-center m-20 text-gray-900">Loading seeds...</p>
       </div>
     );
   if (error)
@@ -94,7 +94,7 @@ export default function CreationsPage() {
     return (
       <div className="min-h-screen bg-white">
         <AppBar />
-        <p className="text-center m-20 text-gray-900">No creations found.</p>
+        <p className="text-center m-20 text-gray-900">No seeds found.</p>
       </div>
     );
 
@@ -102,12 +102,16 @@ export default function CreationsPage() {
     <div className="min-h-screen bg-white text-gray-900">
       <AppBar />
       <section className="w-full py-10 sm:py-12 lg:py-16">
-        <div className="mb-6 px-4" />
+        <div className="mb-8 px-4 text-center">
+          <p className="text-xl text-gray-700" style={{ fontFamily: 'Garamond, serif' }}>Visit any Seed to command Abraham</p>
+        </div>
         <MinimalGallery
           items={galleryItems}
-          persistBlessings
+          persistBlessings={false}
           storageKey="abraham_creations_bless"
           aspectRatio="6 / 4"
+          showBlessings={false}
+          linkToFarcaster={true}
         />
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4 mt-8 px-4">
