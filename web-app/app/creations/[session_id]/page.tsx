@@ -102,12 +102,14 @@ export default function CreationDetailPage() {
       <AppBar />
       <div className="max-w-4xl mx-auto px-4 pt-24 pb-10">
         {posterImage && (
-          <div className="relative w-full mb-6" style={{ aspectRatio: "6 / 4" }}>
+          <div className="relative w-full mb-6">
             <Image
               src={posterImage}
               alt={title}
-              fill
-              className="object-cover"
+              width={1200}
+              height={0}
+              style={{ width: '100%', height: 'auto' }}
+              className="object-contain"
               priority
             />
           </div>
