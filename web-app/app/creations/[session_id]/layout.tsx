@@ -101,6 +101,38 @@ export async function generateMetadata({
       description,
       images: [imageUrl],
     },
+    other: {
+      // Farcaster miniapp embed
+      "fc:miniapp": JSON.stringify({
+        version: "1",
+        imageUrl: imageUrl,
+        button: {
+          title: "View Creation",
+          action: {
+            type: "launch_miniapp",
+            url: pageUrl || "https://abraham.ai/",
+            name: "Abraham",
+            splashImageUrl: imageUrl,
+            splashBackgroundColor: "#ffffff",
+          },
+        },
+      }),
+      // Backward compatibility
+      "fc:frame": JSON.stringify({
+        version: "1",
+        imageUrl: imageUrl,
+        button: {
+          title: "View Creation",
+          action: {
+            type: "launch_frame",
+            url: pageUrl || "https://abraham.ai/",
+            name: "Abraham",
+            splashImageUrl: imageUrl,
+            splashBackgroundColor: "#ffffff",
+          },
+        },
+      }),
+    },
   };
 }
 
